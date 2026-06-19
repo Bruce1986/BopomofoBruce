@@ -66,7 +66,7 @@
 |------|----------|
 | 刪除檔案 | `rm <file>` |
 | 刪除目錄 | `rm -rf <dir>` |
-| 跨平台檔案操作 | 用 Python 腳本（`temp_ops.py`）處理 |
+| 跨平台檔案操作 | 寫 shell script 或用 `gradle` task；macOS 內建工具優先 |
 
 ### Git Commit Message
 
@@ -111,7 +111,7 @@ git commit -F COMMIT_EDITMSG
    - 純文件/風格建議也要處理
 
 3. **驗證**
-   - 跑 `./gradlew ktlintCheck`（或專案採用的 lint 工具）
+   - 跑 `./gradlew ktfmtCheck`（程式碼風格；專案採 Ktfmt，**不是** ktlint）
    - 跑 `./gradlew lint`（Android Lint）
    - 跑 `./gradlew testDebugUnitTest`
    - 三項全部通過才能繼續
