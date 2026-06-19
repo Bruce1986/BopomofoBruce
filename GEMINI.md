@@ -82,13 +82,15 @@ git commit -F COMMIT_EDITMSG
 
 ## 專案特定注意事項
 
+> 與 [`AGENTS.md`](AGENTS.md) 的同名章節保持同步。任何修改請兩邊一起改。
+
 - **語言**：Kotlin 2.x（IME 主程式）+ C/C++（NDK，libchewing JNI 包裝）。不要把 Kotlin 程式碼建議改成 Java。
 - **UI**：Jetpack Compose only。不要在 IME view 引入 XML layout（candidate row、softkey、settings 全 Compose）。
 - **IME 限制**：Android `InputMethodService` 子類禁用 `requireActivity()` 與一般 Activity 生命週期假設；Compose 要透過 `AbstractComposeView` 掛載。
-- **建置**：`./gradlew assembleDebug`（debug APK）、`./gradlew installDebug`（裝到接好的手機）。`./gradlew testDebugUnitTest`（JVM 單測）、`./gradlew connectedDebugAndroidTest`（裝置測試）。
+- **建置**：`./gradlew assembleDebug`（debug APK）、`./gradlew installDebug`（裝到接好的手機）、`./gradlew testDebugUnitTest`（JVM 單測）、`./gradlew connectedDebugAndroidTest`（裝置測試）。風格檢查走 `./gradlew ktfmtCheck`（**不是** ktlint）。
 - **NDK**：`libchewing` 以子模組方式接入（`decoder-native/cmake/`），ABI 限定 arm64-v8a + armeabi-v7a，不打 x86。
 - **金鑰**：簽章金鑰位於 `keystore.properties`（已被 `.gitignore` 排除）。任何 review 建議都不可包含金鑰資訊。
-- **無後端**：本專案 v1 不打網路、不接 Firebase、不接 Google Sign-In。若 review 建議涉及上傳遙測，請拒絕。
+- **無後端**：本專案 v1 不打網路、不接 Firebase、不接 Google Sign-In。若 review 建議涉及上傳遙測、雲端同步或第三方 SDK 連線，請拒絕。
 
 
 ---
