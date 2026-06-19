@@ -1,0 +1,37 @@
+# --- Android / Gradle ---
+.gradle/
+build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.iml
+
+# --- IDE ---
+.idea/
+*.iws
+*.ipr
+.vscode/
+.fleet/
+
+# --- NDK ---
+obj/
+libs/*/*.so
+
+# --- Keystores & secrets ---
+*.jks
+*.keystore
+keystore.properties
+google-services.json
+release/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Misc ---
+*.log
+*.swp
+.python-version
+__pycache__/
+node_modules/
