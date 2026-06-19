@@ -39,7 +39,7 @@
 - **命名**：變數、函式命名是否清晰有語意？
 - **錯誤處理**：失敗路徑是否有妥善處理與 log？
 - **測試**：新增的函式是否有對應的 unit test？
-- **文件一致性**：若有對外介面異動，是否已更新 `../INTERFACES.md`？
+- **文件一致性**：IME 對外行為（鍵盤布局、候選順序、設定 key）異動是否同步更新 `project-handbook.md` 與 `docs/`？
 
 ---
 
@@ -47,9 +47,10 @@
 
 - 以可驗證的事實和嚴謹邏輯為基礎，不捏造資料
 - 遇到不確定的地方，直接說明而非自行假設
-- 複雜任務先在 `IMPROVEMENT_PLAN.md` 制定計畫再動手
-- 重要操作記錄到 `WORKLOG.md`
+- 複雜任務先在 `docs/` 下開 `IMPROVEMENT_PLAN-YYYYMMDD-HHMM.md` 制定計畫再動手
+- 重要決策記錄到 `docs/adr/`（ADR）；每週進度記錄到 `docs/devlog/`
 - 撰寫新 function 時，為其撰寫對應 unit test；若不可行，在 PR 說明原因
+- IME 對外行為（鍵盤布局、候選順序）的變更必須在實機（至少一支 Pixel）錄影 demo 後才能 merge
 
 
 ---
@@ -72,14 +73,14 @@
    - 純文件/風格建議也要處理
 
 3. **驗證**
-   - 跑 `ruff check src/ tests/`
-   - 跑 `mypy src/autonomous_agent/`
-   - 跑 `pytest -v`
+   - 跑 `./gradlew ktlintCheck`（或專案採用的 lint 工具）
+   - 跑 `./gradlew lint`（Android Lint）
+   - 跑 `./gradlew testDebugUnitTest`
    - 三項全部通過才能繼續
 
 4. **Commit & Push**
    - 寫清楚的 commit message（見下方慣例）
-   - 推到 origin 和 homee 兩個 remote
+   - 推到 `origin`
 
 5. **觸發下一輪 review**
    - 在 PR 留言 `/Gemini review`
