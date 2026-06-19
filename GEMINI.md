@@ -123,7 +123,7 @@ git commit -F COMMIT_EDITMSG
    - 推到 `origin`
 
 5. **觸發下一輪 review**
-   - 在 PR 留言 `/Gemini review`
+   - 在 PR 留言 `/Gemini review`（如有 CodeRabbit：`@coderabbitai review`）
 
 6. **等待**
    - `sleep 210` 秒（約 3.5 分鐘）等待 Gemini 回應

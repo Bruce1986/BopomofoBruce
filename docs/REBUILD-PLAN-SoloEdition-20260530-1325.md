@@ -1,7 +1,7 @@
 # BopomofoBruce — Solo Edition 開發計畫
 
 - 文件日期：2026-05-30 13:25
-- 對照文件：[REBUILD-PLAN-Zhuyin-IME-20260530-1310.md](REBUILD-PLAN-Zhuyin-IME-20260530-1310.md)（公司級完整版，僅供參考）
+- 對照文件：[REBUILD-PLAN-Original-20260530-1310.md](REBUILD-PLAN-Original-20260530-1310.md)（公司級完整版，僅供參考）
 - 作者：Bruce（brucex1986@gmail.com）
 
 > 把原計畫從「公司專案」尺度，壓回**單人作品集 + 副業時間（每週 6–10 小時）**的真實尺度。
