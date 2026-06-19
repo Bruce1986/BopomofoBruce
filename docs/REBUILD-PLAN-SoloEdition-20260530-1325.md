@@ -101,7 +101,7 @@
 ### M0｜立項與 spike（2 週）
 - [ ] GitHub repo 公開、README、LICENSE（Apache-2.0）、.gitignore
 - [ ] Gradle 骨架 + Version Catalog（先全空 module）
-- [ ] CI workflow：Gradle build + Android Lint + `testDebugUnitTest`（push 前需先 `gh auth refresh -s workflow`）
+- [ ] CI workflow：Gradle build + Android Lint + `testDebugUnitTest`（首次 push workflow 檔需先 `gh auth refresh -s workflow`）
 - [ ] **Spike：把 libchewing 編成 .so，純 JNI 印一個「ㄅㄆㄇㄈ→候選詞」到 logcat**
 - [ ] 寫 v0 ADR：為什麼選 libchewing、為什麼不用 Hilt、為什麼不做 TV
 

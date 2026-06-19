@@ -66,7 +66,7 @@
 |------|----------|
 | 刪除檔案 | `rm <file>` |
 | 刪除目錄 | `rm -rf <dir>` |
-| 跨平台檔案操作 | 寫 shell script 或用 `gradle` task；macOS 內建工具優先 |
+| 跨平台檔案操作 | 寫 shell script 或用 `./gradlew` task；macOS 內建工具優先 |
 
 ### Git Commit Message
 
