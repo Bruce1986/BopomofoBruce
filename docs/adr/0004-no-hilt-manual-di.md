@@ -51,7 +51,7 @@ W0-1 已確認 `:common` 走純 Kotlin JVM module（commit `6bd6cda`），這意
   // 的具體實作類別（否則 :common ↔ :decoder 又會循環）。
   interface BpmfDependencyProvider {
       val zhuyinDecoder: ZhuyinDecoder      // 介面在 :common；實作在 :decoder
-      val settingsRepository: SettingsRepository  // 介面在 :common；DataStore 實作在 :settings/:settings-data
+      val settingsRepository: SettingsRepository  // 介面在 :common；DataStore 實作在 :settings
       // 其他 singleton 同樣只暴露介面
   }
   ```
