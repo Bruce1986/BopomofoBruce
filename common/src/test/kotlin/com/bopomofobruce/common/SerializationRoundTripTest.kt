@@ -136,6 +136,29 @@ class SerializationRoundTripTest {
     }
 
     @Test
+    fun `KeyboardColors deserializes 6-digit hex as opaque ARGB`() {
+        // 6-digit hex（無 alpha）應被解成完全不透明：自動補 FF 高位。
+        // 同時驗證三種寫法（#prefix / 0x prefix / 無 prefix）都接受。
+        val jsonStr =
+            """
+            {
+                "background": "#1E1E1E",
+                "keyFill": "0x2E2E2E",
+                "keyText": "EAEAEA",
+                "keyAccent": "4A90E2",
+                "candidateText": "EAEAEA",
+                "candidateHighlight": "4A90E2"
+            }
+        """
+                .trimIndent()
+        val colors = json.decodeFromString(KeyboardColors.serializer(), jsonStr)
+        assertEquals(0xFF1E1E1Eu, colors.background)
+        assertEquals(0xFF2E2E2Eu, colors.keyFill)
+        assertEquals(0xFFEAEAEAu, colors.keyText)
+        assertEquals(0xFF4A90E2u, colors.keyAccent)
+    }
+
+    @Test
     fun `CandidateSource enum round trips for every value`() {
         for (source in CandidateSource.entries) {
             val candidate = Candidate("x", 0.5f, source)

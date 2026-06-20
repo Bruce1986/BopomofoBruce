@@ -16,7 +16,7 @@ import kotlinx.serialization.encoding.Encoder
  * { "background": "0xFF1E1E1E", "keyFill": "0xFF2E2E2E", ... }
  * ```
  *
- * Decode 寬容兩種前綴：`0x` 與 `#`（CSS-style），方便人類手寫。
+ * Decode 寬容兩種前綴：`0x` 與 `#`（CSS-style），方便人類手寫。6-digit hex（無 alpha） 視為完全不透明（自動補 `FF` 高位），符合 CSS 顏色慣例。
  */
 object UIntHexSerializer : KSerializer<UInt> {
     override val descriptor: SerialDescriptor =
@@ -36,6 +36,8 @@ object UIntHexSerializer : KSerializer<UInt> {
             }
         require(hex.isNotEmpty()) { "Empty hex value" }
         require(hex.length <= 8) { "Hex value too long (max 8 digits ARGB): $raw" }
-        return hex.toUInt(16)
+        val parsed = hex.toUInt(16)
+        // 6-digit hex 視為 RGB（無 alpha），自動補 FF 高位完全不透明。
+        return if (hex.length <= 6) parsed or 0xFF000000u else parsed
     }
 }
