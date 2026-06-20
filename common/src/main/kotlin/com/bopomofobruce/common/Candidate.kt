@@ -29,4 +29,10 @@ enum class CandidateSource {
  *
  * 設計為 immutable data class 方便在 [InputState] 與 Flow 之間傳遞而不擔心 mutation。
  */
-@Serializable data class Candidate(val text: String, val score: Float, val source: CandidateSource)
+@Serializable
+data class Candidate(val text: String, val score: Float, val source: CandidateSource) {
+    init {
+        require(text.isNotEmpty()) { "Candidate text cannot be empty" }
+        require(score in 0f..1f) { "Candidate score must be in 0f..1f, but was $score" }
+    }
+}

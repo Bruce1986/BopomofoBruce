@@ -43,7 +43,16 @@ data class KeyboardDimens(
     val rowGapDp: Float,
     val keyGapDp: Float,
     val candidateRowHeightDp: Float,
-)
+) {
+    init {
+        require(keyHeightDp >= 0f) { "keyHeightDp must be >= 0, but was $keyHeightDp" }
+        require(rowGapDp >= 0f) { "rowGapDp must be >= 0, but was $rowGapDp" }
+        require(keyGapDp >= 0f) { "keyGapDp must be >= 0, but was $keyGapDp" }
+        require(candidateRowHeightDp >= 0f) {
+            "candidateRowHeightDp must be >= 0, but was $candidateRowHeightDp"
+        }
+    }
+}
 
 /**
  * 一個主題。實作者要嘛硬編碼（內建 Light/Dark/MaterialYou），要嘛從 settings DataStore 載入。

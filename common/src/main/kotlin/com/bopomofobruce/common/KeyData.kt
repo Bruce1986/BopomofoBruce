@@ -28,4 +28,8 @@ data class KeyData(
     val action: KeyAction,
     val weight: Float = 1f,
     val longPress: LongPressData? = null,
-)
+) {
+    init {
+        require(weight > 0f) { "KeyData weight must be > 0, but was $weight" }
+    }
+}
