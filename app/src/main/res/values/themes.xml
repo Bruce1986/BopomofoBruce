@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-      minSdk = 28（API 28），DayNight 需要 API 29+。這份是 API 28 fallback；
-      API 29+ 走 values-v29/themes.xml 改成 DayNight 避免暗色模式白閃。
+      Gemini-review: intentional — W0-1 skeleton 階段刻意維持 Light.NoActionBar。
+      Gemini round 4 建議改 android:Theme.Material.DayNight.NoActionBar 解決
+      dark mode 白閃，但該 style 並不存在於 Android framework（DayNight 只在
+      androidx.appcompat / com.google.android.material 提供）。BopomofoBruce 已
+      移除 appcompat 走 Compose-only，真正的主題系統由 W1-B (:theme) 提供，
+      W3-1 (:app wiring) 才會把 BpmfApplication 接到對應主題。在那之前這份
+      placeholder 不影響使用者（沒有 launcher Activity）。
     -->
     <style name="Theme.BopomofoBruce" parent="android:Theme.Material.Light.NoActionBar" />
 </resources>

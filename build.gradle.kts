@@ -19,7 +19,12 @@ plugins {
 // 暫不阻塞 Configuration Cache。下游若新增需要 cross-project access 的設定，
 // 就是時候抽 build-logic include build 了。
 subprojects {
-    apply(plugin = libs.plugins.ktfmt.get().pluginId)
+    // Gemini-review: intentional — 必須走 `rootProject.libs`。subprojects {} 是
+    // root project scope（lazy 配置 child projects），`libs` extension 只在 root
+    // project 註冊，subproject 不會繼承。直接寫 `libs.plugins.ktfmt` 會在 verify
+    // 跑出「Extension with name 'libs' does not exist」（已實驗過，commit 58be14c
+    // 觸發、bcd789a 修回）。
+    apply(plugin = rootProject.libs.plugins.ktfmt.get().pluginId)
 
     extensions.configure<com.ncorti.ktfmt.gradle.KtfmtExtension> { kotlinLangStyle() }
 
