@@ -50,11 +50,14 @@ W0-1 已確認 `:common` 走純 Kotlin JVM module（commit `6bd6cda`），這意
   // :common — 只能引用 :common 內部的介面型別，不能 import :decoder / :settings
   // 的具體實作類別（否則 :common ↔ :decoder 又會循環）。
   interface BpmfDependencyProvider {
-      val zhuyinDecoder: ZhuyinDecoder      // 介面在 :common；實作在 :decoder
+      val zhuyinDecoder: ZhuyinDecoder            // 介面在 :common；實作在 :decoder
       val settingsRepository: SettingsRepository  // 介面在 :common；DataStore 實作在 :settings
-      // 其他 singleton 同樣只暴露介面
+      val keyboardRegistry: KeyboardRegistry      // 介面在 :common；靜態佈局實作在 :keyboards
+      // 其他 singleton 同樣只暴露 :common 介面
   }
   ```
+  → 規範：**任何要透過 BpmfDependencyProvider 暴露的型別，介面/抽象類必須先下沉至
+  `:common`**，否則 `:common` 反向依賴下游 module 會造成 Gradle 循環依賴。
   `:app` 的 `BpmfApplication` 實作此介面（`:app` → `:common`，順向）。
   `:ime` 的 `BpmfInputMethodService` 在 `onCreate` 取 `application as BpmfDependencyProvider`
   即可拿 singleton（`:ime` → `:common`，順向；**不**反向相依 `:app`）。
