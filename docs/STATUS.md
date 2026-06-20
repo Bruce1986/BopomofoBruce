@@ -24,7 +24,7 @@
 
 | ID | Wave | 範圍（獨占模組／檔案） | 狀態 | 認領者 | Worktree | 分支 | PR | 更新時間 |
 |----|------|----------------------|------|--------|----------|------|----|---------|
-| W0-1 | W0 | Gradle 骨架、Version Catalog | 🟠 In progress | claude-subagent-w0-1 | ../BopomofoBruce-w0-gradle-skeleton | feat/w0-gradle-skeleton | — | 2026-06-20 17:40 |
+| W0-1 | W0 | Gradle 骨架、Version Catalog | 🟣 In review | claude-subagent-w0-1 | ../BopomofoBruce-w0-gradle-skeleton | feat/w0-gradle-skeleton | [#2](https://github.com/Bruce1986/BopomofoBruce/pull/2) | 2026-06-20 18:05 |
 | W0-2 | W0 | `:common` 介面契約（凍結） | 🔵 Backlog | — | — | — | — | — |
 | W0-3 | W0 | CI workflow（Gradle build/lint/test） | 🔵 Backlog | — | — | — | — | — |
 | W0-4 | W0 | ADR-0001 ～ 0005 | 🔵 Backlog | — | — | — | — | — |
@@ -48,7 +48,7 @@
 
 > 認領 / 開工時 append；merge 後刪。
 
-- W0-1  ../BopomofoBruce-w0-gradle-skeleton  feat/w0-gradle-skeleton  PR —  agent=claude-subagent-w0-1  since=2026-06-20 17:40
+- W0-1  ../BopomofoBruce-w0-gradle-skeleton  feat/w0-gradle-skeleton  PR #2  agent=claude-subagent-w0-1  since=2026-06-20 17:40
 
 範例格式：
 ```
