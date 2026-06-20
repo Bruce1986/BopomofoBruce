@@ -1,5 +1,6 @@
 package com.bopomofobruce.common
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -13,10 +14,11 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 enum class CandidateSource {
-    PRIMARY,
-    PERSONAL,
-    EMOJI,
-    SYMBOL,
+    // 釘住 wire format stable id；之後重新命名 Kotlin enum 不會破舊 JSON。
+    @SerialName("primary") PRIMARY,
+    @SerialName("personal") PERSONAL,
+    @SerialName("emoji") EMOJI,
+    @SerialName("symbol") SYMBOL,
 }
 
 /**

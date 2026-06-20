@@ -2,6 +2,7 @@ package com.bopomofobruce.common
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonClassDiscriminator
 
 /**
  * 一個按鍵被觸發後要執行的語意動作。
@@ -20,6 +21,8 @@ import kotlinx.serialization.Serializable
  * 2. 在 :ime 的 dispatcher 補對應分支（when 沒覆蓋會編譯失敗，這是 sealed 的保護）。
  */
 @Serializable
+@JsonClassDiscriminator("type")
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 sealed interface KeyAction {
     /** 輸入一個一般字元（英文/數字/標點），通常由非注音鍵盤產生。 */
     @Serializable @SerialName("character") data class Character(val char: Char) : KeyAction

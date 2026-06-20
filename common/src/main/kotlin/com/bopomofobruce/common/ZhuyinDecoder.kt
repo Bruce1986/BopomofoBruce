@@ -4,9 +4,9 @@ package com.bopomofobruce.common
  * 注音 → 候選詞 decoder 的抽象。
  *
  * 兩個實作目標：
- * - 真實：[com.bopomofobruce.common.fakes.FakeZhuyinDecoder]（in-memory mapping，給 :keyboards / :theme 做
- *   preview 與 unit test 用）。
- * - 真實：:decoder 模組（W2-A）會包 libchewing 的 JNI binding。
+ * - **Fake**：[com.bopomofobruce.common.fakes.FakeZhuyinDecoder]（in-memory mapping，給 :keyboards /
+ *   :theme 做 preview 與 unit test 用）。
+ * - **真實**：:decoder 模組（W2-A）會包 libchewing 的 JNI binding。
  *
  * **State 隱含於 implementation**：[input] 多次呼叫之間，decoder 可以累積上下文（n-gram 之類）。 呼叫 [reset] 清乾淨。:ime 在
  * EditText 切換 / 長時間 idle 時應主動 reset。
