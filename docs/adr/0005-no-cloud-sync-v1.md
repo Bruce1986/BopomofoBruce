@@ -45,8 +45,7 @@ Solo Edition 整個劃掉雲端 + 帳號相關（[SoloEdition §1, §5](../REBUI
 - 不接 Google Sign-In、Google Play Services Auth、Drive API
 - 不接遙測 / crash reporting SDK：不裝 Sentry、Firebase Crashlytics、自架 OpenTelemetry。**唯一例外**：Play Console 內建的 ANR / Crash 收集（這是 Play Store 平台層、不算 app 主動上傳）
 - 不做 OTA self-update（Omaha-like）— 更新走 Play Store / F-Droid 標準管道
-- 個人字典純本機 Room；**Android 雲端備份禁用**（W0-1 已 commit `android:allowBackup="false"`）— 雲端備份是上傳通道，使用者無法逐 app 細控，v1 一致拒絕任何資料離開設備
-- 但 **保留本地 D2D（device-to-device 直接傳輸）作為換手機路徑**：W3-1 wiring 時把 `android:allowBackup` 改回 `true` 並加 `android:dataExtractionRules="@xml/data_extraction_rules"`，rules 內 `<cloud-backup>` 全 exclude（徹底禁雲端）、`<device-transfer>` 僅 include 個人字典 DB 與設定。D2D 是 USB / 同網段實體裝置傳輸，不經任何雲端，符合本 ADR 的 zero-network 原則
+- 個人字典純本機 Room；**Android 系統備份完全禁用**（W0-1 已 commit `android:allowBackup="false"`）— 這同時關掉雲端備份與本地 D2D 傳輸。v1 不留任何系統層備份通道；換手機資料保留待 v1.5/v2 評估（可能透過 ADR-superseded 路徑改用 `dataExtractionRules` 細粒度開放 D2D，仍禁雲端）
 - 主題的相片背景：使用者選的圖讀自本地 `MediaStore`，不上傳、不雲端 sync
 - 任何 review 建議（人類或 AI）若涉及網路請求、遙測、雲同步、第三方 SDK 連線 → 直接 reject（[AGENTS.md](../../AGENTS.md#專案特定注意事項) 已明文）
 
@@ -64,8 +63,8 @@ Solo Edition 整個劃掉雲端 + 帳號相關（[SoloEdition §1, §5](../REBUI
 - 對使用者信任：「輸入法看到我所有打字 + 不打網路」= 信任成本最低
 
 **負面**
-- 換手機若不走 D2D（USB / 同網段傳輸），個人字典詞頻歸零 — 重建週期「幾天到幾週」可接受
-- D2D 路徑依賴使用者主動操作（換機精靈 / Quick Switch），對 less tech-savvy 使用者實際命中率未知 — beta 階段觀察
+- **由於 v1 連系統 D2D 都禁用**，換手機時個人字典詞頻**直接歸零** — 重建週期「幾天到幾週」對 beta 朋友群屬可接受 trade-off
+- v1.5/v2 若要恢復換機路徑（D2D 細粒度開放、本地 JSON 匯出/匯入），都會是 ADR-supersede 級的變更
 - 無法用「跨裝置同步」當市場賣點 — Gboard 有
 - v2 若加同步，是「新增 INTERNET permission」這種**會嚇到既有使用者**的破壞性變更（Android Play Store 會在 update 時警示新增權限）
 - 無法收集匿名遙測 → 不知道實際使用者群有多少、平均輸入速度、哪個鍵按錯最多 — 產品決策只能憑直覺 + beta 5 人反饋
