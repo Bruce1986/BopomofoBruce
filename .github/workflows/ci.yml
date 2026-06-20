@@ -1,0 +1,91 @@
+name: CI
+
+# 觸發：push 到 main + 對 main 的 PR。其餘 branch 推時不跑（推 PR 時才跑）。
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# 同 branch / PR 的連續 push 互相 cancel，避免浪費 Actions 額度。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# 預設權限收最小；只需要讀 repo 內容即可（PR comment 由 Gemini bot 自己處理）。
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Gradle build / lint / test
+    # 固定具體版本而非 ubuntu-latest，避免 GitHub runner 映像 rolling 升級
+    # 觸發非預期的 build diff（package 版本、Java baseline 等）。
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Android SDK 必要層：platforms;android-35 + build-tools;35.0.0。
+      # setup-android@v4 會自動接受 license 並安裝 cmdline-tools。
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0'
+
+      # 用官方 Gradle action 處理 wrapper / ~/.gradle/caches / ~/.gradle/wrapper
+      # 三層 cache。Fork PR 把 cache 設成 read-only 防止 cache poisoning。
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+
+      # 拆成五個 step 讓 PR check list 看得到綠勾 / 紅叉的細項。
+      # 每個 step 都 --no-daemon，避免 self-hosted runner residual daemon 問題
+      # （GitHub-hosted runner 每次都 fresh VM，但保險起見統一）。
+
+      - name: Assemble debug APK
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Ktfmt check
+        run: ./gradlew --no-daemon ktfmtCheck
+
+      - name: Android Lint
+        run: ./gradlew --no-daemon lint
+
+      # 走 testDebugUnitTest 與 AGENTS.md 與 docs/DEVPLAN 對齊；`test` aggregate
+      # 在 :common 純 JVM module 上也會跑（KGP 的 test task 包含 main source set）。
+      - name: Unit tests
+        run: ./gradlew --no-daemon testDebugUnitTest :common:test
+
+      # APK 給 reviewer 直接抓下來在實機驗。Debug 簽章是 Gradle 自帶 keystore，
+      # 不需要 secrets。注意 actions/upload-artifact@v4 與 v3 不相容（不可混用）。
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      # Lint HTML 報告同樣給 reviewer 直接看，省得本機重 build。
+      # 失敗時也上傳（即便 lint step 早 fail，至少能下載報告診斷）。
+      - name: Upload Lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-reports
+          path: '**/build/reports/lint-results-debug.html'
+          if-no-files-found: warn
+          retention-days: 14
