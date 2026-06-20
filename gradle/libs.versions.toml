@@ -93,7 +93,12 @@ junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params", vers
 androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-ext" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
 androidx-test-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "androidx-test-espresso" }
+androidx-test-junit5-runner = { module = "de.mannodermaus.junit5:android-test-runner", version.ref = "androidx-test-junit5" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+
+# Protobuf（W2-C DataStore Proto 會用到）
+protobuf-javalite = { module = "com.google.protobuf:protobuf-javalite", version.ref = "protobuf" }
+protobuf-kotlin-lite = { module = "com.google.protobuf:protobuf-kotlin-lite", version.ref = "protobuf" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -104,3 +109,4 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 ktfmt = { id = "com.ncorti.ktfmt.gradle", version.ref = "ktfmt" }
+protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }
