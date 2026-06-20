@@ -53,7 +53,7 @@
 - 主題系統乾淨：Material 3 動態色 + 使用者相片背景全在同一個 `KeyboardTheme` 介面下（[DEVPLAN W1-B](../DEVPLAN-SubagentFanout-20260620-0851.md#w1-b--theme-主題引擎)）
 - 少一套技術：不需學 XML attribute 語法、`styles.xml` cascade、`?attr/colorPrimary` 解析規則
 - 沒有 `viewBinding` 產出物，build 速度 + APK size 雙贏
-- 設定頁與 IME view 共用同一套 Compose 元件（候選列預覽即時生效，[DEVPLAN W2-C](../DEVPLAN-SubagentFanout-20260620-0851.md#w2-c--settingscompose-設定--firstrun)）
+- 設定頁與 IME view 共用同一套 Compose 元件（候選列預覽即時生效，[DEVPLAN W2-C](../DEVPLAN-SubagentFanout-20260620-0851.md#w2-c--settings-compose-設定--firstrun)）
 
 **負面**
 - `AbstractComposeView` + IME service 掛載 boilerplate 比 `View.inflate(R.layout.xxx)` 多（需手動 set `ViewTreeLifecycleOwner` / `ViewTreeSavedStateRegistryOwner` / `ViewTreeViewModelStoreOwner`）— 第一次踩會痛
