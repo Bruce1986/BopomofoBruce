@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      API 29+ 走 DayNight，避免暗色模式下啟動白閃。Material You 真正主題在
+      W1-B (:theme) + W3-1 (:app wiring) 才會落地，這裡只是 placeholder。
+    -->
+    <style name="Theme.BopomofoBruce" parent="android:Theme.Material.DayNight.NoActionBar" />
+</resources>
