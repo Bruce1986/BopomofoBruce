@@ -7,6 +7,9 @@ captures/
 .cxx/
 *.iml
 
+# Keep the Gradle wrapper jar tracked (Gradle docs recommend committing it).
+!gradle/wrapper/gradle-wrapper.jar
+
 # --- IDE ---
 .idea/
 *.iws

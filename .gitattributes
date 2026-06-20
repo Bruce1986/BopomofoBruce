@@ -1,0 +1,13 @@
+# Gradle wrapper：跨平台 line ending 規則
+gradlew         text eol=lf
+gradlew.bat     text eol=crlf
+
+# Windows-only batch scripts 一律 CRLF
+*.bat           text eol=crlf
+*.cmd           text eol=crlf
+
+# Unix shell scripts 一律 LF
+*.sh            text eol=lf
+
+# Gradle wrapper jar 是二進位
+gradle/wrapper/gradle-wrapper.jar  binary

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      DeviceDefault 在 API 28+ 會跟著系統視覺風格（API 29+ 配合 dark mode），
+      不需要 appcompat 或 material components 套件。Placeholder 階段足夠；
+      W1-B (:theme) + W3-1 (:app wiring) 會替換為真正的 Material You 主題。
+    -->
+    <style name="Theme.BopomofoBruce" parent="android:Theme.DeviceDefault.NoActionBar" />
+</resources>
