@@ -23,7 +23,7 @@
 |----------|------|------|-------------|
 | M0-1 | GitHub repo 公開、LICENSE、.gitignore | 🟡 | — |
 | M0-2 | Gradle 骨架 + Version Catalog | ⏳ | — |
-| M0-3 | CI（build + lint）| ⏳ | M0-2 |
+| M0-3 | CI workflow（Gradle build + Android Lint + unit test）；首次 push workflow 檔需先 `gh auth refresh -s workflow` | ⏳ | M0-2 |
 | M0-4 | libchewing JNI spike：注音→候選詞 logcat | ⏳ | M0-2 |
 | M0-5 | ADR-0001 為何選 libchewing | ⏳ | M0-4 |
 
