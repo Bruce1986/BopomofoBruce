@@ -68,7 +68,14 @@
 
 `:settings` 同時含 Compose UI（設定頁、FirstRun）與設定資料層（DataStore Schema、`SettingsRepository`）。`:ime` 服務需要讀設定（鍵盤布局選擇、震動強度、候選字大小等），但**不該**為此依賴 `:settings`（不該把 UI 模組塞進核心執行期相依鏈）。
 
-解法：[W2-C 開工時](../DEVPLAN-SubagentFanout-20260620-0851.md#w2-c--settings-compose-設定--firstrun)，把 `SettingsRepository` 介面 + DataStore 實作下沉到 `:common`，`:settings` 只留 UI、`:ime` 直接依賴 `:common`。此事不另開 ADR，但 W2-C reviewer 必檢查。
+解法（依 [ADR-0004 manual DI](0004-no-hilt-manual-di.md) + `:common` 純 JVM 限制設計）：
+
+1. **只下沉 `SettingsRepository` 介面到 `:common`**（純 Kotlin，不依賴 Android `Context` / DataStore）
+2. DataStore **實作**留在 Android module（建議 `:settings` 內，或視 W2-C 規模獨立成 `:settings-data`）
+3. `:app` 在 `BpmfApplication` 啟動時建構唯一一份 DataStore 實作，並透過 `:common` 定義的 provider 介面（見 [ADR-0004 的 `BpmfDependencyProvider`](0004-no-hilt-manual-di.md)）暴露給 `:ime` 與 `:settings`
+4. `:ime` `BpmfInputMethodService.onCreate()` 取 `application as BpmfDependencyProvider` 拿 `settingsRepository`
+
+如此既守住 `:common` 純 JVM，又避免 `:ime → :app` 循環依賴、保證 DataStore 單例。W2-C reviewer 必檢查此 wiring。
 
 ## Consequences（後果）
 

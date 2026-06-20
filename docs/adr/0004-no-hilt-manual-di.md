@@ -45,7 +45,18 @@ W0-1 已確認 `:common` 走純 Kotlin JVM module（commit `6bd6cda`），這意
 實作規範：
 
 - `:app` 內定義 `BpmfApplication : Application`，內含 `val decoderModule by lazy { ... }` 等 properties
-- `BpmfInputMethodService` 在 `onCreate` 透過 `application as BpmfApplication` 拿 singleton
+- **在 `:common` 定義 provider 介面**避免 `:ime → :app` 循環依賴：
+  ```kotlin
+  // :common
+  interface BpmfDependencyProvider {
+      val decoderModule: DecoderModule
+      val settingsRepository: SettingsRepository
+      // 其他 singleton
+  }
+  ```
+  `:app` 的 `BpmfApplication` 實作此介面（`:app` → `:common`，順向）。
+  `:ime` 的 `BpmfInputMethodService` 在 `onCreate` 取 `application as BpmfDependencyProvider`
+  即可拿 singleton（`:ime` → `:common`，順向；**不**反向相依 `:app`）。
 - Compose 層用 `CompositionLocalProvider` 把需要的 repository / state holder 向下傳
 - ViewModel 用 `ViewModelProvider.Factory` 手動構造（不用 `by viewModels()` 的 Hilt 變形）
 - 測試替換：每個物件接受 fake 透過建構子或 setter；`:common` 已預備 `FakeZhuyinDecoder` / `FakeImeContextProvider`（[DEVPLAN W0-2](../DEVPLAN-SubagentFanout-20260620-0851.md#w0-2--介面契約common)）
