@@ -24,10 +24,9 @@
 
 | ID | Wave | 範圍（獨占模組／檔案） | 狀態 | 認領者 | Worktree | 分支 | PR | 更新時間 |
 |----|------|----------------------|------|--------|----------|------|----|---------|
-| W0-2 | W0 | `:common` 介面契約（凍結） | 🟣 In review | claude-subagent-w0-2 | ../BopomofoBruce-w0-common-contracts | feat/w0-common-contracts | [#4](https://github.com/Bruce1986/BopomofoBruce/pull/4) | 2026-06-20 19:45 |
-| W1-A | W1 | `:decoder-native` libchewing → libbpmf.so | 🔵 Backlog | — | — | — | — | — |
-| W1-B | W1 | `:theme` Material You + 自訂相片背景 | 🔵 Backlog | — | — | — | — | — |
-| W1-C | W1 | `:keyboards` 注音 4×10、符號、數字、密碼 | 🔵 Backlog | — | — | — | — | — |
+| W1-A | W1 | `:decoder-native` libchewing → libbpmf.so | 🟡 Claimed | claude-subagent-w1-a | ../BopomofoBruce-w1-decoder-native | feat/w1-decoder-native | — | 2026-06-20 20:56 |
+| W1-B | W1 | `:theme` Material You + 自訂相片背景 | 🟡 Claimed | claude-subagent-w1-b | ../BopomofoBruce-w1-theme | feat/w1-theme | — | 2026-06-20 20:56 |
+| W1-C | W1 | `:keyboards` 注音 4×10、符號、數字、密碼 | 🟡 Claimed | claude-subagent-w1-c | ../BopomofoBruce-w1-keyboards | feat/w1-keyboards | — | 2026-06-20 20:56 |
 | W2-A | W2 | `:decoder` JNI binding + 個人字典（Room） | 🔵 Backlog | — | — | — | — | — |
 | W2-B | W2 | `:ime` InputMethodService + Compose IME view | 🔵 Backlog | — | — | — | — | — |
 | W2-C | W2 | `:settings` 設定頁 + FirstRun | 🔵 Backlog | — | — | — | — | — |
@@ -45,7 +44,9 @@
 
 > 認領 / 開工時 append；merge 後刪。
 
-- W0-2  ../BopomofoBruce-w0-common-contracts  feat/w0-common-contracts  PR #4  agent=claude-subagent-w0-2  since=2026-06-20 19:25
+- W1-A  ../BopomofoBruce-w1-decoder-native  feat/w1-decoder-native  PR —  agent=claude-subagent-w1-a  since=2026-06-20 20:56
+- W1-B  ../BopomofoBruce-w1-theme  feat/w1-theme  PR —  agent=claude-subagent-w1-b  since=2026-06-20 20:56
+- W1-C  ../BopomofoBruce-w1-keyboards  feat/w1-keyboards  PR —  agent=claude-subagent-w1-c  since=2026-06-20 20:56
 
 範例格式：
 ```
@@ -61,6 +62,7 @@
 - W0-1  feat/w0-gradle-skeleton  PR [#2](https://github.com/Bruce1986/BopomofoBruce/pull/2)  merged 2026-06-20 by claude-lead (squash)  commit=6bd6cda
 - W0-3  feat/w0-ci  PR [#3](https://github.com/Bruce1986/BopomofoBruce/pull/3)  merged 2026-06-20 by claude-lead (squash)  commit=eade2b0
 - W0-4  feat/w0-adr  PR [#5](https://github.com/Bruce1986/BopomofoBruce/pull/5)  merged 2026-06-20 by claude-lead (squash)  commit=ac0e9a2
+- W0-2  feat/w0-common-contracts  PR [#4](https://github.com/Bruce1986/BopomofoBruce/pull/4)  merged 2026-06-20 by claude-lead (squash)  commit=4c75782  tag=contracts-v1
 
 範例：
 ```
