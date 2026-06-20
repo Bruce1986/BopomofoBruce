@@ -12,12 +12,16 @@ plugins {
     alias(libs.plugins.ktfmt) apply true
 }
 
-// Gemini-review: intentional — W0-1 skeleton 階段以 `subprojects {}` 集中 apply
-// ktfmt 是有意為之。改成 convention plugin 屬於 §11 DEVPLAN 後續 follow-up
-// （Codex round 1 與 Gemini 都建議，已記在 PR description 為 W3 後重構項）。
-// 目前 declarative 寫法 cc-safe（plugin id + extensions.configure 純 config-time），
-// 暫不阻塞 Configuration Cache。下游若新增需要 cross-project access 的設定，
-// 就是時候抽 build-logic include build 了。
+// Gemini-review: intentional, do NOT re-suggest convention plugin —
+// W0-1 skeleton 階段以 `subprojects {}` 集中三組設定（ktfmt / JUnit Platform /
+// Kotlin compilerOptions）是 PR review loop 過程中刻意收斂的結果。Codex round 1
+// 與 Gemini round 1+7 都建議改成 build-logic Convention Plugin（為了 Project
+// Isolation / Gradle 9 Isolated Projects），記為 DEVPLAN §11 W3 後 follow-up：
+// 此 PR scope 是 8 module 空殼，導入 build-logic include build 會把 PR 範圍
+// 拉爆且觸碰其他 wave 的設定。
+// 目前 declarative 寫法 cc-safe（apply plugin + tasks.withType + extensions
+// 純 config-time，無 cross-project state read），Configuration Cache 已驗證可用。
+// W3-1 / W3-2 之後會單獨開 PR 抽 build-logic。
 subprojects {
     // Gemini-review: intentional — 必須走 `rootProject.libs`。subprojects {} 是
     // root project scope（lazy 配置 child projects），`libs` extension 只在 root
