@@ -42,10 +42,13 @@ class FakeImeContextProvider(initialInputType: ImeInputType = ImeInputType.TEXT)
     }
 
     override fun deleteSurroundingText(beforeLength: Int, afterLength: Int) {
+        // 與 Android InputConnection.deleteSurroundingText 契約一致：non-negative。
+        require(beforeLength >= 0) { "beforeLength must be non-negative, but was $beforeLength" }
+        require(afterLength >= 0) { "afterLength must be non-negative, but was $afterLength" }
         _deleteCalls.add(beforeLength to afterLength)
         // 模擬刪除 committed buffer 的 beforeLength 個字元（只支援 BMP，preview/test 足夠）。
         // afterLength 在 fake 裡沒語意（沒有真實 cursor 概念）。
-        val drop = beforeLength.coerceAtLeast(0).coerceAtMost(committed.length)
+        val drop = beforeLength.coerceAtMost(committed.length)
         committed.delete(committed.length - drop, committed.length)
     }
 

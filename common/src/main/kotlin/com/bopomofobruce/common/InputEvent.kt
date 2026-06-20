@@ -15,7 +15,11 @@ package com.bopomofobruce.common
 sealed interface InputEvent {
     data class KeyPressed(val key: KeyData) : InputEvent
 
-    data class CandidateSelected(val index: Int) : InputEvent
+    data class CandidateSelected(val index: Int) : InputEvent {
+        init {
+            require(index >= 0) { "CandidateSelected.index must be non-negative, but was $index" }
+        }
+    }
 
     data class TextCommitted(val text: String) : InputEvent
 

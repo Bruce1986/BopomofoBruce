@@ -28,7 +28,13 @@ sealed interface KeyAction {
     @Serializable @SerialName("character") data class Character(val char: Char) : KeyAction
 
     /** 輸入一個注音符號（ㄅㄆㄇㄈ...或聲調），交給 [ZhuyinDecoder] 累積成候選詞。 */
-    @Serializable @SerialName("zhuyin") data class Zhuyin(val symbol: String) : KeyAction
+    @Serializable
+    @SerialName("zhuyin")
+    data class Zhuyin(val symbol: String) : KeyAction {
+        init {
+            require(symbol.isNotEmpty()) { "Zhuyin symbol cannot be empty" }
+        }
+    }
 
     /** 退格。若 composing buffer 非空優先刪 buffer，否則對 IME context 觸發 deleteSurroundingText。 */
     @Serializable @SerialName("backspace") data object Backspace : KeyAction
@@ -52,5 +58,11 @@ sealed interface KeyAction {
      * 用戶自訂動作（例如「貼上剪貼簿」、「插入常用語」），由 :ime / :settings 用 [id] 對應到實際行為。 把它做成 escape hatch，讓 :common
      * 不需要為每個新功能擴 sealed 子型別。
      */
-    @Serializable @SerialName("custom") data class Custom(val id: String) : KeyAction
+    @Serializable
+    @SerialName("custom")
+    data class Custom(val id: String) : KeyAction {
+        init {
+            require(id.isNotEmpty()) { "Custom action id cannot be empty" }
+        }
+    }
 }

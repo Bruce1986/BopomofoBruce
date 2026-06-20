@@ -1,5 +1,6 @@
 package com.bopomofobruce.common
 
+import com.bopomofobruce.common.serialization.UIntHexSerializer
 import kotlinx.serialization.Serializable
 
 /**
@@ -22,12 +23,12 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class KeyboardColors(
-    val background: UInt,
-    val keyFill: UInt,
-    val keyText: UInt,
-    val keyAccent: UInt,
-    val candidateText: UInt,
-    val candidateHighlight: UInt,
+    @Serializable(with = UIntHexSerializer::class) val background: UInt,
+    @Serializable(with = UIntHexSerializer::class) val keyFill: UInt,
+    @Serializable(with = UIntHexSerializer::class) val keyText: UInt,
+    @Serializable(with = UIntHexSerializer::class) val keyAccent: UInt,
+    @Serializable(with = UIntHexSerializer::class) val candidateText: UInt,
+    @Serializable(with = UIntHexSerializer::class) val candidateHighlight: UInt,
 )
 
 /**
