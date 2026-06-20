@@ -46,11 +46,17 @@ data class KeyboardDimens(
     val candidateRowHeightDp: Float,
 ) {
     init {
-        require(keyHeightDp >= 0f) { "keyHeightDp must be >= 0, but was $keyHeightDp" }
-        require(rowGapDp >= 0f) { "rowGapDp must be >= 0, but was $rowGapDp" }
-        require(keyGapDp >= 0f) { "keyGapDp must be >= 0, but was $keyGapDp" }
-        require(candidateRowHeightDp >= 0f) {
-            "candidateRowHeightDp must be >= 0, but was $candidateRowHeightDp"
+        require(keyHeightDp >= 0f && keyHeightDp.isFinite()) {
+            "keyHeightDp must be >= 0 and finite, but was $keyHeightDp"
+        }
+        require(rowGapDp >= 0f && rowGapDp.isFinite()) {
+            "rowGapDp must be >= 0 and finite, but was $rowGapDp"
+        }
+        require(keyGapDp >= 0f && keyGapDp.isFinite()) {
+            "keyGapDp must be >= 0 and finite, but was $keyGapDp"
+        }
+        require(candidateRowHeightDp >= 0f && candidateRowHeightDp.isFinite()) {
+            "candidateRowHeightDp must be >= 0 and finite, but was $candidateRowHeightDp"
         }
     }
 }

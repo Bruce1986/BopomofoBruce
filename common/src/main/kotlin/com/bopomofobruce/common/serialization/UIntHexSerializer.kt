@@ -34,10 +34,11 @@ object UIntHexSerializer : KSerializer<UInt> {
                 raw.startsWith("#") -> raw.substring(1)
                 else -> raw
             }
-        require(hex.isNotEmpty()) { "Empty hex value" }
-        require(hex.length <= 8) { "Hex value too long (max 8 digits ARGB): $raw" }
+        require(hex.length == 6 || hex.length == 8) {
+            "Hex value must be either 6 digits (RGB) or 8 digits (ARGB), but was: $raw"
+        }
         val parsed = hex.toUInt(16)
         // 6-digit hex 視為 RGB（無 alpha），自動補 FF 高位完全不透明。
-        return if (hex.length <= 6) parsed or 0xFF000000u else parsed
+        return if (hex.length == 6) parsed or 0xFF000000u else parsed
     }
 }

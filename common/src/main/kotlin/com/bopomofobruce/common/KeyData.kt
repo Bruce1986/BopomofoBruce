@@ -30,6 +30,8 @@ data class KeyData(
     val longPress: LongPressData? = null,
 ) {
     init {
-        require(weight > 0f) { "KeyData weight must be > 0, but was $weight" }
+        require(weight > 0f && weight.isFinite()) {
+            "KeyData weight must be > 0 and finite, but was $weight"
+        }
     }
 }
