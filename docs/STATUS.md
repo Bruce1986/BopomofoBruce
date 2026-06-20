@@ -24,7 +24,7 @@
 
 | ID | Wave | 範圍（獨占模組／檔案） | 狀態 | 認領者 | Worktree | 分支 | PR | 更新時間 |
 |----|------|----------------------|------|--------|----------|------|----|---------|
-| W0-1 | W0 | Gradle 骨架、Version Catalog | 🟣 In review | claude-subagent-w0-1 | ../BopomofoBruce-w0-gradle-skeleton | feat/w0-gradle-skeleton | [#2](https://github.com/Bruce1986/BopomofoBruce/pull/2) | 2026-06-20 18:05 |
+| W0-1 | W0 | Gradle 骨架、Version Catalog | 🟣 In review（bot loop 收斂，等 lead merge） | claude-subagent-w0-1 | ../BopomofoBruce-w0-gradle-skeleton | feat/w0-gradle-skeleton | [#2](https://github.com/Bruce1986/BopomofoBruce/pull/2) | 2026-06-20 19:19 |
 | W0-2 | W0 | `:common` 介面契約（凍結） | 🔵 Backlog | — | — | — | — | — |
 | W0-3 | W0 | CI workflow（Gradle build/lint/test） | 🔵 Backlog | — | — | — | — | — |
 | W0-4 | W0 | ADR-0001 ～ 0005 | 🔵 Backlog | — | — | — | — | — |
