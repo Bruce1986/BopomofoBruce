@@ -32,6 +32,22 @@ data class InputState(
         }
     }
 
+    /**
+     * 安全地更新 [candidates] 並把 [cursorIndex] coerce 到新範圍。
+     *
+     * Processor 處理「decoder 返回新候選列表」時用這個，避免直接 `copy(candidates = ...)` 因 init `require` 觸發
+     * [IllegalArgumentException]（例如 cursorIndex 還停在舊大小範圍）。
+     */
+    fun copyWithCandidates(newCandidates: List<Candidate>): InputState {
+        val newCursor =
+            if (newCandidates.isEmpty()) 0 else cursorIndex.coerceIn(newCandidates.indices)
+        return InputState(
+            composing = composing,
+            candidates = newCandidates,
+            cursorIndex = newCursor,
+        )
+    }
+
     companion object {
         val EMPTY: InputState =
             InputState(composing = "", candidates = emptyList(), cursorIndex = 0)
