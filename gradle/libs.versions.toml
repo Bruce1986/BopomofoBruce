@@ -110,3 +110,5 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 ktfmt = { id = "com.ncorti.ktfmt.gradle", version.ref = "ktfmt" }
 protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }
+# Room Gradle Plugin (2.6.0+) — 取代手動 ksp { arg("room.schemaLocation", ...) }
+room = { id = "androidx.room", version.ref = "androidx-room" }

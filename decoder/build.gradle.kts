@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.room)
 }
 
 android {
@@ -20,11 +21,13 @@ android {
     }
 }
 
-// Room schema 輸出：避免 KSP 編譯警告，並追蹤 schema 演進。
+// Room Gradle Plugin（Room 2.6.0+ 官方）取代手動 ksp arg：
+// - 自動配置 KSP（無需 room.schemaLocation 參數）
+// - 自動把 schema 目錄配給 androidTest 任務（MigrationTestHelper 直接吃）
+// - Inputs/Outputs 追蹤與 Build Cache 正確
 // W2-A (`feat/w2-decoder-jni`) 真正定義 entity 後，schema JSON 會 emit 到
-// decoder/schemas/<version>.json 並提交版控（migration test 會用）。
-// （ksp 是 Project-level extension，必須放在 top-level，不是 defaultConfig 內。）
-ksp { arg("room.schemaLocation", "$projectDir/schemas") }
+// decoder/schemas/<version>.json 並提交版控。
+room { schemaDirectory("$projectDir/schemas") }
 
 dependencies {
     implementation(project(":common"))
