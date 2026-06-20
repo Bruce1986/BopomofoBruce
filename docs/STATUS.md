@@ -24,9 +24,9 @@
 
 | ID | Wave | 範圍（獨占模組／檔案） | 狀態 | 認領者 | Worktree | 分支 | PR | 更新時間 |
 |----|------|----------------------|------|--------|----------|------|----|---------|
-| W0-2 | W0 | `:common` 介面契約（凍結） | 🟡 Claimed | claude-subagent-w0-2 | ../BopomofoBruce-w0-common-contracts | feat/w0-common-contracts | — | 2026-06-20 19:25 |
-| W0-3 | W0 | CI workflow（Gradle build/lint/test） | 🟡 Claimed | claude-subagent-w0-3 | ../BopomofoBruce-w0-ci | feat/w0-ci | — | 2026-06-20 19:25 |
-| W0-4 | W0 | ADR-0001 ～ 0005 | 🟡 Claimed | claude-subagent-w0-4 | ../BopomofoBruce-w0-adr | feat/w0-adr | — | 2026-06-20 19:25 |
+| W0-2 | W0 | `:common` 介面契約（凍結） | 🟣 In review | claude-subagent-w0-2 | ../BopomofoBruce-w0-common-contracts | feat/w0-common-contracts | [#4](https://github.com/Bruce1986/BopomofoBruce/pull/4) | 2026-06-20 19:45 |
+| W0-3 | W0 | CI workflow（Gradle build/lint/test） | 🟣 In review | claude-subagent-w0-3 | ../BopomofoBruce-w0-ci | feat/w0-ci | [#3](https://github.com/Bruce1986/BopomofoBruce/pull/3) | 2026-06-20 19:45 |
+| W0-4 | W0 | ADR-0001 ～ 0005 | 🟣 In review | claude-subagent-w0-4 | ../BopomofoBruce-w0-adr | feat/w0-adr | [#5](https://github.com/Bruce1986/BopomofoBruce/pull/5) | 2026-06-20 19:45 |
 | W1-A | W1 | `:decoder-native` libchewing → libbpmf.so | 🔵 Backlog | — | — | — | — | — |
 | W1-B | W1 | `:theme` Material You + 自訂相片背景 | 🔵 Backlog | — | — | — | — | — |
 | W1-C | W1 | `:keyboards` 注音 4×10、符號、數字、密碼 | 🔵 Backlog | — | — | — | — | — |
@@ -47,9 +47,9 @@
 
 > 認領 / 開工時 append；merge 後刪。
 
-- W0-2  ../BopomofoBruce-w0-common-contracts  feat/w0-common-contracts  PR —  agent=claude-subagent-w0-2  since=2026-06-20 19:25
-- W0-3  ../BopomofoBruce-w0-ci  feat/w0-ci  PR —  agent=claude-subagent-w0-3  since=2026-06-20 19:25
-- W0-4  ../BopomofoBruce-w0-adr  feat/w0-adr  PR —  agent=claude-subagent-w0-4  since=2026-06-20 19:25
+- W0-2  ../BopomofoBruce-w0-common-contracts  feat/w0-common-contracts  PR #4  agent=claude-subagent-w0-2  since=2026-06-20 19:25
+- W0-3  ../BopomofoBruce-w0-ci  feat/w0-ci  PR #3  agent=claude-subagent-w0-3  since=2026-06-20 19:25
+- W0-4  ../BopomofoBruce-w0-adr  feat/w0-adr  PR #5  agent=claude-subagent-w0-4  since=2026-06-20 19:25
 
 範例格式：
 ```
