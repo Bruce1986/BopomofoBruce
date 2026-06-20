@@ -32,7 +32,7 @@
 
 1. **`ViewModelStore` 只在 `InputMethodService.onDestroy()` 清空** — 不要在 `AbstractComposeView.onDetachedFromWindow()` 清，否則收鍵盤就會丟所有暫存狀態（composing buffer / 設定 cache 等），UX 災難
 2. **ViewModel 嚴禁持有 View / Activity Context 強引用** — 需要 Context 時用 `applicationContext`
-3. 注意 `InputMethodService` **沒有** `onDestroyInputView` callback（不同於 Fragment 的 `onDestroyView`）
+3. 注意 `InputMethodService` 雖**有** `onDestroyInputView()` callback（API 1 起），但它在 input view 不再顯示時被呼叫、不代表 service 被銷毀；ViewModelStore 在這裡清會丟暫存狀態（見上方第 1 條規範）— 真正乾淨銷毀在 `onDestroy()`
 
 W3-1 wiring reviewer 必檢查此點。
 

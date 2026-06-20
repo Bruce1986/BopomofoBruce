@@ -46,7 +46,11 @@ libchewing 的 source-level 可行性檢查通過（尚未做完整 NDK build）
 
 **負面**
 - 失去對 decoder 行為的完全控制：libchewing 的選詞偏好、片語切分、特殊符號處理皆是 upstream 決定，本專案只能透過個人字典加權扭轉
-- libchewing 是 C99，每個 `chewing_context_t` 帶 global state：執行緒安全（thread-safety）需在 JNI 層自己保護，coroutine wrapper（[DEVPLAN W2-A](../DEVPLAN-SubagentFanout-20260620-0851.md#w2-a--decoderjni--個人字典)）要小心。**Kotlin 側建議用 `Mutex` 或單執行緒 dispatcher（例如 `Dispatchers.IO.limitedParallelism(1)`）序列化所有 decoder 呼叫** — 即使 JNI 層加鎖，多 coroutine 併發仍可能讓 input buffer 被交錯修改造成解碼錯亂
+- libchewing 是 C99，每個 `chewing_context_t` 帶 global state：執行緒安全（thread-safety）需在 JNI 層自己保護，coroutine wrapper（[DEVPLAN W2-A](../DEVPLAN-SubagentFanout-20260620-0851.md#w2-a--decoderjni--個人字典)）要小心。**Kotlin 側建議用 `Mutex` 或單執行緒 dispatcher 序列化所有 decoder 呼叫** — 即使 JNI 層加鎖，多 coroutine 併發仍可能讓 input buffer 被交錯修改造成解碼錯亂。
+  注意 `Dispatchers.IO.limitedParallelism(1)` 保證**順序**但**不保證同一實體執行緒**；
+  JNI 對 `JNIEnv` 有 thread-local 限制，若 W1-A JNI 包裝層快取 `JNIEnv` 或依賴 thread
+  affinity 就會崩潰。穩當選擇是 `newSingleThreadContext("bpmf-decoder")` 專屬執行緒，
+  或確保 JNI 層每次呼叫都動態 `GetEnv`/`AttachCurrentThread`
 - LGPL-2.1 動態連結雖合規，未來若想靜態連結（statically link，為了 APK size）需重新評估授權與逆向工程（reverse-engineering）條款
 - 失去自家 LM 的差異化敘事（無法宣稱「我們的 decoder 更聰明」）— 但本 app 本來就不靠這個賣點
 
