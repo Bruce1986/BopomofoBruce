@@ -1,23 +1,17 @@
+// :common 是純 Kotlin JVM module（沒有 Android API 依賴）：
+// - W0-2 定義介面契約（KeyData / Candidate / InputState / ZhuyinDecoder /
+//   KeyboardTheme / ImeContextProvider 等）必須與 Android framework 解耦，
+//   才能讓 :keyboards / :theme / :settings 可以用 Fake 做 unit test 與
+//   Compose preview，不必啟動 emulator
+// - 純 JVM 跳過 AGP（Manifest 合併、資源處理、R/BuildConfig 生成），編譯更快
 plugins {
-    alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
 }
 
-android {
-    namespace = "com.bopomofobruce.common"
-    compileSdk = 35
-
-    defaultConfig {
-        minSdk = 28
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        consumerProguardFiles("consumer-rules.pro")
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 dependencies {
