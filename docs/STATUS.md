@@ -24,10 +24,9 @@
 
 | ID | Wave | 範圍（獨占模組／檔案） | 狀態 | 認領者 | Worktree | 分支 | PR | 更新時間 |
 |----|------|----------------------|------|--------|----------|------|----|---------|
-| W0-1 | W0 | Gradle 骨架、Version Catalog | 🟣 In review（bot loop 收斂，等 lead merge） | claude-subagent-w0-1 | ../BopomofoBruce-w0-gradle-skeleton | feat/w0-gradle-skeleton | [#2](https://github.com/Bruce1986/BopomofoBruce/pull/2) | 2026-06-20 19:19 |
-| W0-2 | W0 | `:common` 介面契約（凍結） | 🔵 Backlog | — | — | — | — | — |
-| W0-3 | W0 | CI workflow（Gradle build/lint/test） | 🔵 Backlog | — | — | — | — | — |
-| W0-4 | W0 | ADR-0001 ～ 0005 | 🔵 Backlog | — | — | — | — | — |
+| W0-2 | W0 | `:common` 介面契約（凍結） | 🟡 Claimed | claude-subagent-w0-2 | ../BopomofoBruce-w0-common-contracts | feat/w0-common-contracts | — | 2026-06-20 19:25 |
+| W0-3 | W0 | CI workflow（Gradle build/lint/test） | 🟡 Claimed | claude-subagent-w0-3 | ../BopomofoBruce-w0-ci | feat/w0-ci | — | 2026-06-20 19:25 |
+| W0-4 | W0 | ADR-0001 ～ 0005 | 🟡 Claimed | claude-subagent-w0-4 | ../BopomofoBruce-w0-adr | feat/w0-adr | — | 2026-06-20 19:25 |
 | W1-A | W1 | `:decoder-native` libchewing → libbpmf.so | 🔵 Backlog | — | — | — | — | — |
 | W1-B | W1 | `:theme` Material You + 自訂相片背景 | 🔵 Backlog | — | — | — | — | — |
 | W1-C | W1 | `:keyboards` 注音 4×10、符號、數字、密碼 | 🔵 Backlog | — | — | — | — | — |
@@ -48,7 +47,9 @@
 
 > 認領 / 開工時 append；merge 後刪。
 
-- W0-1  ../BopomofoBruce-w0-gradle-skeleton  feat/w0-gradle-skeleton  PR #2  agent=claude-subagent-w0-1  since=2026-06-20 17:40
+- W0-2  ../BopomofoBruce-w0-common-contracts  feat/w0-common-contracts  PR —  agent=claude-subagent-w0-2  since=2026-06-20 19:25
+- W0-3  ../BopomofoBruce-w0-ci  feat/w0-ci  PR —  agent=claude-subagent-w0-3  since=2026-06-20 19:25
+- W0-4  ../BopomofoBruce-w0-adr  feat/w0-adr  PR —  agent=claude-subagent-w0-4  since=2026-06-20 19:25
 
 範例格式：
 ```
@@ -61,7 +62,7 @@
 
 > 最近 5 筆。再往前的搬 `docs/devlog/` 歸檔。
 
-_(空)_
+- W0-1  feat/w0-gradle-skeleton  PR [#2](https://github.com/Bruce1986/BopomofoBruce/pull/2)  merged 2026-06-20 by claude-lead (squash)  commit=6bd6cda
 
 範例：
 ```
