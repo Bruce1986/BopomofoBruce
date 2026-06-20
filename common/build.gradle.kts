@@ -15,7 +15,7 @@ java {
 }
 
 dependencies {
-    implementation(libs.kotlinx.coroutines.core)
+    // W0-2 凍結的介面目前沒有 Flow / suspend 型別；等真正 API 出現再加 coroutines-core。
     implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit.jupiter.api)
