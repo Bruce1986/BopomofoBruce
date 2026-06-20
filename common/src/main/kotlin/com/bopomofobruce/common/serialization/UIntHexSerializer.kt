@@ -1,6 +1,7 @@
 package com.bopomofobruce.common.serialization
 
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -34,10 +35,18 @@ object UIntHexSerializer : KSerializer<UInt> {
                 raw.startsWith("#") -> raw.substring(1)
                 else -> raw
             }
-        require(hex.length == 6 || hex.length == 8) {
-            "Hex value must be either 6 digits (RGB) or 8 digits (ARGB), but was: $raw"
+        // 用 SerializationException 讓 kotlinx.serialization 能附帶 JSON 位置上下文。
+        if (hex.length != 6 && hex.length != 8) {
+            throw SerializationException(
+                "Hex value must be either 6 digits (RGB) or 8 digits (ARGB), but was: $raw"
+            )
         }
-        val parsed = hex.toUInt(16)
+        val parsed =
+            try {
+                hex.toUInt(16)
+            } catch (e: NumberFormatException) {
+                throw SerializationException("Invalid hex format: $raw", e)
+            }
         // 6-digit hex 視為 RGB（無 alpha），自動補 FF 高位完全不透明。
         return if (hex.length == 6) parsed or 0xFF000000u else parsed
     }
