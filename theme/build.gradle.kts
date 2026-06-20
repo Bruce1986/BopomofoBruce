@@ -56,5 +56,6 @@ dependencies {
     implementation(libs.coil)
     implementation(libs.coil.compose)
 
-    testImplementation(libs.junit4)
+    testImplementation(libs.junit.jupiter.api)
+    testRuntimeOnly(libs.junit.jupiter.engine)
 }

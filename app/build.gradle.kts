@@ -61,12 +61,11 @@ dependencies {
     implementation(project(":ime"))
     implementation(project(":keyboards"))
     implementation(project(":decoder"))
-    implementation(project(":decoder-native"))
     implementation(project(":theme"))
     implementation(project(":settings"))
+    // :decoder-native 不直接 import；經由 :decoder 中介（W3-1 wiring 確認）
 
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.kotlinx.coroutines.android)
 
@@ -76,5 +75,6 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
     implementation(libs.compose.ui.tooling.preview)
 
-    testImplementation(libs.junit4)
+    testImplementation(libs.junit.jupiter.api)
+    testRuntimeOnly(libs.junit.jupiter.engine)
 }
