@@ -19,7 +19,9 @@ permissions:
 jobs:
   build:
     name: Gradle build / lint / test
-    runs-on: ubuntu-latest
+    # 固定具體版本而非 ubuntu-latest，避免 GitHub runner 映像 rolling 升級
+    # 觸發非預期的 build diff（package 版本、Java baseline 等）。
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     steps:
@@ -35,14 +37,14 @@ jobs:
           java-version: '17'
 
       # Android SDK 必要層：platforms;android-35 + build-tools;35.0.0。
-      # setup-android@v3 會自動接受 license 並安裝 cmdline-tools。
+      # setup-android@v4 會自動接受 license 並安裝 cmdline-tools。
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
           packages: 'platforms;android-35 build-tools;35.0.0'
 
       # 用官方 Gradle action 處理 wrapper / ~/.gradle/caches / ~/.gradle/wrapper
-      # 三層 cache，並維持 build scan / dependency-graph 機制。
+      # 三層 cache。Fork PR 把 cache 設成 read-only 防止 cache poisoning。
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -61,8 +63,10 @@ jobs:
       - name: Android Lint
         run: ./gradlew --no-daemon lint
 
+      # 走 testDebugUnitTest 與 AGENTS.md 與 docs/DEVPLAN 對齊；`test` aggregate
+      # 在 :common 純 JVM module 上也會跑（KGP 的 test task 包含 main source set）。
       - name: Unit tests
-        run: ./gradlew --no-daemon test
+        run: ./gradlew --no-daemon testDebugUnitTest :common:test
 
       # APK 給 reviewer 直接抓下來在實機驗。Debug 簽章是 Gradle 自帶 keystore，
       # 不需要 secrets。注意 actions/upload-artifact@v4 與 v3 不相容（不可混用）。
