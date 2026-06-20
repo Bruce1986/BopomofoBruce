@@ -47,11 +47,12 @@ W0-1 已確認 `:common` 走純 Kotlin JVM module（commit `6bd6cda`），這意
 - `:app` 內定義 `BpmfApplication : Application`，內含 `val decoderModule by lazy { ... }` 等 properties
 - **在 `:common` 定義 provider 介面**避免 `:ime → :app` 循環依賴：
   ```kotlin
-  // :common
+  // :common — 只能引用 :common 內部的介面型別，不能 import :decoder / :settings
+  // 的具體實作類別（否則 :common ↔ :decoder 又會循環）。
   interface BpmfDependencyProvider {
-      val decoderModule: DecoderModule
-      val settingsRepository: SettingsRepository
-      // 其他 singleton
+      val zhuyinDecoder: ZhuyinDecoder      // 介面在 :common；實作在 :decoder
+      val settingsRepository: SettingsRepository  // 介面在 :common；DataStore 實作在 :settings/:settings-data
+      // 其他 singleton 同樣只暴露介面
   }
   ```
   `:app` 的 `BpmfApplication` 實作此介面（`:app` → `:common`，順向）。
