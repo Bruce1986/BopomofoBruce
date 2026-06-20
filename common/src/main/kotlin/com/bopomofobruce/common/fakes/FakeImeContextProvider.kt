@@ -15,7 +15,7 @@ import com.bopomofobruce.common.ImeInputType
  *
  * Thread-safe：no（同 [com.bopomofobruce.common.ZhuyinDecoder]）。
  */
-class FakeImeContextProvider(initialInputType: ImeInputType = ImeInputType.TEXT) :
+class FakeImeContextProvider(private val initialInputType: ImeInputType = ImeInputType.TEXT) :
     ImeContextProvider {
 
     override var currentInputType: ImeInputType = initialInputType
@@ -56,10 +56,11 @@ class FakeImeContextProvider(initialInputType: ImeInputType = ImeInputType.TEXT)
         _sentKeys.add(keyCode)
     }
 
-    /** 清空所有狀態，方便 test 之間共用同一個 instance。 */
+    /** 清空所有狀態，方便 test 之間共用同一個 instance。currentInputType 也還原為建構時設定。 */
     fun clearAll() {
         committed.clear()
         _deleteCalls.clear()
         _sentKeys.clear()
+        currentInputType = initialInputType
     }
 }

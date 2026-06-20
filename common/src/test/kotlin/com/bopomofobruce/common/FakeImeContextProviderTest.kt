@@ -50,14 +50,16 @@ class FakeImeContextProviderTest {
     }
 
     @Test
-    fun `clearAll resets every recording surface`() {
-        val ime = FakeImeContextProvider()
+    fun `clearAll resets every recording surface and currentInputType`() {
+        val ime = FakeImeContextProvider(initialInputType = ImeInputType.TEXT)
+        ime.currentInputType = ImeInputType.PASSWORD
         ime.commitText("abc")
         ime.deleteSurroundingText(1, 0)
         ime.sendKey(66)
 
         ime.clearAll()
 
+        assertEquals(ImeInputType.TEXT, ime.currentInputType)
         assertTrue(ime.getCommittedText().isEmpty())
         assertTrue(ime.deleteCalls.isEmpty())
         assertTrue(ime.sentKeys.isEmpty())
