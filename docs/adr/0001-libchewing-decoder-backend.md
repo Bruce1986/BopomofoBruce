@@ -28,7 +28,7 @@ libchewing 的 source-level 可行性檢查通過（尚未做完整 NDK build）
 
 **採用 libchewing 作為 v1 注音 decoder 後端，透過 JNI 包裝**。
 
-- 把 libchewing 以 git submodule 形式 vendor 進 `decoder-native/src/main/cpp/libchewing/`
+- 把 libchewing 以 git submodule 形式 vendor 進 `decoder-native/cmake/libchewing/`（對齊 [AGENTS.md NDK 段](../../AGENTS.md#專案特定注意事項) 與 [GEMINI.md](../../GEMINI.md) — CMake 與 vendor source 同根於 `decoder-native/cmake/`）
 - 在 `decoder-native` 編出 `libbpmf.so`（thin C wrapper exposing 4 個 C API：init/input/commit/free）
 - `:decoder` 用 JNI binding 包這四個 API，並實作 `:common` 定義的 `ZhuyinDecoder` 介面
 - 個人字典（`PersonalDictEntry`）以 Room 儲存於 `:decoder`，候選詞時與 libchewing 結果加權合併
@@ -46,7 +46,7 @@ libchewing 的 source-level 可行性檢查通過（尚未做完整 NDK build）
 
 **負面**
 - 失去對 decoder 行為的完全控制：libchewing 的選詞偏好、片語切分、特殊符號處理皆是 upstream 決定，本專案只能透過個人字典加權扭轉
-- libchewing 是 C99，每個 `chewing_context_t` 帶 global state：執行緒安全（thread-safety）需在 JNI 層自己保護，coroutine wrapper（[DEVPLAN W2-A](../DEVPLAN-SubagentFanout-20260620-0851.md#w2-a--decoderjni--個人字典)）要小心
+- libchewing 是 C99，每個 `chewing_context_t` 帶 global state：執行緒安全（thread-safety）需在 JNI 層自己保護，coroutine wrapper（[DEVPLAN W2-A](../DEVPLAN-SubagentFanout-20260620-0851.md#w2-a--decoderjni--個人字典)）要小心。**Kotlin 側建議用 `Mutex` 或單執行緒 dispatcher（例如 `Dispatchers.IO.limitedParallelism(1)`）序列化所有 decoder 呼叫** — 即使 JNI 層加鎖，多 coroutine 併發仍可能讓 input buffer 被交錯修改造成解碼錯亂
 - LGPL-2.1 動態連結雖合規，未來若想靜態連結（statically link，為了 APK size）需重新評估授權與逆向工程（reverse-engineering）條款
 - 失去自家 LM 的差異化敘事（無法宣稱「我們的 decoder 更聰明」）— 但本 app 本來就不靠這個賣點
 
