@@ -30,7 +30,7 @@ Solo Edition 整個劃掉雲端 + 帳號相關（[SoloEdition §1, §5](../REBUI
 
 **v1 沒有也活得下去**
 - 個人字典局限本機 = 換手機要重新累積詞頻：可接受。對「我自己 + 5 個 beta 朋友」這個目標群體屬於小痛點，不是 blocker
-- v1 沒有「我手機掉了字典就沒了」的場景 — 自動 backup 由 Android Auto Backup 接管（系統層備份本機資料，無需自家雲）
+- v1 沒有「我手機掉了字典就沒了」的場景 — 換手機重建詞頻列為已知 trade-off（個人字典首次幾天累積即可堪用，beta 朋友群可承受）
 - F-Droid 上架對「無網路權限」app 有加分（reproducible build + zero-tracking 雙重 badge）
 
 **差異化敘事一致**
@@ -45,7 +45,7 @@ Solo Edition 整個劃掉雲端 + 帳號相關（[SoloEdition §1, §5](../REBUI
 - 不接 Google Sign-In、Google Play Services Auth、Drive API
 - 不接遙測 / crash reporting SDK：不裝 Sentry、Firebase Crashlytics、自架 OpenTelemetry。**唯一例外**：Play Console 內建的 ANR / Crash 收集（這是 Play Store 平台層、不算 app 主動上傳）
 - 不做 OTA self-update（Omaha-like）— 更新走 Play Store / F-Droid 標準管道
-- 個人字典純本機 Room，依賴 Android Auto Backup 做系統層 backup
+- 個人字典純本機 Room；**Android Auto Backup 同樣禁用**（W0-1 已 commit `android:allowBackup="false"`）— 系統層雲端備份也是上傳通道，且使用者無法逐 app 細控；v1 一致拒絕任何資料離開設備
 - 主題的相片背景：使用者選的圖讀自本地 `MediaStore`，不上傳、不雲端 sync
 - 任何 review 建議（人類或 AI）若涉及網路請求、遙測、雲同步、第三方 SDK 連線 → 直接 reject（[AGENTS.md](../../AGENTS.md#專案特定注意事項) 已明文）
 
@@ -63,17 +63,16 @@ Solo Edition 整個劃掉雲端 + 帳號相關（[SoloEdition §1, §5](../REBUI
 - 對使用者信任：「輸入法看到我所有打字 + 不打網路」= 信任成本最低
 
 **負面**
-- 換手機 = 個人字典詞頻歸零（除非 Android Auto Backup 觸發；但 Auto Backup 在使用者長期不開 app 時可能被 GC）
+- 換手機 = 個人字典詞頻**直接歸零**（v1 連 Auto Backup 都禁用）— 已接受 trade-off；換手機重建詞頻週期是「幾天到幾週」範圍，beta 朋友群可承受
 - 無法用「跨裝置同步」當市場賣點 — Gboard 有
 - v2 若加同步，是「新增 INTERNET permission」這種**會嚇到既有使用者**的破壞性變更（Android Play Store 會在 update 時警示新增權限）
 - 無法收集匿名遙測 → 不知道實際使用者群有多少、平均輸入速度、哪個鍵按錯最多 — 產品決策只能憑直覺 + beta 5 人反饋
 - crash report 只能靠 Play Console（覆蓋率不如自家 Sentry）
 
 **開放問題 / 風險**
-- Android Auto Backup 行為：使用者關閉 Auto Backup 或長期不開 app 會導致詞典「同步空缺」— 屬於 Android 平台層問題，v1 在設定頁明示即可
 - 若 v2 評估同步：必須在本 ADR superseded 之前回答「為什麼信任成本上升的代價值得」。Bar 很高
 - F-Droid 上架的 reproducible build 仍需獨立 ADR / 工程努力 — 本 ADR 只保證「沒網路權限」這個必要條件成立
-- **重評觸發條件**：(1) ≥ 5 個獨立使用者明確要求同步且願意承擔信任成本上升；(2) 出現「個人字典遺失影響日常使用」的具體案例 ≥ 3 次；(3) Android Auto Backup 在統計上不可靠到使用者無法接受。任一條觸發 → 開新 ADR 評估 v2 同步方案
+- **重評觸發條件**：(1) ≥ 5 個獨立使用者明確要求同步且願意承擔信任成本上升；(2) 出現「個人字典遺失影響日常使用」的具體案例 ≥ 3 次。任一條觸發 → 開新 ADR 評估 v2 同步方案（屆時也可順便重評是否要 opt-in Auto Backup 走系統層）
 
 ## Alternatives considered（替代方案）
 
@@ -90,4 +89,4 @@ Solo Edition 整個劃掉雲端 + 帳號相關（[SoloEdition §1, §5](../REBUI
 - [README §Planned features](../../README.md#planned-features-v1) — "100% 離線；零網路請求"
 - [project-handbook.md §此專案不做的事](../../project-handbook.md) #1
 - [AGENTS.md §專案特定注意事項](../../AGENTS.md#專案特定注意事項) — "不打網路、不接 Firebase、不接 Google Sign-In"
-- Android Auto Backup 官方文件：<https://developer.android.com/identity/data/autobackup>
+- W0-1 [app/src/main/AndroidManifest.xml](../../app/src/main/AndroidManifest.xml)：`android:allowBackup="false"` 是本 ADR 的具現化

@@ -8,7 +8,7 @@ ADR（Architectural Decision Record）的目的：把「當下為什麼這樣選
 
 ## 規則
 
-1. 每份 ADR 一個檔案，編號連續 (`NNNN-kebab-case-title.md`)。檔名沿用業界 well-known 的 ADR 編號慣例（不掛日期前綴），但每份 ADR 內部 frontmatter 須明列 `日期：YYYY-MM-DD`。
+1. 每份 ADR 一個檔案，編號連續 (`NNNN-kebab-case-title.md`)。檔名沿用業界 well-known 的 ADR 編號慣例（不掛日期前綴），但每份 ADR 內部 metadata bullet 須明列 `日期：YYYY-MM-DD`。
 2. 狀態欄走以下流轉：
    - `Proposed`：草稿、提案中、未拍板
    - `Accepted`：已採用、規範後續開發

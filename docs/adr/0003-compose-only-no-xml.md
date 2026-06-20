@@ -28,7 +28,7 @@
 - [SoloEdition §2 不用的](../REBUILD-PLAN-SoloEdition-20260530-1325.md#2-技術棧壓縮版) 已決定不用 Hilt（[ADR-0004](0004-no-hilt-manual-di.md)）；Compose 的 `LocalXxx` + `remember` 對「沒有 DI 框架」的場景特別友善（manual provide 自然落地）
 - [AGENTS.md §專案特定注意事項](../../AGENTS.md#專案特定注意事項) 已明文 "Jetpack Compose only. 不要在 IME view 引入 XML layout"
 
-對「IME view 重建成本」的擔憂：Compose state 用 `viewModelScope` / `rememberSaveable` 配置好後，IME view 在切應用時的重建主要是 composition 而非 inflate；實測 baseline 仍在 [SoloEdition DoD](../REBUILD-PLAN-SoloEdition-20260530-1325.md#4-里程碑單人時間表) 「Pixel 4a 上鍵盤展開 < 350 ms」目標內（見 [DEVPLAN W2-B 驗收](../DEVPLAN-SubagentFanout-20260620-0851.md#w2-b--imeinputmethodservice--compose-ime-view)）。若 M2 實測卡頓，再針對熱 path 引入 `AndroidView` fallback。
+對「IME view 重建成本」的擔憂：Compose state 用 `viewModelScope` / `rememberSaveable` 配置好後，IME view 在切應用時的重建**理論上**主要是 composition 而非 inflate。Solo Edition 設定的目標是「Pixel 4a 上鍵盤展開 < 350 ms」（[SoloEdition DoD](../REBUILD-PLAN-SoloEdition-20260530-1325.md#4-里程碑單人時間表)），但**尚未在 W0-1 階段做實機測量** — 這是 [W2-B 驗收條件](../DEVPLAN-SubagentFanout-20260620-0851.md#w2-b--imeinputmethodservice--compose-ime-view)，若 W2-B 實測超標、且找不到 root cause，需重評 Compose IME 路線（針對熱 path 引入 `AndroidView` fallback，或退回 XML — 後者觸發本 ADR superseded）。
 
 ## Decision（決定）
 

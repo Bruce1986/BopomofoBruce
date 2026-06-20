@@ -36,7 +36,7 @@ BpmfInputMethodService (Android Service)
 
 W0-1 已確認 `:common` 走純 Kotlin JVM module（commit `6bd6cda`），這意味著 Hilt 在 `:common` 不適用（KSP 配置複雜化），DI 邊界天然就被切成「Android module（接 Hilt）+ pure Kotlin module（接不到）」兩半，這種混合反而比全手動更難理解。
 
-[SoloEdition §2 不用的](../REBUILD-PLAN-SoloEdition-20260530-1325.md#2-技術棧壓縮版) 已明列「不用 Hilt（8 模組手動 DI 不痛）」、[SoloEdition §3](../REBUILD-PLAN-SoloEdition-20260530-1325.md#3-gradle-module從-30-砍到-8) 也注「之後 v1.5 加拼音/倉頡時不另開模組」— 物件圖永遠不會大幅膨脹。
+[SoloEdition §2 不用的](../REBUILD-PLAN-SoloEdition-20260530-1325.md#2-技術棧壓縮版) 已明列「不用 Hilt（8 模組手動 DI 不痛）」、[SoloEdition §3](../REBUILD-PLAN-SoloEdition-20260530-1325.md#3-gradle-module從-30-砍到-8) 也注「之後 v1.5 加拼音/倉頡時不另開模組」— **在目前 v1/v1.5 範圍內，物件圖不預期會大幅膨脹**（v2 若加雲端 / 多 backend / 多語言 decoder，再重評）。
 
 ## Decision（決定）
 
