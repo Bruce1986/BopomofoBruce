@@ -62,6 +62,12 @@
 - **同類東西合一個 module**：所有鍵盤定義（注音 + 符號 + 數字 + 密碼 + emoji）合在 `:keyboards`，不再拆 `:kb-*` × N 個
 - **多輸入法不預先抽 plugin 介面**：v1.5 加拼音/倉頡時直接擴 `:keyboards` + `:decoder`，不另開 module
 - **無 `:framework-*` 三件套**：framework concerns 都收在 `:ime`
+
+**重要邊界 — 避免 `:ime` → `:settings` 依賴**
+
+`:settings` 同時含 Compose UI（設定頁、FirstRun）與設定資料層（DataStore Schema、`SettingsRepository`）。`:ime` 服務需要讀設定（鍵盤布局選擇、震動強度、候選字大小等），但**不該**為此依賴 `:settings`（不該把 UI 模組塞進核心執行期相依鏈）。
+
+解法：[W2-C 開工時](../DEVPLAN-SubagentFanout-20260620-0851.md#w2-c--settings-compose-設定--firstrun)，把 `SettingsRepository` 介面 + DataStore 實作下沉到 `:common`，`:settings` 只留 UI、`:ime` 直接依賴 `:common`。此事不另開 ADR，但 W2-C reviewer 必檢查。
 - **無 `:metrics` / `:sync` / `:tv`**：v1 沒做這些功能，沒對應 module（見 [ADR-0005](0005-no-cloud-sync-v1.md)）
 
 ## Consequences（後果）

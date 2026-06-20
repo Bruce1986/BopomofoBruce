@@ -71,7 +71,7 @@ W0-1 已確認 `:common` 走純 Kotlin JVM module（commit `6bd6cda`），這意
 
 **開放問題 / 風險**
 - 物件圖規模膨脹門檻：當 `BpmfApplication` 內的 `by lazy` properties 超過 ~15 個、或出現「constructor 參數 > 5 個的物件」時，重審是否引入 Hilt
-- 並發初始化風險：`by lazy` 預設 `LazyThreadSafetyMode.SYNCHRONIZED`，多 thread 同時觸發 wire 時不會 race；但若改 `PUBLICATION` 為效能優化需小心
+- 並行初始化風險：`by lazy` 預設 `LazyThreadSafetyMode.SYNCHRONIZED`，多執行緒同時觸發 wire 時不會產生競態（race）；但若改 `PUBLICATION` 為效能優化需小心
 - 測試切換成本：若整合測試需替換多個 module，手動構造會比 Hilt `@TestInstallIn` 囉嗦 — 接受這個 trade-off
 - **重評觸發條件**：(1) v1.5 加拼音/倉頡後 ViewModel 超過 8 個；(2) 整合測試的 setup boilerplate > 一頁；(3) 出現需要 scope 管理（不是單純 singleton vs activity-scope）的物件
 
