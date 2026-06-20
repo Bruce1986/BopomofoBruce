@@ -30,7 +30,7 @@ class SerializationRoundTripTest {
     @Test
     fun `KeyData with simple action round trips`() {
         val original =
-            KeyData(label = "ㄅ", action = KeyAction.Zhuyin("ㄅ"), weight = 1f, longPressLabel = null)
+            KeyData(label = "ㄅ", action = KeyAction.Zhuyin("ㄅ"), weight = 1f, longPress = null)
 
         val encoded = json.encodeToString(KeyData.serializer(), original)
         val decoded = json.decodeFromString(KeyData.serializer(), encoded)
@@ -45,8 +45,7 @@ class SerializationRoundTripTest {
                 label = " ",
                 action = KeyAction.Space,
                 weight = 5f,
-                longPressLabel = "符號",
-                longPressAction = KeyAction.SymbolToggle,
+                longPress = LongPressData(label = "符號", action = KeyAction.SymbolToggle),
             )
 
         val encoded = json.encodeToString(KeyData.serializer(), original)
@@ -106,12 +105,12 @@ class SerializationRoundTripTest {
     fun `KeyboardColors and KeyboardDimens round trip`() {
         val colors =
             KeyboardColors(
-                background = 0xFF1E1E1EL,
-                keyFill = 0xFF2E2E2EL,
-                keyText = 0xFFEAEAEAL,
-                keyAccent = 0xFF4A90E2L,
-                candidateText = 0xFFEAEAEAL,
-                candidateHighlight = 0xFF4A90E2L,
+                background = 0xFF1E1E1Eu,
+                keyFill = 0xFF2E2E2Eu,
+                keyText = 0xFFEAEAEAu,
+                keyAccent = 0xFF4A90E2u,
+                candidateText = 0xFFEAEAEAu,
+                candidateHighlight = 0xFF4A90E2u,
             )
         val dimens =
             KeyboardDimens(

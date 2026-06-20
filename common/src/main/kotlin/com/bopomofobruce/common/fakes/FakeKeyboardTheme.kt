@@ -18,15 +18,15 @@ class FakeKeyboardTheme(
 ) : KeyboardTheme {
 
     companion object {
-        /** ARGB Long 常數；高 8-bit alpha + RGB。 */
+        /** ARGB UInt 常數；高 8-bit alpha + RGB。 */
         val DEFAULT_COLORS: KeyboardColors =
             KeyboardColors(
-                background = 0xFF1E1E1EL,
-                keyFill = 0xFF2E2E2EL,
-                keyText = 0xFFEAEAEAL,
-                keyAccent = 0xFF4A90E2L,
-                candidateText = 0xFFEAEAEAL,
-                candidateHighlight = 0xFF4A90E2L,
+                background = 0xFF1E1E1Eu,
+                keyFill = 0xFF2E2E2Eu,
+                keyText = 0xFFEAEAEAu,
+                keyAccent = 0xFF4A90E2u,
+                candidateText = 0xFFEAEAEAu,
+                candidateHighlight = 0xFF4A90E2u,
             )
 
         val DEFAULT_DIMENS: KeyboardDimens =

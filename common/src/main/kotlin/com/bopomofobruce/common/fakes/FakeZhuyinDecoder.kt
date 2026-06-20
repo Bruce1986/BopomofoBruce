@@ -17,8 +17,11 @@ import com.bopomofobruce.common.ZhuyinDecoder
  */
 class FakeZhuyinDecoder : ZhuyinDecoder {
 
-    /** Test 可以查詢「使用者 commit 了哪些候選詞」確認 chain 行為。 */
-    val committedHistory: MutableList<Candidate> = mutableListOf()
+    private val _committedHistory: MutableList<Candidate> = mutableListOf()
+
+    /** Test 可以查詢「使用者 commit 了哪些候選詞」確認 chain 行為。對外唯讀。 */
+    val committedHistory: List<Candidate>
+        get() = _committedHistory
 
     private var resetCount: Int = 0
 
@@ -36,11 +39,11 @@ class FakeZhuyinDecoder : ZhuyinDecoder {
     }
 
     override fun commit(candidate: Candidate) {
-        committedHistory.add(candidate)
+        _committedHistory.add(candidate)
     }
 
     override fun reset() {
-        committedHistory.clear()
+        _committedHistory.clear()
         resetCount += 1
     }
 

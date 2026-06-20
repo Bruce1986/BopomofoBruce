@@ -13,7 +13,7 @@ import com.bopomofobruce.common.ImeInputType
  * - [deleteSurroundingText] / [sendKey] 也記錄到對應 list 供 test assert。
  * - [currentInputType] 設為 `var` 讓 test 可以模擬切 input field。
  *
- * Thread-safe：no（同 [ZhuyinDecoder]）。
+ * Thread-safe：no（同 [com.bopomofobruce.common.ZhuyinDecoder]）。
  */
 class FakeImeContextProvider(initialInputType: ImeInputType = ImeInputType.TEXT) :
     ImeContextProvider {
@@ -25,18 +25,24 @@ class FakeImeContextProvider(initialInputType: ImeInputType = ImeInputType.TEXT)
     /** Test 查詢「目前 input field 累積了什麼字」。 */
     fun getCommittedText(): String = committed.toString()
 
-    /** [deleteSurroundingText] 每次呼叫記錄 `(beforeLength, afterLength)`。 */
-    val deleteCalls: MutableList<Pair<Int, Int>> = mutableListOf()
+    private val _deleteCalls: MutableList<Pair<Int, Int>> = mutableListOf()
 
-    /** [sendKey] 收到的 keyCode 序列。 */
-    val sentKeys: MutableList<Int> = mutableListOf()
+    /** [deleteSurroundingText] 每次呼叫記錄 `(beforeLength, afterLength)`。對外唯讀。 */
+    val deleteCalls: List<Pair<Int, Int>>
+        get() = _deleteCalls
+
+    private val _sentKeys: MutableList<Int> = mutableListOf()
+
+    /** [sendKey] 收到的 keyCode 序列。對外唯讀。 */
+    val sentKeys: List<Int>
+        get() = _sentKeys
 
     override fun commitText(text: String) {
         committed.append(text)
     }
 
     override fun deleteSurroundingText(beforeLength: Int, afterLength: Int) {
-        deleteCalls.add(beforeLength to afterLength)
+        _deleteCalls.add(beforeLength to afterLength)
         // 模擬刪除 committed buffer 的 beforeLength 個字元（只支援 BMP，preview/test 足夠）。
         // afterLength 在 fake 裡沒語意（沒有真實 cursor 概念）。
         val drop = beforeLength.coerceAtLeast(0).coerceAtMost(committed.length)
@@ -44,13 +50,13 @@ class FakeImeContextProvider(initialInputType: ImeInputType = ImeInputType.TEXT)
     }
 
     override fun sendKey(keyCode: Int) {
-        sentKeys.add(keyCode)
+        _sentKeys.add(keyCode)
     }
 
     /** 清空所有狀態，方便 test 之間共用同一個 instance。 */
     fun clearAll() {
         committed.clear()
-        deleteCalls.clear()
-        sentKeys.clear()
+        _deleteCalls.clear()
+        _sentKeys.clear()
     }
 }
