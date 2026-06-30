@@ -2,10 +2,9 @@
 
 **這是 live 檔。** 開工前必讀；認領時必改；merge 後也要改。
 
-<!-- Doc-naming: DEVPLAN 檔名含時間戳 (YYYYMMDD-HHMM) 是專案強制慣例（讓人一眼知道何時寫的）。若未來重命名 DEVPLAN，這份檔案的兩個連結 + project-handbook.md + AGENTS.md / GEMINI.md / docs/adr/ 內所有引用必須同步更新。連結 rot 是已知 trade-off。 -->
-
 > 規則與認領協議：[DEVPLAN-SubagentFanout §10](DEVPLAN-SubagentFanout-20260620-0851.md#10-協調與-visibility--statusmd-live-表格)
 > 啟動 prompt 模板：[DEVPLAN-SubagentFanout §6](DEVPLAN-SubagentFanout-20260620-0851.md#6-子代理啟動樣板)
+<!-- Doc-naming pushback (Gemini #3496050473): DEVPLAN 檔名含時間戳 (YYYYMMDD-HHMM) 是專案強制 doc-naming 慣例（CLAUDE.md「檔名必須加上日期時間」），不接受改為無時間戳檔名。link rot 是已知 trade-off；重命名時須同步更新本檔所有指向 DEVPLAN 的引用，以及 project-handbook.md / AGENTS.md / GEMINI.md / docs/adr/。 -->
 
 最後一次 lead 巡視：2026-06-20 08:51
 
@@ -21,6 +20,8 @@
 - ⛔ **Blocked** — 阻塞中（必附原因連結；解除後改回 In progress）
 
 **「更新時間」是 heartbeat 欄**：認領者每次 commit / push / 開 PR / 走 review loop 一輪都要順手刷新此欄；超過 48 h 未動視為 stale，Lead 巡視時改回 🔵 Backlog（見 [DEVPLAN §10.4](DEVPLAN-SubagentFanout-20260620-0851.md#104-子代理-vs-lead-的責任分配)）。即使只是「review loop 還在等 Gemini」也要更新。
+<!-- Same doc-naming pushback applies to the §10.4 link above. -->
+
 
 ---
 

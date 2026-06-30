@@ -685,7 +685,7 @@ W14  W4 polish     W4-A README   W4-B a11y         W4-C perf
 - 主表狀態必為 6 圖例其中之一
 - Claimed/In progress/In review 列必有對應的 Worktree 與分支欄
 - 「Active worktrees」實際列數 == 主表 Claimed + In progress + In review 列數
-- 「Recently merged」筆數 ≤ 5（超過要搬 `docs/devlog/`）
+- 「Recently merged」筆數 ≤ 5（超過要搬 `docs/devlog/status-archive.md`，與 §10.2 / project-handbook 同檔）
 
 ### 10.4 子代理 vs lead 的責任分配
 

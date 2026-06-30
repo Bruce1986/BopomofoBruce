@@ -66,8 +66,7 @@ Solo dev 階段：自己 review、留 24 小時冷卻再 merge。
 - 「Lead 巡視紀錄」段落 append 一列
 
 任何 schema 變動、章節結構、圖例文字、範例格式變更仍走 PR。詳見 [DEVPLAN §10.2](docs/DEVPLAN-SubagentFanout-20260620-0851.md#102-機制)。
-
-<!-- Doc-naming: DEVPLAN 檔名含時間戳 (YYYYMMDD-HHMM) 是專案強制慣例。重命名時須更新所有引用點（本檔、docs/STATUS.md、AGENTS.md、GEMINI.md、docs/adr/）。連結 rot 是接受的 trade-off。 -->
+<!-- Doc-naming pushback (Gemini #3496050472): DEVPLAN 檔名含時間戳 (YYYYMMDD-HHMM) 是專案強制 doc-naming 慣例（CLAUDE.md「檔名必須加上日期時間」），不接受改為無時間戳檔名。link rot 是已知 trade-off；重命名時須同步更新本檔、docs/STATUS.md、AGENTS.md、GEMINI.md、docs/adr/ 等所有引用點。 -->
 
 ---
 
