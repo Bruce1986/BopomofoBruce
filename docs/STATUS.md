@@ -18,6 +18,8 @@
 - ✅ **Merged** — 已 squash merge 進 main（merge 後 24 h 內搬到 Recently merged）
 - ⛔ **Blocked** — 阻塞中（必附原因連結；解除後改回 In progress）
 
+**「更新時間」是 heartbeat 欄**：認領者每次 commit / push / 開 PR / 走 review loop 一輪都要順手刷新此欄；超過 48 h 未動視為 stale，Lead 巡視時改回 🔵 Backlog（見 [DEVPLAN §10.4](DEVPLAN-SubagentFanout-20260620-0851.md#104-子代理-vs-lead-的責任分配)）。即使只是「review loop 還在等 Gemini」也要更新。
+
 ---
 
 ## 主表
@@ -64,9 +66,9 @@
 - W0-4  feat/w0-adr  PR [#5](https://github.com/Bruce1986/BopomofoBruce/pull/5)  merged 2026-06-20 by claude-lead (squash)  commit=ac0e9a2
 - W0-2  feat/w0-common-contracts  PR [#4](https://github.com/Bruce1986/BopomofoBruce/pull/4)  merged 2026-06-20 by claude-lead (squash)  commit=4c75782  tag=contracts-v1
 
-範例：
+範例（格式對齊現有列）：
 ```
-- W0-1  feat/w0-gradle-skeleton  PR #5   merged 2026-06-30 by lead   commit=abc1234
+- <ID>  <branch>  PR [#<N>](url)  merged YYYY-MM-DD by <merger> (squash)  commit=<sha7>
 ```
 
 ---

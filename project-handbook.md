@@ -57,6 +57,8 @@ Solo dev 階段：自己 review、留 24 小時冷卻再 merge。
 
 直接 push 到 `main` 僅限文件小修正（typo 等級），功能性變更一律走 PR。
 
+**例外**：`docs/STATUS.md` 主表的狀態欄、認領者、Worktree、分支、PR、更新時間欄位更新被視為 bookkeeping，等同 typo 級允許直推（commit 必須只動 `docs/STATUS.md`、type 用 `chore(status):`）。任何 schema / 章節結構 / 副區塊範例變更仍走 PR。詳見 [DEVPLAN §10.2](docs/DEVPLAN-SubagentFanout-20260620-0851.md#102-機制)。
+
 ---
 
 ## 程式碼規範
