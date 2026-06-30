@@ -657,9 +657,17 @@ W14  W4 polish     W4-A README   W4-B a11y         W4-C perf
 
 **鎖機制**：誰先 `git push origin main` 改該列誰得手。push 衝突時，`git pull --rebase` 後**重檢主表該列的狀態欄**；若已被搶走則放棄、回報 lead。
 
-> Race condition 的範圍：`git push` 序列化只保證「commit 不會交錯」，**不保證 STATUS.md 主表 + Active worktrees + Recently merged 三處欄位永遠一致**。每次改動務必三處一起改、單一 commit、有 lint script（見 §10.3）兜底。一秒內兩個人搶同一包是稀有事件，但別假設它不會發生 — rebase 後重檢主表是真正的防線。
+> Race condition 的範圍：`git push` 序列化只保證「commit 不會交錯」，**不保證 STATUS.md 主表 + Active worktrees + Recently merged + Blockers + Lead 巡視紀錄五處欄位永遠一致**。每次改動務必相關段落一起改、單一 commit，並依靠 §10.3 列出的人工 sanity checklist 兜底（自動化 lint script 待補）。一秒內兩個人搶同一包是稀有事件，但別假設它不會發生 — rebase 後重檢主表是真正的防線。
 
-**與專案 push policy 的關係**：`project-handbook.md` 規定 main 直推只限 typo 級小修。**STATUS.md 主表的狀態欄、認領者、Worktree、分支、PR、更新時間欄位更新被視為 bookkeeping，比照 typo-class 直推允許**（同一 commit 必須只動 STATUS.md，commit type 用 `chore(status):`）。任何其他改動（schema、章節、Active worktrees / Recently merged 以外的副區塊新增）一律走 PR。若未來開啟 main branch protection，bookkeeping 改走 micro-PR + auto-squash；屆時「git push 序列化當 lock」會降級為「open PR 的 head SHA 序列化當 lock」，需要 lead 配合快速 merge。
+**與專案 push policy 的關係**：`project-handbook.md` 規定 main 直推只限 typo 級小修。**`docs/STATUS.md` 的 live bookkeeping 動作被列為例外、比照 typo-class 直推允許**（同一 commit 必須只動 `docs/STATUS.md`、commit type 用 `chore(status):`）。允許的動作清單與 [`project-handbook.md` Code Review 流程段](../project-handbook.md#3-review)的例外條款字面**一字不差**地一致：
+
+- 主表任意列的「狀態 / 認領者 / Worktree / 分支 / PR / 更新時間」欄位更新
+- 「Active worktrees」段落 append / delete 一行
+- 「Recently merged」段落搬入新列（並順手把超過 5 筆的舊列移到 `docs/devlog/`）
+- 「Blockers」段落新增 / 移除 / 更新原因連結
+- 「Lead 巡視紀錄」段落 append 一列
+
+清單之外（schema 變動、章節結構、圖例文字、範例格式變更）一律走 PR。若未來開啟 main branch protection，bookkeeping 改走 micro-PR + auto-squash；屆時「git push 序列化當 lock」會降級為「open PR 的 head SHA 序列化當 lock」，需要 lead 配合快速 merge。
 
 ### 10.3 STATUS.md 的格式（schema）
 
