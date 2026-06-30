@@ -672,12 +672,12 @@ W14  W4 polish     W4-A README   W4-B a11y         W4-C perf
   - **Recently merged**（最近 5 筆）：merge 完搬到這
   - **Blockers**：被 ⛔ 卡住的包，附原因連結
 
-每個 sub-agent 啟動時的 pre-flight 第 0 步必須跑這個 sanity check（lint）：
+每個 sub-agent 啟動時的 pre-flight 第 0 步必須做 **人工** sanity check（自動化 lint script `scripts/status-lint.sh` 待補；issue 追在 [W4-C 之前的 tooling backlog]）：
 
-```bash
-# 主表狀態必為 5 種其中之一；認領中的列必有 PR 或 worktree；Active worktrees 與主表 Claimed/In progress/In review 列數一致
-scripts/status-lint.sh    # TODO: W0 收尾時補；目前先人工檢查
-```
+- 主表狀態必為 6 圖例其中之一
+- Claimed/In progress/In review 列必有對應的 Worktree 與分支欄
+- 「Active worktrees」實際列數 == 主表 Claimed + In progress + In review 列數
+- 「Recently merged」筆數 ≤ 5（超過要搬 `docs/devlog/`）
 
 ### 10.4 子代理 vs lead 的責任分配
 
