@@ -4,6 +4,7 @@
 
 > 規則與認領協議：[DEVPLAN-SubagentFanout §10](DEVPLAN-SubagentFanout-20260620-0851.md#10-協調與-visibility--statusmd-live-表格)
 > 啟動 prompt 模板：[DEVPLAN-SubagentFanout §6](DEVPLAN-SubagentFanout-20260620-0851.md#6-子代理啟動樣板)
+<!-- Doc-naming pushback (Gemini #3496050473): DEVPLAN 檔名含時間戳 (YYYYMMDD-HHMM) 是專案強制 doc-naming 慣例（CLAUDE.md「檔名必須加上日期時間」），不接受改為無時間戳檔名。link rot 是已知 trade-off；重命名時須同步更新本檔所有指向 DEVPLAN 的引用，以及 project-handbook.md / AGENTS.md / GEMINI.md / docs/adr/。 -->
 
 最後一次 lead 巡視：2026-06-20 08:51
 
@@ -17,6 +18,10 @@
 - 🟣 **In review** — PR 已開、正在跑 codex / Gemini / CodeRabbit
 - ✅ **Merged** — 已 squash merge 進 main（merge 後 24 h 內搬到 Recently merged）
 - ⛔ **Blocked** — 阻塞中（必附原因連結；解除後改回 In progress）
+
+**「更新時間」是 heartbeat 欄**：認領者每次 commit / push / 開 PR / 走 review loop 一輪都要順手刷新此欄；超過 48 h 未動視為 stale，Lead 巡視時改回 🔵 Backlog（見 [DEVPLAN §10.4](DEVPLAN-SubagentFanout-20260620-0851.md#104-子代理-vs-lead-的責任分配)）。即使只是「review loop 還在等 Gemini」也要更新。
+<!-- Same doc-naming pushback applies to the §10.4 link above. -->
+
 
 ---
 
@@ -64,9 +69,9 @@
 - W0-4  feat/w0-adr  PR [#5](https://github.com/Bruce1986/BopomofoBruce/pull/5)  merged 2026-06-20 by claude-lead (squash)  commit=ac0e9a2
 - W0-2  feat/w0-common-contracts  PR [#4](https://github.com/Bruce1986/BopomofoBruce/pull/4)  merged 2026-06-20 by claude-lead (squash)  commit=4c75782  tag=contracts-v1
 
-範例：
+範例（格式對齊現有列）：
 ```
-- W0-1  feat/w0-gradle-skeleton  PR #5   merged 2026-06-30 by lead   commit=abc1234
+- <ID>  <branch>  PR [#<N>](url)  merged YYYY-MM-DD by <merger> (squash)  commit=<sha7>
 ```
 
 ---

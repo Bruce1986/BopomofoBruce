@@ -198,7 +198,7 @@ W0 結束後，介面凍結，三個獨立技術領域可同時下手。
 **子代理檔案領域**：`decoder-native/` 全部 + `gradle/libs.versions.toml`（只能加 NDK 相關）
 
 **工作內容**
-- vendor libchewing 進 `decoder-native/src/main/cpp/libchewing/`（git submodule 或固定 tarball）
+- vendor libchewing 進 `decoder-native/cmake/libchewing/`（git submodule 或固定 tarball；路徑與 [ADR-0001](adr/0001-libchewing-decoder-backend.md)、`AGENTS.md` NDK 段落、`GEMINI.md` 一致）
 - CMakeLists.txt：編出 `libbpmf.so`，wrap libchewing 並輸出 C API：
   ```c
   void*  bpmf_init(const char* data_path);
@@ -286,7 +286,7 @@ W1 結束後，可同時開 4 個子代理：
 - 實作 `ZhuyinDecoder` 介面（取自 :common）
 - 個人字典：Room schema `PersonalDictEntry(word, zhuyin, freq, lastUsedAt)`
 - 候選詞合併策略：libchewing 結果 ⊕ 個人字典加權
-- Coroutine 包裝：`suspend fun input(...)`，避免 main thread blocking
+- **保留 `ZhuyinDecoder.input` 為同步**（contracts-v1 已凍結；見 [`common/src/main/kotlin/com/bopomofobruce/common/ZhuyinDecoder.kt`](../common/src/main/kotlin/com/bopomofobruce/common/ZhuyinDecoder.kt) 的 thread-safety 註解）。讓 :ime 端負責把呼叫派到 work dispatcher，避免 main thread blocking — `:decoder` 不對外提供 suspend 版本，也不引入 dispatcher 相依
 - 提供 `DecoderModule` 物件給 :ime 拿 instance（手動 DI）
 
 **驗收**
@@ -455,7 +455,7 @@ git worktree add ../BopomofoBruce-w1-theme -b feat/w1-theme origin/main
 
 1. 子代理收到工作包，cd 到對應 worktree
 2. 對照「檔案領域 + 禁碰清單」工作
-3. 進度寫進 `docs/devlog/<branch>.md`（每天一句也行）
+3. 進度寫進 `docs/devlog/<branch>.md`（每天一句也行）— **可選但鼓勵**：每包獨立 devlog 不是 merge gate；強制要求的是 wave 收尾時的 `docs/devlog/W<N>-summary.md`（見每個 Wave 同步點）
 4. 本機跑 `./gradlew :<module>:assembleDebug` + `:<module>:test`
 5. 跑 codex review（同你已建立的 3 輪流程）
 6. push branch → `gh pr create` → `/gemini review` + `@coderabbitai review`
@@ -544,7 +544,7 @@ git worktree add ../BopomofoBruce-w1-theme -b feat/w1-theme origin/main
 1. <測試 1>
 2. <測試 2>
 3. PR 通過 codex 3 輪 + Gemini 1 輪、無 blocking
-4. devlog 寫好
+4. devlog 寫好（個別包 devlog 為可選；wave summary devlog 為強制）
 5. STATUS.md 走完狀態流（Claimed → In progress → In review → Merged）
 
 【工作流】
@@ -629,7 +629,7 @@ W14  W4 polish     W4-A README   W4-B a11y         W4-C perf
 
 ## 10. 協調與 visibility — STATUS.md live 表格
 
-### 11.1 為什麼需要
+### 10.1 為什麼需要
 
 §5 的 worktree 機制只解決「檔案不衝突」。但**「誰已經在做什麼、進度到哪」**是另一個維度的問題：
 
@@ -641,7 +641,7 @@ W14  W4 polish     W4-A README   W4-B a11y         W4-C perf
 
 解法：**用一份檔案當作 live 表格**，加上 git push 當天然 lock。
 
-### 11.2 機制
+### 10.2 機制
 
 **單一事實來源**：`docs/STATUS.md`（在 main 上）
 
@@ -655,21 +655,39 @@ W14  W4 polish     W4-A README   W4-B a11y         W4-C perf
                                                               移到 Recently merged
 ```
 
-**鎖機制**：誰先 `git push origin main` 改該列誰得手。push 衝突時，`git pull --rebase` 後重檢狀態欄；若已被搶走則放棄、回報 lead。
+**鎖機制**：誰先 `git push origin main` 改該列誰得手。push 衝突時，`git pull --rebase` 後**重檢主表該列的狀態欄**；若已被搶走則放棄、回報 lead。
 
-> 不必擔心 race condition — main 的 push 序列化天然就是 lock。一秒內兩個人搶同一包是極罕見，且 rebase 後一定能偵測到（狀態欄不是 Backlog）。
+> Race condition 的範圍：`git push` 序列化只保證「commit 不會交錯」，**不保證 STATUS.md 主表 + Active worktrees + Recently merged + Blockers + Lead 巡視紀錄五處欄位永遠一致**。每次改動務必相關段落一起改、單一 commit，並依靠 §10.3 列出的人工 sanity checklist 兜底。一秒內兩個人搶同一包是稀有事件，但別假設它不會發生 — rebase 後重檢主表是真正的防線。
 
-### 11.3 STATUS.md 的格式（schema）
+**與專案 push policy 的關係**：`project-handbook.md` 規定 main 直推只限 typo 級小修。**`docs/STATUS.md` 的 live bookkeeping 動作被列為例外、比照 typo-class 直推允許**（同一 commit 必須只動 `docs/STATUS.md`、commit type 用 `chore(status):`）。允許的動作清單與 [`project-handbook.md` Code Review 流程段](../project-handbook.md#3-review)的例外條款字面**一字不差**地一致：
+
+- 主表任意列的「狀態 / 認領者 / Worktree / 分支 / PR / 更新時間」欄位更新
+- 「Active worktrees」段落 append / delete 一行
+- 「Recently merged」段落搬入新列（並順手把超過 5 筆的舊列移到 `docs/devlog/status-archive.md`，依時間序 append；若該檔不存在則建立）
+- 「Blockers」段落新增 / 移除 / 更新原因連結
+- 「Lead 巡視紀錄」段落 append 一列
+
+清單之外（schema 變動、章節結構、圖例文字、範例格式變更）一律走 PR。若未來開啟 main branch protection，bookkeeping 改走 micro-PR + auto-squash；屆時「git push 序列化當 lock」會降級為「open PR 的 head SHA 序列化當 lock」，需要 lead 配合快速 merge。
+
+### 10.3 STATUS.md 的格式（schema）
 
 詳見 [`docs/STATUS.md`](STATUS.md)。要點：
 
 - 主表格：`ID / Wave / 範圍 / 狀態 / 認領者 / Worktree / 分支 / PR / 更新時間`
+- **「更新時間」是 heartbeat 欄**：認領者每次 commit / push / 開 PR / 走 review loop 一輪都要順手更新；空白超過 24 h 視為可疑、48 h 視為 stale（見 §10.4）。
 - 副區塊：
   - **Active worktrees**：認領者開工時 append 一行；merge 後刪
   - **Recently merged**（最近 5 筆）：merge 完搬到這
   - **Blockers**：被 ⛔ 卡住的包，附原因連結
 
-### 11.4 子代理 vs lead 的責任分配
+每個 sub-agent 啟動時的 pre-flight 第 0 步必須做 **人工** sanity check：
+
+- 主表狀態必為 6 圖例其中之一
+- Claimed/In progress/In review 列必有對應的 Worktree 與分支欄
+- 「Active worktrees」實際列數 == 主表 Claimed + In progress + In review 列數
+- 「Recently merged」筆數 ≤ 5（超過要搬 `docs/devlog/status-archive.md`，與 §10.2 / project-handbook 同檔）
+
+### 10.4 子代理 vs lead 的責任分配
 
 | 動作 | 由誰做 |
 |---|---|
@@ -679,9 +697,10 @@ W14  W4 polish     W4-A README   W4-B a11y         W4-C perf
 | Merge（In review → Merged） | Lead（或子代理 squash merge 後）順手把列搬到 Recently merged |
 | 標 ⛔ Blocked | 子代理發現阻塞時自己標 + 留原因 |
 | 解 ⛔ Blocked | Lead 處理後改回 In progress |
-| 清掉 stale Claimed（> 48 h 無進度） | Lead — 改回 Backlog，附 devlog 說明 |
+| 清掉 stale Claimed（更新時間 > 48 h 無進度） | Lead — 改回 Backlog，附 devlog 說明 |
+| 心跳 / 進度回報（每天工作前後刷新「更新時間」欄） | 子代理 — 即使只是「還在 review loop 中」也要更新 |
 
-### 11.5 失敗模式對應
+### 10.5 失敗模式對應
 
 | 失敗 | 對應 |
 |---|---|
@@ -690,7 +709,7 @@ W14  W4 polish     W4-A README   W4-B a11y         W4-C perf
 | 子代理忘記改 STATUS | Lead PR review 時看到沒同步就 block merge |
 | STATUS.md 自己被 merge 衝突弄壞 | Lead 手動修；表格保持「人類友善」格式不要過度自動化 |
 
-### 11.6 與 GitHub Issue 的關係
+### 10.6 與 GitHub Issue 的關係
 
 目前**不**用 GitHub Issue 當 work package tracker（理由：避免提早建出 17 個空 issue 變雜訊）。
 

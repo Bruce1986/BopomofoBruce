@@ -57,6 +57,17 @@ Solo dev 階段：自己 review、留 24 小時冷卻再 merge。
 
 直接 push 到 `main` 僅限文件小修正（typo 等級），功能性變更一律走 PR。
 
+**例外**：`docs/STATUS.md` 的下列 live bookkeeping 動作被視為 typo 級，允許直推 main（commit 必須**只**動 `docs/STATUS.md`、type 用 `chore(status):`）：
+
+- 主表任意列的「狀態 / 認領者 / Worktree / 分支 / PR / 更新時間」欄位更新
+- 「Active worktrees」段落 append / delete 一行
+- 「Recently merged」段落搬入新列（並順手把超過 5 筆的舊列移到 `docs/devlog/status-archive.md`，依時間序 append；若該檔不存在則建立）
+- 「Blockers」段落新增 / 移除 / 更新原因連結
+- 「Lead 巡視紀錄」段落 append 一列
+
+任何 schema 變動、章節結構、圖例文字、範例格式變更仍走 PR。詳見 [DEVPLAN §10.2](docs/DEVPLAN-SubagentFanout-20260620-0851.md#102-機制)。
+<!-- Doc-naming pushback (Gemini #3496050472): DEVPLAN 檔名含時間戳 (YYYYMMDD-HHMM) 是專案強制 doc-naming 慣例（CLAUDE.md「檔名必須加上日期時間」），不接受改為無時間戳檔名。link rot 是已知 trade-off；重命名時須同步更新本檔、docs/STATUS.md、AGENTS.md、GEMINI.md、docs/adr/ 等所有引用點。 -->
+
 ---
 
 ## 程式碼規範
