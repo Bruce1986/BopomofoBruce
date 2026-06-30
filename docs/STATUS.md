@@ -2,6 +2,8 @@
 
 **這是 live 檔。** 開工前必讀；認領時必改；merge 後也要改。
 
+<!-- Doc-naming: DEVPLAN 檔名含時間戳 (YYYYMMDD-HHMM) 是專案強制慣例（讓人一眼知道何時寫的）。若未來重命名 DEVPLAN，這份檔案的兩個連結 + project-handbook.md + AGENTS.md / GEMINI.md / docs/adr/ 內所有引用必須同步更新。連結 rot 是已知 trade-off。 -->
+
 > 規則與認領協議：[DEVPLAN-SubagentFanout §10](DEVPLAN-SubagentFanout-20260620-0851.md#10-協調與-visibility--statusmd-live-表格)
 > 啟動 prompt 模板：[DEVPLAN-SubagentFanout §6](DEVPLAN-SubagentFanout-20260620-0851.md#6-子代理啟動樣板)
 

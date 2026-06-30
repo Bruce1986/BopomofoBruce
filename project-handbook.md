@@ -61,7 +61,7 @@ Solo dev 階段：自己 review、留 24 小時冷卻再 merge。
 
 - 主表任意列的「狀態 / 認領者 / Worktree / 分支 / PR / 更新時間」欄位更新
 - 「Active worktrees」段落 append / delete 一行
-- 「Recently merged」段落搬入新列（並順手把超過 5 筆的舊列移到 `docs/devlog/`）
+- 「Recently merged」段落搬入新列（並順手把超過 5 筆的舊列移到 `docs/devlog/status-archive.md`，依時間序 append；若該檔不存在則建立）
 - 「Blockers」段落新增 / 移除 / 更新原因連結
 - 「Lead 巡視紀錄」段落 append 一列
 
