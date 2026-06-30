@@ -657,7 +657,7 @@ W14  W4 polish     W4-A README   W4-B a11y         W4-C perf
 
 **鎖機制**：誰先 `git push origin main` 改該列誰得手。push 衝突時，`git pull --rebase` 後**重檢主表該列的狀態欄**；若已被搶走則放棄、回報 lead。
 
-> Race condition 的範圍：`git push` 序列化只保證「commit 不會交錯」，**不保證 STATUS.md 主表 + Active worktrees + Recently merged + Blockers + Lead 巡視紀錄五處欄位永遠一致**。每次改動務必相關段落一起改、單一 commit，並依靠 §10.3 列出的人工 sanity checklist 兜底（自動化 lint script 待補）。一秒內兩個人搶同一包是稀有事件，但別假設它不會發生 — rebase 後重檢主表是真正的防線。
+> Race condition 的範圍：`git push` 序列化只保證「commit 不會交錯」，**不保證 STATUS.md 主表 + Active worktrees + Recently merged + Blockers + Lead 巡視紀錄五處欄位永遠一致**。每次改動務必相關段落一起改、單一 commit，並依靠 §10.3 列出的人工 sanity checklist 兜底。一秒內兩個人搶同一包是稀有事件，但別假設它不會發生 — rebase 後重檢主表是真正的防線。
 
 **與專案 push policy 的關係**：`project-handbook.md` 規定 main 直推只限 typo 級小修。**`docs/STATUS.md` 的 live bookkeeping 動作被列為例外、比照 typo-class 直推允許**（同一 commit 必須只動 `docs/STATUS.md`、commit type 用 `chore(status):`）。允許的動作清單與 [`project-handbook.md` Code Review 流程段](../project-handbook.md#3-review)的例外條款字面**一字不差**地一致：
 
@@ -680,7 +680,7 @@ W14  W4 polish     W4-A README   W4-B a11y         W4-C perf
   - **Recently merged**（最近 5 筆）：merge 完搬到這
   - **Blockers**：被 ⛔ 卡住的包，附原因連結
 
-每個 sub-agent 啟動時的 pre-flight 第 0 步必須做 **人工** sanity check（自動化 lint script `scripts/status-lint.sh` 待補；issue 追在 [W4-C 之前的 tooling backlog]）：
+每個 sub-agent 啟動時的 pre-flight 第 0 步必須做 **人工** sanity check：
 
 - 主表狀態必為 6 圖例其中之一
 - Claimed/In progress/In review 列必有對應的 Worktree 與分支欄
