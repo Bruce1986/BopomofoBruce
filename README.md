@@ -5,7 +5,7 @@
 
 Google 注音輸入法（`com.google.android.apps.inputmethod.zhuyin`）自 2017 年起未再更新，2024 年後在新版 Android 上的相容性與體驗逐漸惡化。本專案以 clean-room 方式從零重建，並補上 2026 年該有的：Material You、Jetpack Compose、隱私可驗證、完全離線的核心解碼。
 
-> ⚠️ **狀態：M0 — 立項中。** 還沒有可用的 APK。Roadmap 見 [docs/](./docs)。
+> ⚠️ **狀態：W0（骨架期）完成，W1 未開工。** Gradle 骨架、CI、`:common` 介面契約、ADR-0001~0005 已 merge（2026-06-20）；libchewing spike 與各功能 module 尚未開始，還沒有可用的 APK。即時進度見 [docs/STATUS.md](./docs/STATUS.md)，最近一次全案審查見 [docs/REVIEW-ProjectStatus-20260807-0209.md](./docs/REVIEW-ProjectStatus-20260807-0209.md)。
 
 ---
 
@@ -49,7 +49,7 @@ BopomofoBruce 的差異化在 **UX + 主題 + 隱私**，不在解碼引擎（�
 
 ## Building
 
-(尚未可建置，待 M0 spike 完成後補。)
+骨架已可建置（`./gradlew build`，CI 同步驗證），但尚無可安裝使用的 IME。完整建置說明待 libchewing spike（W1-A）完成後補。
 
 ---
 

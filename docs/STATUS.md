@@ -6,7 +6,7 @@
 > 啟動 prompt 模板：[DEVPLAN-SubagentFanout §6](DEVPLAN-SubagentFanout-20260620-0851.md#6-子代理啟動樣板)
 <!-- Doc-naming pushback (Gemini #3496050473): DEVPLAN 檔名含時間戳 (YYYYMMDD-HHMM) 是專案強制 doc-naming 慣例（CLAUDE.md「檔名必須加上日期時間」），不接受改為無時間戳檔名。link rot 是已知 trade-off；重命名時須同步更新本檔所有指向 DEVPLAN 的引用，以及 project-handbook.md / AGENTS.md / GEMINI.md / docs/adr/。 -->
 
-最後一次 lead 巡視：2026-06-20 08:51
+最後一次 lead 巡視：2026-08-07 02:09
 
 ---
 
@@ -29,9 +29,9 @@
 
 | ID | Wave | 範圍（獨占模組／檔案） | 狀態 | 認領者 | Worktree | 分支 | PR | 更新時間 |
 |----|------|----------------------|------|--------|----------|------|----|---------|
-| W1-A | W1 | `:decoder-native` libchewing → libbpmf.so | 🟡 Claimed | claude-subagent-w1-a | ../BopomofoBruce-w1-decoder-native | feat/w1-decoder-native | — | 2026-06-20 20:56 |
-| W1-B | W1 | `:theme` Material You + 自訂相片背景 | 🟡 Claimed | claude-subagent-w1-b | ../BopomofoBruce-w1-theme | feat/w1-theme | — | 2026-06-20 20:56 |
-| W1-C | W1 | `:keyboards` 注音 4×10、符號、數字、密碼 | 🟡 Claimed | claude-subagent-w1-c | ../BopomofoBruce-w1-keyboards | feat/w1-keyboards | — | 2026-06-20 20:56 |
+| W1-A | W1 | `:decoder-native` libchewing → libbpmf.so | 🔵 Backlog | — | — | — | — | 2026-08-07 02:09 |
+| W1-B | W1 | `:theme` Material You + 自訂相片背景 | 🔵 Backlog | — | — | — | — | 2026-08-07 02:09 |
+| W1-C | W1 | `:keyboards` 注音 4×10、符號、數字、密碼 | 🔵 Backlog | — | — | — | — | 2026-08-07 02:09 |
 | W2-A | W2 | `:decoder` JNI binding + 個人字典（Room） | 🔵 Backlog | — | — | — | — | — |
 | W2-B | W2 | `:ime` InputMethodService + Compose IME view | 🔵 Backlog | — | — | — | — | — |
 | W2-C | W2 | `:settings` 設定頁 + FirstRun | 🔵 Backlog | — | — | — | — | — |
@@ -49,9 +49,7 @@
 
 > 認領 / 開工時 append；merge 後刪。
 
-- W1-A  ../BopomofoBruce-w1-decoder-native  feat/w1-decoder-native  PR —  agent=claude-subagent-w1-a  since=2026-06-20 20:56
-- W1-B  ../BopomofoBruce-w1-theme  feat/w1-theme  PR —  agent=claude-subagent-w1-b  since=2026-06-20 20:56
-- W1-C  ../BopomofoBruce-w1-keyboards  feat/w1-keyboards  PR —  agent=claude-subagent-w1-c  since=2026-06-20 20:56
+_(無 — W1 幽靈認領已於 2026-08-07 巡視清除；`.claude/worktrees/` 下尚有四個 W0 殘留 worktree，其中三個含未提交殘值，見 [REVIEW-ProjectStatus-20260807-0209.md §三](REVIEW-ProjectStatus-20260807-0209.md)，撿完殘值後清除)_
 
 範例格式：
 ```
@@ -91,3 +89,4 @@ _(空)_
 | 日期 | 巡視人 | 動作 |
 |------|--------|------|
 | 2026-06-20 | Bruce | 初始化 STATUS.md，17 包全部 Backlog |
+| 2026-08-07 | claude-lead（審查） | W1-A/B/C 幽靈認領（06-20 認領後 48 天無 heartbeat、worktree/分支從未建立）依 stale 規則退回 Backlog；全案審查報告見 [REVIEW-ProjectStatus-20260807-0209.md](REVIEW-ProjectStatus-20260807-0209.md)；續跑 vs 冷凍待 owner 拍板 |

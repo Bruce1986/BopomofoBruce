@@ -38,3 +38,6 @@ Thumbs.db
 .python-version
 __pycache__/
 node_modules/
+
+# Claude Code 本機工作目錄（含殘留 worktree），不入版控
+.claude/

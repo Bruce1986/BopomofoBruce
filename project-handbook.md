@@ -7,7 +7,7 @@
 | **專案名稱** | BopomofoBruce |
 | **在生態系統中的角色** | 開源繁體中文（注音）Android 輸入法。Clean-room 重寫已停更的 Google 注音輸入法。 |
 | **開發優先順序** | 個人作品集 / 副業專案 |
-| **目前階段** | M0 — 立項中 |
+| **目前階段** | W0 完成、W1 未開工（2026-08-07 審查認定；即時進度以 [docs/STATUS.md](docs/STATUS.md) 為準） |
 | **架構說明** | [README.md](README.md)、[docs/REBUILD-PLAN-SoloEdition-20260530-1325.md](docs/REBUILD-PLAN-SoloEdition-20260530-1325.md) |
 
 > ⚠️ **此專案不做的事：**
@@ -19,15 +19,7 @@
 
 ## 任務清單
 
-| 任務編號 | 說明 | 狀態 | 依賴 / 備註 |
-|----------|------|------|-------------|
-| M0-1 | GitHub repo 公開、LICENSE、.gitignore | 🟡 | — |
-| M0-2 | Gradle 骨架 + Version Catalog | ⏳ | — |
-| M0-3 | CI workflow（Gradle build + Android Lint + unit test）；首次 push workflow 檔需先 `gh auth refresh -s workflow` | ⏳ | M0-2 |
-| M0-4 | libchewing JNI spike：注音→候選詞 logcat | ⏳ | M0-2 |
-| M0-5 | ADR-0001 為何選 libchewing | ⏳ | M0-4 |
-
-**狀態圖例：** ⏳ 待開始 ｜ 🟡 進行中 ｜ 🔍 審核中 ｜ ✅ 完成 ｜ ⛔ 阻塞
+**單一真相來源是 [docs/STATUS.md](docs/STATUS.md)（Wave 制工作包表）**——本手冊不再維護第二份任務表，避免雙真相來源失真（2026-08-07 審查改制；改制前的 M0-x 舊表已由 W0 各包取代，其中原 M0-4 libchewing spike 對應 W1-A，仍未開工）。
 
 ---
 
