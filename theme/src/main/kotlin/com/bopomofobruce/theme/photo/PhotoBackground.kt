@@ -14,6 +14,9 @@ import kotlinx.serialization.UseSerializers
  *   離譜大的值——模糊層邊界外擴、在部分渲染路徑上可能造成明顯效能與畫面裁切問題）。
  * - [opacity]：疊加不透明度，`0f`（完全透明）..`1f`（完全不透明）。
  * - [tint]：疊加色（ARGB [UInt]，比照 [com.bopomofobruce.common.KeyboardColors] 慣例），`null` 代表不上色。
+ *   [PhotoBackgroundLayer] 用 `BlendMode.SrcAtop` 套用這個顏色：alpha 就是疊色強度本身，`0xFF`（不透明）
+ *   會讓整張相片被蓋成純色矩形、完全看不到底圖。這裡的 `init` **不會**驗證或限制 alpha——想要「疊色但仍看得到 相片」，呼叫端（例如設定頁）必須自己在 UI 上把可選的
+ *   alpha 限制在低值，這是產品/視覺決策，不是本型別的責任。
  */
 @Serializable
 data class PhotoBackground(

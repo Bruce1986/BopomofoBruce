@@ -22,7 +22,10 @@ private const val TAG = "PhotoBackgroundLayer"
  *   fallback，`RenderEffect` 是硬體合成才有的機制。本模組 `minSdk = 28`，所以只在 `Build.VERSION.SDK_INT >=
  *   Build.VERSION_CODES.S`（API 31）時才套用 `.blur()`；`< 31` 一律跳過模糊， 只疊 `.alpha()` 與
  *   [PhotoBackground.tint]（見下）當降級效果——不假裝有模糊。
- * - [PhotoBackground.tint] 用 `ColorFilter.tint(..., BlendMode.SrcAtop)` 疊加，保留原圖亮度層次， 不是整片蓋純色。
+ * - [PhotoBackground.tint] 用 `ColorFilter.tint(..., BlendMode.SrcAtop)` 疊加：`SrcAtop` 的合成結果是 「用 tint
+ *   的 alpha 混合 tint 顏色與底圖」，**不是**「保留底圖亮度層次再上色」。tint 的 alpha 就是疊色強度本身—— 使用者從一般調色盤挑色時 alpha 常是
+ *   `0xFF`（完全不透明），此時每個像素的合成結果都等於 tint 顏色本身， 整張相片會被蓋成一塊純色矩形，看不到任何底圖。要「疊色但仍看得到底圖」，呼叫端必須自己把
+ *   [PhotoBackground.tint] 的 alpha 控制在較低值（例如 UI 上限制在 `0x80` 以下）；本層不會替呼叫端做這個限制。
  * - 圖片載入失敗（例如使用者曾選過的 `content://` URI 因來源 App 移除授權而失效）時， [AsyncImage] 的 `onError` 只記一行
  *   `Log.w`；不擋住底層主題色，讓鍵盤仍可用。
  *
