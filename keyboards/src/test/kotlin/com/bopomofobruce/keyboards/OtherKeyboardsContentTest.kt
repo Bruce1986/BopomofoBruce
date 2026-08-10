@@ -53,6 +53,22 @@ class OtherKeyboardsContentTest {
         assertTrue('.' in digitActions, "numeric keyboard should have a decimal point")
     }
 
+    @Test
+    fun `numeric keyboard can type a minus sign for signed values`() {
+        // F2: numeric_standard previously had 0-9 and '.' but no '-' and no page-switch key, so a
+        // TYPE_CLASS_NUMBER|TYPE_NUMBER_FLAG_SIGNED field (temperature, price delta, offset) could
+        // not have a negative value typed at all, with no escape hatch to another keyboard. Added
+        // as longPress on the '.' key.
+        val chars =
+            Keyboards.numericStandard.rows.flatten().flatMap { key ->
+                listOfNotNull(
+                    (key.action as? KeyAction.Character)?.char,
+                    (key.longPress?.action as? KeyAction.Character)?.char,
+                )
+            }
+        assertTrue('-' in chars, "numeric keyboard cannot type '-' (short or long press)")
+    }
+
     /**
      * Every [KeyAction.Character] reachable from a keyboard, counting both the short-press [action]
      * and (if present) the long-press [com.bopomofobruce.common.KeyData.longPress] action. Used to
@@ -96,8 +112,9 @@ class OtherKeyboardsContentTest {
     @Test
     fun `url keyboard can type the half-width symbols needed for a query string`() {
         // D1: url_qwerty could reach only '/' and '.' beyond letters/digits (C9's fix). The
-        // keyboard's only escape hatch to another page is "123" -> symbol_standard, whose glyphs
-        // are entirely full-width (：－＆＝...) -- visually similar to their ASCII twins but the
+        // keyboard's only escape hatch to another page is "符號" (F1: relabelled from the
+        // misleading "123") -> symbol_standard, whose glyphs are entirely full-width
+        // (：－＆＝...) -- visually similar to their ASCII twins but the
         // wrong code point for a URL. Without half-width ': - _ ? = & # % ~ @' reachable directly
         // on url_qwerty, "http://" and any query string are simply untypeable. Added as longPress
         // on the (shared-with-password) a-l and z-m letter rows.
@@ -162,6 +179,22 @@ class OtherKeyboardsContentTest {
             assertTrue(d in chars, "phone dialpad missing digit '$d'")
         }
         assertTrue('*' in chars && '#' in chars, "phone dialpad missing * or #")
+    }
+
+    @Test
+    fun `phone dialpad can type out common phone number separators`() {
+        // F3: phone_dialpad previously reached only 0-9 * # +, with no way to type '-' as in
+        // "02-2712-3456" / "0912-345-678", no page-switch key, and no way to reach a dial pause
+        // ','. Added '-' as longPress on '+' and ',' as longPress on '#'.
+        val chars =
+            Keyboards.phoneDialpad.rows.flatten().flatMap { key ->
+                listOfNotNull(
+                    (key.action as? KeyAction.Character)?.char,
+                    (key.longPress?.action as? KeyAction.Character)?.char,
+                )
+            }
+        assertTrue('-' in chars, "phone dialpad cannot type '-' (short or long press)")
+        assertTrue(',' in chars, "phone dialpad cannot type ',' (short or long press)")
     }
 
     @Test

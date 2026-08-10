@@ -30,7 +30,10 @@ object Keyboards {
         KeyboardLoader.loadFromResource("keyboards/symbol_standard.json")
     }
 
-    /** 純數字（計算機式 3 欄）。 */
+    /**
+     * 純數字（計算機式 3 欄）。`.` 鍵的 longPress 掛 `-`（F2），供 `TYPE_NUMBER_FLAG_SIGNED`
+     * 欄位（溫度、價差、偏移量）輸入負數；本頁沒有切頁鍵，是唯一終端頁。
+     */
     val numericStandard: KeyboardDef by lazy {
         KeyboardLoader.loadFromResource("keyboards/numeric_standard.json")
     }
@@ -44,12 +47,20 @@ object Keyboards {
      * `:ime` 有機會把它誤 render 成一顆可按 的鍵，比「列與列鍵柱沒對齊」更糟。因此各列**左邊界對齊、右邊界依各列 weight 總和自然收尾**，跨列的水平
      * 留白（讓鍵柱視覺對齊）留給 `:ime`（W2-B）渲染時自行處理，例如用容器 padding 或依最大列寬正規化，而不是 在 `:common`/`:keyboards`
      * 這層資料模型硬湊。`url_qwerty` 也是同樣狀況（10 / 9 / 9.6 / 8.8）。
+     *
+     * **F1 已知落差**：控制列的切頁鍵標籤是「符號」（原本誤標「123」，`symbol_toggle` 這個 action 唯一的目的地是 [symbolStandard]，那頁一個
+     * ASCII 數字都沒有——見 [symbolStandard] 的 KDoc 與 `OtherKeyboardsContentTest` 釘死的「全形、非 ASCII」測試）。
+     * 也就是說**在密碼／URL 欄位按下這顆鍵，使用者得到的是全形標點頁，不是半形數字或半形符號 頁**——本模組目前沒有半形符號頁可切，這是已知落差，登記為
+     * W2-B（`:ime`）follow-up： 若要讓使用者在密碼／URL 情境切到「真正半形」的符號/數字頁，需要新增一份半形符號頁（新的 交付範圍，不在本輪處理）。
      */
     val passwordQwerty: KeyboardDef by lazy {
         KeyboardLoader.loadFromResource("keyboards/password_qwerty.json")
     }
 
-    /** 電話撥號鍵盤。 */
+    /**
+     * 電話撥號鍵盤。`+` 鍵的 longPress 掛 `-`、`#` 鍵的 longPress 掛 `,`（撥號暫停）（F3），供台灣常見
+     * 「02-2712-3456」「0912-345-678」電話號碼分隔符輸入；本頁沒有切頁鍵，是唯一終端頁。
+     */
     val phoneDialpad: KeyboardDef by lazy {
         KeyboardLoader.loadFromResource("keyboards/phone_dialpad.json")
     }
