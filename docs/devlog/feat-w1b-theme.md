@@ -25,9 +25,13 @@
   套用。
 - Compose `@Preview`：`theme/.../preview/ThemePreviews.kt` 四個預覽
   （Light / Dark / Material You 退化路徑 `apiLevel = 30` / Material You 動態取色
-  路徑 `apiLevel = 35`）共用一個 `ThemeSwatch` 假鍵盤列 render。
-- 32 條 unit test（style round-trip、validation、photo round-trip、color
-  round-trip、內建主題、MaterialYouTheme 退化分支與值語意）。
+  路徑 `apiLevel = 35`）共用一個 `ThemeSwatch` 假鍵盤列 render。**G2 後**：候選列
+  只有第一個候選套 `candidateHighlight`、其餘留在 `background`（契約語意是「標示
+  cursor 位置」，不是整列都選中）；按鍵列多一顆 `keyAccent` 底色的功能鍵（模擬
+  ⌫），是全模組唯一引用 `keyAccent` 的渲染程式碼。
+- 48 條 unit test（style round-trip、validation、photo round-trip、color
+  round-trip、內建主題對比度守門、MaterialYouTheme 退化分支與值語意、動態取色
+  選色函式 `pickAccentColor`）。
 
 ## 驗收結果
 
@@ -36,7 +40,7 @@
 | 三主題各有 `@Preview` | ✅ 過（`LightThemePreview` / `DarkThemePreview` / `MaterialYouThemeFallbackPreview` + `MaterialYouThemeDynamicPreview`，共 4 個；B14 後 Material You 拆成兩條路徑各一個）。證據等級：函式存在且編譯通過，未實際在 Android Studio 內 render 過。 |
 | 主題序列化/反序列化 round-trip test | ✅ 過（`StyleSheetSerializationTest`、`PhotoBackgroundTest`，含巢狀 `UIntHexSerializer`） |
 | `./gradlew :theme:assembleDebug` | ✅ 過 |
-| `./gradlew :theme:testDebugUnitTest` | ✅ 過（32/32，見下方「踩雷」） |
+| `./gradlew :theme:testDebugUnitTest` | ✅ 過（48/48，見下方「踩雷」與 2026-08-11 第九輪紀錄） |
 | `./gradlew :theme:ktfmtCheck` | ✅ 過（`BUILD SUCCESSFUL`；期間跑過 `:theme:ktfmtFormat` 修過格式後才綠——含 2026-08-10 B12/B14/B15 修正後、最後一次 commit 之後重跑的結果） |
 | `./gradlew :theme:lint` | ✅ 過（`BUILD SUCCESSFUL`，`lint-results-debug.txt`：`No issues found.`——2026-08-10 B12/B14/B15 修正後、最後一次 commit 之後重跑的結果） |
 | PhotoBackground 實機渲染 < 200 ms | ❌ **沒有量測**——沒有連上 Pixel 6 / 任何實機做這項；本 session 只跑到 JVM unit test 與 AGP 編譯層級，誠實回報未驗證，不編數字。 |
@@ -205,3 +209,74 @@
   `background` 的分離度在**任何**桌布下都落在 1.2～1.9 量級——固定色盤剛修掉的缺陷，在動態
   路徑上原封不動存在。這條無法用 JVM 測試驗證，標為推理；一併掛在既有的 W2 契約 follow-up
   （`KeyboardColors` 缺 on-accent / on-candidate-highlight 色）之下。
+
+## 2026-08-11 第九輪 — G1/G2/G3
+
+- **G1（medium）：守門的嚴格度反了，`BuiltInThemesContrastTest` 逐條核對後發現三個問題。**
+  1. `keyText/keyFill`（一般鍵的字疊在一般鍵底色上、鍵盤上被讀最多次的畫素）只鎖 3.0，
+     實測 Light 17.13:1、Dark 11.12:1，餘裕巨大卻鬆到讓「keyFill 調到 3.x:1」仍全綠。
+  2. 類別 KDoc 明文寫「`candidateText/candidateHighlight` 也用 AA 的 4.5」，但 Light 那條
+     實際只斷言 3.0（Dark 已是 4.5），KDoc 與測試自相矛盾。
+  3. `candidateText` 對 `background`（候選列上未被選中、也就是大多數候選字畫在背景上的
+     組合）完全沒有門檻。
+  已改：`keyText/keyFill`（Light/Dark 兩條）、`candidateText/candidateHighlight`（Light 那條，
+  Dark 本來就是 4.5）全部提到 4.5；新增 `candidateText` 對 `background` 的兩條 4.5 門檻
+  （Light 14.90:1、Dark 13.27:1，Python 重算過的實測值）。類別 KDoc 同步改寫成「keyText/keyFill
+  與 candidateText/background 皆為 AA 4.5」的實際狀態。
+  **已證明守門有效**：把 Light 的 `keyFill` 暫改成 `#717171`（對 keyText 3.5097:1），重跑
+  `BuiltInThemesContrastTest`，`LightTheme keyText on keyFill meets WCAG AA text contrast`
+  立刻 FAILED（`org.opentest4j.AssertionFailedError: expected >= 4.5, was 3.509685660644931`）；
+  還原後重跑全綠。（連帶讓 `LightTheme keyAccent stands out from keyFill and background`
+  也 FAILED，因為改動的 `keyFill` 同時是那條測試的分母——這是這次示範刻意選值造成的副作用，
+  不影響 G1 本身要證明的事。）
+
+- **G2（medium）：`keyAccent` 在渲染程式碼中出現次數為零，`ThemeSwatch` 也把候選列語意畫錯。**
+  Grep 確認過整個 `theme/src/main` 只有色值定義與 `MaterialYouTheme` 的映射提到
+  `keyAccent`，`ThemeSwatch`（四個 `@Preview` 共用的唯一視覺產出）從未畫過它，owner 卻在
+  B22→B24 兩輪被要求對它做視覺取捨。另外 `ThemeSwatch` 把整條候選列刷成
+  `candidateHighlight`，但 `:common` 契約語意是「候選列上目前 cursor 位置的底色」，等於把
+  「一個候選被選中」畫成「整列都被選中」，`background` 在候選列區域完全不出現。
+  已改（純預覽層，`ThemeSwatch` 本身，未動任何主題色值）：
+  1. 候選列改成整列先鋪 `background`，只有第一個候選（`Modifier.background(...)`）套
+     `candidateHighlight`，其餘用 `Color.Transparent` 留在 `background` 上。
+  2. 按鍵列加一顆 `keyAccent` 底色的 ⌫ 功能鍵，上面照樣畫 `keyText`——讓 `keyAccent` 對
+     `keyFill`、對 `background`，以及 `keyText` 疊在其上這三組關係一次入鏡。
+  這是預覽用 Composable，本模組沒有 Compose render test（沿用既有的誠實揭露：四條
+  `@Preview` 只驗證到編譯通過），用 `:theme:assembleDebug` 確認編譯通過。
+
+- **G3（P1／high，codex 獨立審查）：動態 Material You 路徑重現了 B22/B24 剛修掉的缺陷。**
+  `MaterialYouTheme.dynamicColorsFor()` 原本把 `keyAccent` 寫死映到
+  `scheme.primaryContainer`、`candidateHighlight` 寫死映到 `scheme.secondaryContainer`。
+  M3 的 `*Container` 與 `surface` 是固定 tone 目標（light 下 surface≈98/container≈90，
+  dark 下 10/30），桌布只換色相與彩度、不換 tone，所以這個映射在任何桌布下都只有
+  約 1–2:1 的自身分離度——跟固定色盤剛修掉的缺陷同源，且影響每一個 Material You 使用者。
+  **已修，不是「做不到」**：新增 `theme/src/main/kotlin/com/bopomofobruce/theme/color/DynamicAccentSelection.kt`，
+  公開純函式 `pickAccentColor(candidates, textPartner, separationReferences, textThreshold = 4.5)`：
+  先篩出對 `textPartner` 達 4.5 的候選，若有則取「與 `separationReferences` 的最小分離度」
+  最大的一個；若沒有候選過文字門檻，退回「文字對比度最高」的候選，不偽造假合格值。
+  `MaterialYouTheme.dynamicColorsFor()` 改成從多個候選角色（`primaryContainer` /
+  `tertiaryContainer` / `secondaryContainer` / `primary` / `tertiary` / `secondary` /
+  `inversePrimary` / `onSurfaceVariant`）中挑，`keyAccent` 的 `separationReferences` 是
+  `[keyFill, background]`、`candidateHighlight` 只看 `[background]`（依契約語意）。
+  **這個函式是純數學、不需要 Android runtime，已用假造的色彩組合在 JVM 覆蓋**
+  （`AccentColorSelectionTest`，4 條）：
+  1. 「container 與 surface 幾乎同 tone、分離度差」vs.「文字剛過門檻但分離度好」的候選並存時，
+     選分離度好的那個，不是優先序第一個。
+  2. 「所有候選都不過文字門檻」的極端情境（模擬 G3 描述的最壞桌布），退回文字對比度最高的候選、
+     不崩潰也不偽造合格值。
+  3. 同分時保留優先序在前的候選。
+  4. `separationReferences` 只看呼叫端傳入的參照色，不會偷用其他色（合成色值驗證，
+     不綁在任何真實主題數字上）。
+  **已證明測試有效**：把 `pickAccentColor` 暫時改成 `return candidates.first()`（模擬修正前的
+  「寫死映射」行為），重跑 `AccentColorSelectionTest`，4 條裡有 3 條 FAILED
+  （`picks the candidate with the best separation...`、
+  `falls back to the highest text contrast candidate...`、
+  `separation is scored only against the references...`，皆為
+  `org.opentest4j.AssertionFailedError`）；還原後重跑全綠。
+  `dynamicLightColorScheme`/`dynamicDarkColorScheme` 呼叫本身仍然需要系統資源，本檔依然沒有
+  Robolectric、也沒有實機驗證——**這件事沒有變**：改動只讓「給定一組桌布色彩，選色函式會不會
+  選對」有守門，實際桌布數字（真實 `ColorScheme` 各角色的實際 RGB 值）仍未驗證，誠實記在此。
+
+- **本輪額外查核**：三條 finding 逐條核對後，內容與程式碼現況一致，沒有發現 finding 本身有誤的地方。
+  唯一補充：G1 描述「Light 那條實際只斷言 3.0」時舉的實測值（Light 4.61）與本輪重算的 4.62
+  略有小數點差異（四捨五入），不影響結論，門檻與現值關係不變。
