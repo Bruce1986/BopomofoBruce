@@ -42,4 +42,15 @@ class MaterialYouThemeTest {
         assertEquals(DarkTheme.colors, theme.colors)
         assertEquals(DarkTheme.dimens, theme.dimens)
     }
+
+    @Test
+    fun `two calls with the same inputs produce equal instances`() {
+        val first =
+            MaterialYouTheme.from(context, darkMode = false, sdkInt = Build.VERSION_CODES.S - 1)
+        val second =
+            MaterialYouTheme.from(context, darkMode = false, sdkInt = Build.VERSION_CODES.S - 1)
+
+        assertEquals(first, second)
+        assertEquals(first.hashCode(), second.hashCode())
+    }
 }

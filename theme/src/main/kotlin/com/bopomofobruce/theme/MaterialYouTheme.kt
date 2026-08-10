@@ -11,6 +11,7 @@ import com.bopomofobruce.common.KeyboardDimens
 import com.bopomofobruce.common.KeyboardTheme
 import com.bopomofobruce.theme.color.toKeyboardUInt
 import com.bopomofobruce.theme.style.StyleSheet
+import kotlin.ConsistentCopyVisibility
 
 /**
  * Material You 動態色主題。Android 12+（API 31，`Build.VERSION_CODES.S`）讀系統桌布色；<31 沒有
@@ -20,9 +21,15 @@ import com.bopomofobruce.theme.style.StyleSheet
  * [sdkInt] 開一個建構參數而非直接讀 `Build.VERSION.SDK_INT`，是為了讓「<31 退化」這條分支可以在純 JVM unit test 下驗證，不需要
  * Robolectric（本專案目前沒有引入）。>=31 分支呼叫真正的 `dynamicLightColorScheme(Context)` 需要 Android runtime
  * 提供的系統資源，只能在 connectedAndroidTest / 實機驗證，這裡沒有量測。
+ *
+ * `data class`：equals/hashCode 以 [id] + [styleSheet] 為準，讓相同輸入兩次呼叫 [from] 得到相等的實例 （[styleSheet] 本身已是
+ * data class，逐欄位比較）。這只解決值語意，**不會**讓用到 [MaterialYouTheme] 的 composable 自動被 Compose 跳過重組——2.0.20+ 的
+ * strong skipping 對 unstable 型別是用 `===` 比較， 要真的可 skip 必須在 `:common` 的 [KeyboardTheme] interface 標
+ * `@Stable`/`@Immutable`，那屬於 contracts-v1（凍結中），本模組不能動，已記在 devlog 當 W2 follow-up。
  */
-class MaterialYouTheme private constructor(override val id: String, val styleSheet: StyleSheet) :
-    KeyboardTheme {
+@ConsistentCopyVisibility
+data class MaterialYouTheme
+private constructor(override val id: String, val styleSheet: StyleSheet) : KeyboardTheme {
 
     override val colors: KeyboardColors
         get() = styleSheet.colors

@@ -26,8 +26,8 @@
 - Compose `@Preview`：`theme/.../preview/ThemePreviews.kt` 三個預覽
   （Light / Dark / Material You fallback path）共用一個 `ThemeSwatch` 假鍵盤列
   render。
-- 26 條 unit test（style round-trip、validation、photo round-trip、color
-  round-trip、內建主題、MaterialYouTheme 退化分支）。
+- 32 條 unit test（style round-trip、validation、photo round-trip、color
+  round-trip、內建主題、MaterialYouTheme 退化分支與值語意）。
 
 ## 驗收結果
 
@@ -36,9 +36,9 @@
 | 三主題各有 `@Preview` | ✅ 過（`LightThemePreview` / `DarkThemePreview` / `MaterialYouThemePreview`） |
 | 主題序列化/反序列化 round-trip test | ✅ 過（`StyleSheetSerializationTest`、`PhotoBackgroundTest`，含巢狀 `UIntHexSerializer`） |
 | `./gradlew :theme:assembleDebug` | ✅ 過 |
-| `./gradlew :theme:testDebugUnitTest` | ✅ 過（26/26，見下方「踩雷」） |
-| `./gradlew :theme:ktfmtCheck` | ✅ 過（`BUILD SUCCESSFUL`；期間跑過 `:theme:ktfmtFormat` 修過兩檔格式後才綠） |
-| `./gradlew :theme:lint` | ✅ 過（`BUILD SUCCESSFUL`，`lint-results-debug.txt`：`No issues found.`） |
+| `./gradlew :theme:testDebugUnitTest` | ✅ 過（32/32，見下方「踩雷」） |
+| `./gradlew :theme:ktfmtCheck` | ✅ 過（`BUILD SUCCESSFUL`；期間跑過 `:theme:ktfmtFormat` 修過格式後才綠——含 2026-08-10 B12/B14/B15 修正後、最後一次 commit 之後重跑的結果） |
+| `./gradlew :theme:lint` | ✅ 過（`BUILD SUCCESSFUL`，`lint-results-debug.txt`：`No issues found.`——2026-08-10 B12/B14/B15 修正後、最後一次 commit 之後重跑的結果） |
 | PhotoBackground 實機渲染 < 200 ms | ❌ **沒有量測**——沒有連上 Pixel 6 / 任何實機做這項；本 session 只跑到 JVM unit test 與 AGP 編譯層級，誠實回報未驗證，不編數字。 |
 
 ## 踩雷 / 決定
@@ -60,7 +60,7 @@
   - `internal fun from(context, darkMode, sdkInt)`：測試專用，標 `@VisibleForTesting`。
     用 `internal` 而非只掛註解，是因為 `@VisibleForTesting` 只會產生 lint 警告、
     本專案沒開 `warningsAsErrors`，擋不住模組外部呼叫；`internal` 才是編譯期強制，
-    而同 module 的 unit test source set 仍呼叫得到（已實測編譯與 31 條測試皆過）。
+    而同 module 的 unit test source set 仍呼叫得到（已實測編譯與全部測試皆過，見上方驗收表）。
 
   >=31 呼叫
   `dynamicLightColorScheme(Context)` 需要真系統資源，這條分支沒有
@@ -74,3 +74,46 @@
   `Build.VERSION.SDK_INT >= 31` 判斷，<31 時不套 `.blur()`、只疊
   `.alpha()` / `tint` 當降級效果；(3) `AsyncImage` 加 `onError` 記 log，圖片
   載入失敗時至少可觀測、且不擋住底層主題色。
+
+## 2026-08-10 獨立驗證回合（B12/B14/B15/B19）
+
+- **B12（誠實文件修正，非行為改動）**：`PhotoBackgroundLayer.kt` KDoc 原本寫
+  `SrcAtop` tint「保留原圖亮度層次，不是整片蓋純色」——這句在最常見輸入下是
+  **錯的**。從合成公式推導：`SrcAtop` 的結果是「用 tint 的 alpha 混合 tint 顏色
+  與底圖」，tint 的 alpha 就是疊色強度本身；使用者從一般調色盤挑色時 alpha 常
+  是 `0xFF`（不透明），此時整張相片會被蓋成一塊純色矩形，完全看不到底圖。
+  `PhotoBackground.tint` 的 `init` 沒有限制 alpha，KDoc 原本也只說「疊加色」沒
+  講清楚語意。**決定：不改 `BlendMode`**（換成別的混色模式或加 alpha 上限
+  `require` 是產品/視覺決策，超出修文件 bug 的範圍）——已改寫
+  `PhotoBackgroundLayer.kt` 與 `PhotoBackground.kt` 兩處 KDoc，誠實記載
+  「alpha 就是疊色強度，`0xFF` 會完全蓋掉原圖，呼叫端要自己在 UI 限制低
+  alpha」。**給 owner 的建議**：W2-C 設定頁若讓使用者自訂 tint，UI 上應該把
+  alpha 滑桿限制在低值（例如 `0x80` 以下），或考慮改用
+  `BlendMode.Multiply` / `Modifier.alpha()` 疊一層純色矩形之類「一定保留底圖」
+  的混色方式；這兩個都是視覺設計選擇，本次只修文件、未動行為。
+- **B14**：`ThemePreviews.kt` 的 `MaterialYouThemePreview` 原本沒有指定
+  `@Preview(apiLevel = ...)`（預設 -1，由 tooling 決定），KDoc 卻斷言「Preview
+  tooling 跑在 API<31」——這句沒有依據。已拆成兩個預覽：
+  `MaterialYouThemeFallbackPreview`（`apiLevel = 30`，明確釘住 <31 退化路徑）與
+  `MaterialYouThemeDynamicPreview`（`apiLevel = 35`，釘住 >=31 動態取色路
+  徑），KDoc 改成誠實敘述「以 `apiLevel` 釘住渲染環境，實際桌布取色結果仍須
+  實機驗證」。
+- **B15**：`MaterialYouTheme` 原本是普通 class，`from()` 每次 `new`，相同輸入
+  兩次呼叫不相等；`LightTheme`/`DarkTheme` 卻是 `object`（天然單例、相等）。已
+  改成 `data class`（配 `@ConsistentCopyVisibility` 消除 Kotlin 對「非 public
+  建構子暴露在 `copy()`」的警告），equals/hashCode 以 `id` + `styleSheet` 為
+  準（`styleSheet` 本身已是 data class，逐欄位比較）。補了一條
+  `two calls with the same inputs produce equal instances` 測試；改回普通
+  class 重跑會紅（已現場驗證：`assertEquals(first, second)` 因用
+  `AssertionFailedError` 失敗），改回 data class 後綠，證明測試有效保護這個
+  性質。**W2 follow-up（本包不動）**：驗證者指出光加 equals 不會讓用到
+  `MaterialYouTheme` 的 composable 被 Compose 跳過重組——Compose 2.0.20+ 的
+  strong skipping 對 unstable 型別是用 `===` 比較，要真的可 skip 必須在
+  `:common` 的 `KeyboardTheme` interface 標 `@Stable`/`@Immutable`；那是
+  contracts-v1（凍結中），本包不准動，登記給 W2 之後處理。
+- **B19**：本檔驗收表原寫「26/26」，同檔另一處寫「31 條」，實際重新清點是
+  32 條（B15 補了一條測試後）。已更新為實際數字；ktfmtCheck / lint 兩格已在
+  B12/B14/B15 全部改完、最後一次 commit 之後重新跑過，不是沿用中途快照
+  （`ktfmtCheck` 首次重跑抓到本回合新改的 4 個檔案格式跑紅，跑
+  `:theme:ktfmtFormat` 修過後再次 `ktfmtCheck` 才綠；`lint` 重跑仍是
+  `No issues found.`）。
