@@ -25,7 +25,22 @@ object Keyboards {
         KeyboardLoader.loadFromResource("keyboards/zhuyin_4x10_landscape.json")
     }
 
-    /** 標準符號鍵盤（含全形標點 ，。、；：「」『』）。目前僅一頁；多頁／半形切換留待後續。 */
+    /**
+     * 標準符號鍵盤（含全形標點 ，。、；：「」『』）。目前僅一頁；多頁／半形切換留待後續。
+     *
+     * **控制列兩顆切換鍵**（J1，round-11 審查）：
+     * - 「ABC」掛 [com.bopomofobruce.common.KeyAction.LanguageToggle]——字面語意「切換到英文/數字鍵盤」，
+     *   跟標籤一致。**落差**：`Keyboards.all` 目前沒有通用英文鍵盤可當它的目的地（不在 W1-C 交付範圍）， 已登記為 W2-B follow-up，不在本輪新增。
+     * - 「注音」掛 [com.bopomofobruce.common.KeyAction.Custom]（id `"switch_to_zhuyin"`）——`KeyAction`
+     *   sealed 型別裡沒有任何內建變體字面上代表「切回注音鍵盤」（`symbol_toggle`/`language_toggle` 只覆蓋 「去符號」「去英數」兩個方向），改用
+     *   `Custom` 這個 escape hatch（見 [com.bopomofobruce.common.KeyAction] KDoc：「不需要為每個新功能擴 sealed
+     *   子型別」），不動 `:common` 契約。`:ime` 端需對應實作。
+     *
+     * `:ime` 目前需要實作的 `Custom` id 清單（J1 收尾整理，供 W2-B 對照）：
+     * - `"url_insert_dot_com"`（見 [urlQwerty]）
+     * - `"switch_to_zhuyin"`（本鍵盤，切回 [zhuyin4x10Portrait] / [zhuyin4x10Landscape]，依當時 orientation
+     *   擇一）
+     */
     val symbolStandard: KeyboardDef by lazy {
         KeyboardLoader.loadFromResource("keyboards/symbol_standard.json")
     }

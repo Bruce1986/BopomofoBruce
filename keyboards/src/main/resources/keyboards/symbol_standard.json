@@ -221,14 +221,15 @@
       {
         "label": "注音",
         "action": {
-          "type": "language_toggle"
+          "type": "custom",
+          "id": "switch_to_zhuyin"
         },
         "weight": 1.2
       },
       {
         "label": "ABC",
         "action": {
-          "type": "symbol_toggle"
+          "type": "language_toggle"
         },
         "weight": 1.2
       },
