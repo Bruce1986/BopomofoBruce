@@ -258,3 +258,112 @@ ADR-0001 本體。詳細裁示內容見 lead 轉達訊息（本檔不重抄，�
 ### Commit
 
 見本次 PR/分支的完整 commit 列表（子代理最終回報裡有列 sha）。
+
+---
+
+## 第三階段（Opus 級驗證者查證後的 7 條 finding 修正輪，2026-08-10）
+
+以下 7 條 finding 皆經獨立驗證者逐條查證屬實才動手修，逐條記錄處理方式與證據。
+
+- **A5〔high〕測試專用 JNI 進了 release .so**：`decoder-native/cmake/CMakeLists.txt`
+  改成只在 `CMAKE_BUILD_TYPE STREQUAL "Debug"` 時才把 `bpmf_test_jni.c` 加進
+  `add_library(bpmf SHARED ...)` 的來源清單（AGP 對 debug variant 傳
+  `CMAKE_BUILD_TYPE=Debug`，release variant 傳 `RelWithDebInfo`，已用實跑
+  `assembleDebug`/`assembleRelease` 的 log 核對）。用 NDK 的 `llvm-nm -D` 對兩個 ABI 的
+  stripped release `.so` 核對：`bpmf_commit`/`bpmf_free`/`bpmf_init`/`bpmf_input` 四個公開 API
+  在，`nativeTest*` 四個符號**完全不在**；debug `.so` 兩者都在（見下方指令輸出，本輪跑過兩次，
+  格式化前後都核對一致）。另外補了 `bpmf_test_jni.c:30`（`nativeTestInit` 的
+  `GetStringUTFChars`）與原 `:40`（`nativeTestInput` 的）兩處 NULL 檢查：`jstring` 本身為
+  NULL、以及 `GetStringUTFChars` 因 OOM 回傳 NULL 兩種情況都提早 return，不再把 NULL
+  指標往下傳。`bpmf_test_jni.c` 檔頭與 `BpmfTestBridge.kt` 的 KDoc 都補了「這四個符號在
+  release .so 裡缺席，已用 nm -D 驗證」的明文說明，取代原本含糊的 TEST-ONLY 措辭。
+
+  ```
+  === RELEASE arm64-v8a ===
+  bpmf_commit / bpmf_free / bpmf_init / bpmf_input   （僅此四個，nativeTest* 不存在）
+  === RELEASE armeabi-v7a ===
+  bpmf_commit / bpmf_free / bpmf_init / bpmf_input   （同上）
+  === DEBUG arm64-v8a ===
+  bpmf_commit / bpmf_free / bpmf_init / bpmf_input
+  Java_..._BpmfTestBridge_nativeTestCommit/nativeTestFree/nativeTestInit/nativeTestInput
+  ```
+
+- **A6〔high〕字典解壓非原子、壞檔永不自癒**：`ChewingDataPath.kt` 改成寫入
+  `<name>.tmp` 再 `File.renameTo` 原子換名到最終檔名；skip 判斷只看最終檔名是否存在
+  （不再看 `length() > 0`——原檢查對「非零長度截斷檔」完全無效，這正是 finding 描述的
+  bug）；rename 失敗會刪 tmp 並拋 `IOException`。KDoc 的「Idempotent: 非零長度視為已完成」
+  改成準確描述新的原子寫入不變量。**測試證明會失敗**：先把
+  `ChewingDataPathTest.kt` 新增的「中斷複製不留下最終檔名的截斷檔」測試跑在**修正前**的舊版
+  `extractChewingData`（`git show HEAD:...` 取出舊版蓋掉，跑
+  `./gradlew :decoder-native:testDebugUnitTest --rerun`）——RED，1 個測試失敗、斷言最終檔案
+  不該存在但確實存在；換回修正後版本，跑 `--rerun` 重測全 GREEN。另外把舊測試「零長度殘檔會
+  重新解壓」換成「已存在最終檔名時完全信任、不重新讀 assets」，因為新的原子寫入不變量下，
+  「最終檔名存在」本身就是「已完整寫入」的證明，舊測試斷言的情境（半殘檔案卡在最終檔名）
+  在新程式碼下不該再自然發生。
+
+- **A7〔medium〕解壓無同步**：`extractChewingData` 整段包進
+  `synchronized(extractionLock)`（檔案層級的 `private val extractionLock = Any()`），
+  防兩條 thread 同時通過「最終檔名不存在」判斷後交錯寫入同一個 `.tmp`。A6 的 tmp+rename
+  緩解了「半殘檔留在最終名」，但 rename 前的寫入順序本身仍需要序列化，這條鎖補的正是這段。
+
+- **A2〔medium〕userpath 傳了目錄，使用者字典其實從未啟用**：查證 vendored
+  `capi/src/io.rs` 的 `chewing_new3()`（"All parameters will be default if set to NULL"，
+  userpath 為 NULL 時轉成 `Option::None`）與 `src/editor/mod.rs` 的
+  `Editor::chewing()`（`userpath` 為 `None` 時 `custom_userpath` 為 false，
+  完全跳過 `user_dict_mgr.userphrase_path()`/`.init()`，`user_dict` 直接是 `None`，是一個
+  乾淨、有明確語意的 no-op，不是靜默失敗）——確認 `chewing_new3` 接受 NULL userpath 且行為
+  可預期，選 **(b)**：`bpmf_wrapper.c` 的 `chewing_new3()` 呼叫把 userpath 從
+  `data_path` 改成 `NULL`，並在呼叫點與 `bpmf.h` 都寫清楚「W1-A 刻意不啟用 libchewing 內建
+  使用者字典，個人字典由 W2-A 的 Room 負責」。同步修正 `bpmf.h:39-41` 「用作 userpath 所以
+  必須可寫」的失準說明，改成準確描述 `data_path` 只需可讀（syspath-only）。
+
+- **A1〔medium〕C header 沒有執行緒契約**：`bpmf.h` 補了一段「Thread-safety
+  contract」，交叉引用 `ZhuyinDecoder.kt` 的既有措辭（不保證 thread-safe、呼叫方需在同一
+  dispatcher 序列化），並明寫「不要在 BpmfHandle 內加 mutex 補償」——照驗證者的意見，沒有動
+  `bpmf_wrapper.c` 的 `BpmfHandle` 結構本身，純文件修正。
+
+- **A3〔medium〕fetch 腳本 idempotency 名不副實**：`fetch_chewing_data.sh` 的
+  fast-path 判斷從單純 `[[ -f ... ]]` 改成對已存在的 `word.dat`/`tsi.dat` 各自算
+  `shasum -a 256` 比對已知期望值（用當下 repo 裡已存在的檔案跑 `shasum -a 256` 取得，記在腳本
+  常數 `EXPECTED_WORD_DAT_SHA256`/`EXPECTED_TSI_DAT_SHA256`）；下載+解壓後的 `cp` 也改成
+  「先寫 `.tmp` 再 `mv`」的同資料夾原子換名，不再直接 `cp` 到最終檔名。註解同步改成準確描述
+  這個行為，不再宣稱舊版沒做到的「大小正確才跳過」。
+
+- **A4〔medium〕preBuild 綁死網路**：`decoder-native/build.gradle.kts` 拿掉
+  `tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(fetchChewingData) }`
+  這行，只留（且擴充）「會實際讀 `src/main/assets` 的 task」依賴：`merge*Assets`/
+  `package*Assets`（AGP 資源合併管線分兩段，`merge` 產生中介檔、`package` 又直接讀一次
+  source set，兩段都要掛，只掛 `merge` 會被 Gradle 的 task 輸入驗證擋下）與
+  `lint*`/`Lint*`（lint 的 model builder 直接讀 source set 的 assets 目錄，不經過資源合併
+  管線）。**已驗證**：`./gradlew :decoder-native:testDebugUnitTest --dry-run` 印出的完整
+  task graph裡沒有 `fetchChewingData`（`grep -c fetchChewingData` 回 0），且這個 dry-run
+  結果在最終版 `build.gradle.kts` 上重新核對過一次；`assembleDebug`/`assembleRelease`/
+  `lint`/`connectedAndroidTest` 四項都仍會觸發 `fetchChewingData`（因為 assets 已存在於
+  worktree，實際不會真的打網路，只用 log 確認 task 有出現在圖上）並全部成功。
+
+### 修正輪四項 gradle 指令 + 實機測試結果
+
+- `:decoder-native:assembleDebug` → `BUILD SUCCESSFUL`（兩 ABI `.so` 皆產出）
+- `:decoder-native:testDebugUnitTest` → `BUILD SUCCESSFUL`（含新增/修改後的
+  `ChewingDataPathTest` 全數 6 個測試綠）
+- `:decoder-native:ktfmtCheck` → `BUILD SUCCESSFUL`（第一輪 3 個檔案格式不符，跑
+  `ktfmtFormat` 修正後綠）
+- `:decoder-native:lint` → `BUILD SUCCESSFUL`
+- 四項合併在同一次 `./gradlew` 呼叫裡也核對過一次全綠（排除「個別跑綠、合跑因 task 順序
+  觸發 A4 的 Gradle 驗證錯誤」的可能性——事實上第一次合跑真的踩到這個錯誤，`lintAnalyzeDebug`
+  也直接讀 assets 卻沒宣告依賴，這才發現只掛 `merge*Assets` 不夠，追加了 `lint*` 這段）
+- `:decoder-native:connectedAndroidTest`（實機 `R6AIB700988748X`）→ `BUILD SUCCESSFUL`，
+  `BpmfNativeSmokeTest` 3/3 綠（`bpmfInit_withExtractedDictionaryData_succeeds`、
+  `bpmfInput_forNiHao_returnsNonEmptyCandidates`、
+  `bpmfFree_isSafeToCallOnFreshHandleAndDoesNotCrash`），修正輪跑了兩次（CMake 改動後一次、
+  build.gradle.kts 追加 lint 依賴後再一次）確認沒改壞。
+
+### 對 finding 本身的補充意見
+
+- 沒有發現 7 條 finding 裡有誤判或需要 push back 的地方；A2 要求「選 (b) 前先查證
+  `chewing_new3` 是否接受 NULL userpath」這條查證確實非顯而易見（需要讀
+  `capi/src/io.rs` **和** `src/editor/mod.rs` 兩層才能確認 NULL userpath 是乾淨 no-op
+  而非某種降級到 default 路徑的行為），花了額外時間但查證結果明確支持 (b)。
+- A6 舊測試「零長度殘檔會重新解壓」與 A6 修正後的新不變量（最終檔名存在即信任）在語意上
+  互斥，這點 finding 本身沒有明講但邏輯上必然如此；已在上面 A6 段落記錄取捨，供之後回頭
+  查證時參考，不是我自己新發現的額外缺陷。

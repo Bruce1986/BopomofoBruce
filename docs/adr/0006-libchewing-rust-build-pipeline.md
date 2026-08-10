@@ -25,6 +25,16 @@ owner 已就此裁示（見 devlog 2026-08-10 段）：**採用 v0.12.0（commit
 - 我們自己寫的一個薄 C wrapper（`decoder-native/cmake/src/bpmf_wrapper.c`，含 DaChen 鍵盤對照表 — 對照表直接照抄 vendored `src/editor/zhuyin_layout/standard.rs`，不是憑記憶重建）`#include` 上游的 `capi/include/chewing.h`，呼叫 `chewing_new3`/`chewing_handle_Default`/`chewing_cand_*`/`chewing_commit_String`/`chewing_delete` 等公開 C API，`target_link_libraries` 連結剛剛的 `chewing_capi` staticlib，一起編成單一 `libbpmf.so`。這條路線完全比照 upstream 自己的 `CMakeLists.txt`（`add_library(libchewing capi/src/chewing.c)` 接 `chewing_capi`），只是我們的 C 檔案換成 `bpmf_wrapper.c` 輸出 DEVPLAN 指定的 4 個簡化 API，而不是把全部 ~60 個 libchewing C API 都轉出去。
 - 字典資料（`word.dat`/`tsi.dat`）**不**在 CMake/cargo 建置流程裡現編（那需要另外跑 `chewing-cli`，等於再多一個 host-side Rust 建置目標）。改用 `decoder-native/scripts/fetch_chewing_data.sh` 下載 upstream 發布的 prebuilt "Generic" 資料包（`chewing/libchewing-data` release `v2026.3.22`），sha256 校驗後解壓進 `decoder-native/src/main/assets/chewing/`，Gradle 把這個 script 掛在 `preBuild`/`mergeAssets` 前。已驗證這個 `v2026.3.22` release 的 commit（`c44e81aef24b06f1509f19e1be54c99812d0c43f`）與我們 vendor 的 `data` submodule commit **完全一致**，不是版本混搭。二進位資料不進 git（見 `.gitignore`），靠腳本可重現下載。
 
+**（2026-08-10 修正輪更新）** 這個 fetch task **不**掛在 `preBuild`：`preBuild` 也在純 JVM 的
+`testDebugUnitTest`/`testReleaseUnitTest`（例如 `ChewingDataPathTest`）task graph 裡，這些測試
+完全不碰 assets，掛在 `preBuild` 會讓乾淨 checkout 跑一個純 unit test 也要對外連 GitHub，離線環境
+（或額度受限時）會無謂失敗。改成只掛在會實際讀 `src/main/assets` 的 task 上：AGP 的
+`merge*Assets`/`package*Assets`（資源合併管線）與 `lint*`/`Lint*`（lint 的 model builder 直接讀
+source set 的 assets 目錄，不經過 merge/package）。已用 `--dry-run` 核對
+`:decoder-native:testDebugUnitTest` 的 task graph 裡沒有 `fetchChewingData`，且
+`assembleDebug`/`assembleRelease`/`lint`/`connectedAndroidTest` 都仍會觸發它並成功跑完。詳見
+devlog A4。
+
 一句話：**上游已經把「編譯」這件事的重心從 C 編譯器搬到 cargo，我們的建置管線只是如實反映這件事，同時盡量重用上游自己驗證過的 Corrosion 配方，而不是自己發明一套。**
 
 ## Consequences（後果）
