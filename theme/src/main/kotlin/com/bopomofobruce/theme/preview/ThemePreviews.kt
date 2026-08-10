@@ -89,7 +89,11 @@ private fun MaterialYouThemeFallbackPreview() {
 
 /**
  * 用 `@Preview(apiLevel = 35)` 釘住 >=31 的 host，走 [MaterialYouTheme]
- * 的動態取色分支（`dynamicLightColorScheme`）。 Preview tooling 對動態色的模擬桌布不等於實機真實桌布色，實際渲染結果仍須實機驗證，見 devlog。
+ * 的動態取色分支（`dynamicLightColorScheme`）。
+ *
+ * **這條 preview 從未在 Android Studio 內實際開啟驗證過**，只確認過編譯通過。`dynamicLightColorScheme` 會去讀
+ * `android.R.color.system_accentN_*`，那些值在實機上是由 SystemUI 的桌布取色服務在執行期寫入的； Layoutlib 沙盒是否模擬該流程依
+ * Studio／layoutlib 版本而異。因此這條 preview 的結果可能是 「顏色與實機不同」，也可能是「直接 render 失敗」——兩種都沒有被排除。實際取色結果一律以實機為準。
  */
 @Preview(name = "Material You (dynamic)", showBackground = true, apiLevel = 35)
 @Composable

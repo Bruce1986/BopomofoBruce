@@ -97,7 +97,12 @@
   `MaterialYouThemeFallbackPreview`（`apiLevel = 30`，明確釘住 <31 退化路徑）與
   `MaterialYouThemeDynamicPreview`（`apiLevel = 35`，釘住 >=31 動態取色路
   徑），KDoc 改成誠實敘述「以 `apiLevel` 釘住渲染環境，實際桌布取色結果仍須
-  實機驗證」。
+  實機驗證」。**round-5 補充**：四條 preview 全部只驗證到「編譯通過」，沒有任何
+  一條在 Android Studio 內實際開啟 render 過。其中 `apiLevel = 35` 那條會走
+  `dynamicLightColorScheme` 去讀 `android.R.color.system_accentN_*`，那些資源在
+  實機上由 SystemUI 桌布取色服務於執行期寫入，Layoutlib 沙盒是否模擬依版本而異
+  ——所以它可能顏色不準，也可能直接 render 失敗，兩種都沒被排除。刻意不在 preview
+  裡加 try/catch 掩蓋（那是為推測中的失敗加防禦碼），改為誠實記載未驗證。
 - **B15**：`MaterialYouTheme` 原本是普通 class，`from()` 每次 `new`，相同輸入
   兩次呼叫不相等；`LightTheme`/`DarkTheme` 卻是 `object`（天然單例、相等）。已
   改成 `data class`（配 `@ConsistentCopyVisibility` 消除 Kotlin 對「非 public
