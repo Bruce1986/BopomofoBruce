@@ -280,3 +280,67 @@
 - **本輪額外查核**：三條 finding 逐條核對後，內容與程式碼現況一致，沒有發現 finding 本身有誤的地方。
   唯一補充：G1 描述「Light 那條實際只斷言 3.0」時舉的實測值（Light 4.61）與本輪重算的 4.62
   略有小數點差異（四捨五入），不影響結論，門檻與現值關係不變。
+
+  **修正（第十一輪審查追加）**：G3 段落原本沒提到 `keyAccent`/`candidateHighlight` 兩次呼叫
+  `pickAccentColor` 會撞色——這個風險當時漏了，補記在下方 H1。
+
+## 2026-08-11 第十一輪 — H1 撞色與 H2 又一條不可能失敗的測試
+
+- **H1（medium）：`keyAccent` 與 `candidateHighlight` 會挑到同一個顏色（撞色）。**
+  `dynamicColorsFor()` 對 `accentCandidates`／`highlightCandidates` 各呼叫一次
+  `pickAccentColor`，但兩份候選清單成員相同（`primaryContainer` / `tertiaryContainer` /
+  `secondaryContainer` / `primary` / `tertiary` / `secondary` / `inversePrimary` /
+  `onSurfaceVariant` 這 8 個），只是排序不同。用貼近真實 M3 baseline 的 tone 分布實測：
+  container 系 tone≈90 與 surface 幾乎同 tone、primary/secondary/tertiary 系文字對比不到
+  4.5，最後只剩 `inversePrimary` 同時通過文字門檻且分離度最好——**兩次呼叫都選中
+  `0xFFD0BCFF`**。結果是功能鍵按下的底色與候選列選中游標的底色變成同一個顏色，使用者無法用
+  顏色區分「這是功能鍵」還是「這是被選中的候選字」。這正是 G3／B22 註解裡明講要避免的事
+  （「改對應 `secondaryContainer` 以免與 `keyAccent` 撞色」），繞一圈又回來了。兩者各自的
+  對比度都合格，純粹是語意撞色的 UX 缺陷，不違反 WCAG。
+
+  已修：`pickAccentColor`（`theme/src/main/kotlin/com/bopomofobruce/theme/color/DynamicAccentSelection.kt`）
+  新增 `excluded: Set<UInt> = emptySet()` 參數——排除後的候選清單非空就從中選；若排除後變空
+  （理論上只有桌布配色高度單調到所有候選角色都撞在一起才會發生），**忽略排除限制、退回原本
+  規則選色**，不丟例外也不偽造一個不在候選清單裡的假顏色，這個「退化語意」寫進了 KDoc。
+  `MaterialYouTheme.dynamicColorsFor()` 改成先選出 `keyAccent`，再用
+  `excluded = setOf(keyAccent)` 選 `candidateHighlight`，並在呼叫處補了說明退化情境的註解。
+
+  **補測試**（`AccentColorSelectionTest.kt`）：
+  1. `excludes an already-chosen color and picks the next best candidate`——重用既有的
+     `containerLike`/`distinctHue`/`badCandidate` 三個候選，排除掉本來會贏的 `distinctHue`
+     後斷言選中次佳的 `containerLike`。
+  2. `falls back to ignoring the exclusion when every candidate is excluded`——單一候選且
+     該候選同時是 `excluded`，斷言退回原候選（已記載的退化情境，不崩潰）。
+
+  **已證明會紅**：把 `pickAccentColor` 內的排除邏輯暫時改成永遠 `effectiveCandidates =
+  candidates`（不管 `excluded`），重跑 `AccentColorSelectionTest`——
+  `excludes an already-chosen color and picks the next best candidate()` FAILED：
+  `org.opentest4j.AssertionFailedError: expected: <5191563> but was: <8737174>`
+  （`5191563` = `containerLike` 0x4F378B，`8737174` = `distinctHue` 0x855196，證明沒排除時
+  仍選中本應被排除的顏色）。還原後重跑，6 條全綠。
+
+- **H2（medium）：又一條不可能失敗的測試。**
+  `keeps the earlier candidate on an exact tie` 舊寫法是 `listOf(candidate, candidate)`——
+  同一個 UInt 值放兩次，不管 `pickAccentColor` 內部 tie-break 規則是保留先出現的、後出現的、
+  還是隨機挑，回傳值都必然等於 `candidate`，對 KDoc 明文宣稱的 tie-break 語意零鑑別力。
+
+  已修：改用兩個**不同的 UInt**——`earlierCandidate = 0x11855196u`、
+  `laterCandidate = 0x99855196u`。關鍵是 `relativeLuminance()`/`contrastRatio()` 的實作
+  只看 `(argb shr 16) and 0xFF` 這類低 24 bit（R/G/B），完全不讀最上面的 alpha byte
+  （bit 24-31），所以這兩個「不同的 UInt」的分離度分數是**數學上精確相等**（同一個
+  double 值），不是湊巧或四捨五入後相等，可以真正驗證 `maxWithOrNull(compareBy(...))` 在
+  `compare == 0` 時保留先出現的候選。
+
+  **已證明會紅**：把 `pickAccentColor` 最後一行暫時改成
+  `pool.reversed().maxWithOrNull(compareBy(scoreBy))`（反轉 tie-break 方向），重跑
+  `AccentColorSelectionTest`——`keeps the earlier candidate on an exact tie()` FAILED：
+  `org.opentest4j.AssertionFailedError: expected: <293949846> but was: <2575651222>`
+  （`293949846` = `earlierCandidate` 0x11855196，`2575651222` = `laterCandidate`
+  0x99855196，證明反轉後真的選到後面那個）。還原後重跑，6 條全綠。
+
+- **本輪驗收**：`AccentColorSelectionTest` 從 4 條增至 6 條，`:theme` 模組總測試數從 48 增至 50。
+  `./gradlew :theme:assembleDebug :theme:testDebugUnitTest :theme:ktfmtCheck :theme:lint`
+  全部 `BUILD SUCCESSFUL`；`ktfmtCheck` 第一次因新加的 KDoc 換行未套用 ktfmt 而 FAILED，跑
+  `:theme:ktfmtFormat` 後重新完整跑一次四項確認全綠（`lint-results-debug.txt`：
+  `No issues found.`）。
+- **本輪額外查核**：兩條 finding 逐條核對後，內容與程式碼現況一致，沒有發現 finding 本身有誤的地方。
