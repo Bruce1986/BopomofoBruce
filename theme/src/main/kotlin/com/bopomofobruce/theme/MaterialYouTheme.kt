@@ -42,7 +42,7 @@ class MaterialYouTheme private constructor(override val id: String, val styleShe
          * `@RequiresApi(S)` 的動態取色路徑而在執行期崩潰。
          */
         @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
-        fun from(context: Context, darkMode: Boolean, sdkInt: Int): MaterialYouTheme {
+        internal fun from(context: Context, darkMode: Boolean, sdkInt: Int): MaterialYouTheme {
             val fallback = if (darkMode) DarkTheme.styleSheet else LightTheme.styleSheet
             // Lint 的 NewApi 資料流分析只認得對 `Build.VERSION.SDK_INT` 的直接比較；這裡刻意透過
             // `sdkInt` 參數（正式路徑由上面的兩參數版本填入 `Build.VERSION.SDK_INT`）注入，讓 <31 退化分支能在純 JVM unit

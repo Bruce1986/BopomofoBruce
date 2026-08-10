@@ -16,8 +16,8 @@
   - `MaterialYouTheme`：Android 12+（API 31）用
     `androidx.compose.material3.dynamicLightColorScheme` /
     `dynamicDarkColorScheme` 讀系統桌布色；<31 退化為 `LightTheme` /
-    `DarkTheme` 色盤，id 仍回報 `"material-you"`。`sdkInt` 開成建構參數
-    （預設 `Build.VERSION.SDK_INT`），讓退化分支可在純 JVM unit test 驗證。
+    `DarkTheme` 色盤，id 仍回報 `"material-you"`。`from()` 拆成兩支 overload，
+    讓退化分支可在純 JVM unit test 驗證（見下方「踩雷 / 決定」）。
 - 自訂相片背景：`PhotoBackground`（`theme/.../photo/PhotoBackground.kt`，uri /
   blurRadiusDp / opacity / tint）+ `PhotoBackgroundLayer`
   （`photo/PhotoBackgroundLayer.kt`）用 Coil `AsyncImage` 載入、
@@ -51,8 +51,18 @@
   Robolectric 的純 JVM unit test 下會因缺 Android runtime 而炸掉；實測
   `ColorConversionsTest` 直接綠燈通過，Compose UI graphics 這層的 sRGB 轉換是
   純 Kotlin 數學運算，不需要 Android framework stub。
-- `MaterialYouTheme.from()` 刻意把 `sdkInt` 開成帶預設值的建構參數，而不是
-  內部直接讀 `Build.VERSION.SDK_INT`，只為了讓 <31 退化分支可測；>=31 呼叫
+- `MaterialYouTheme.from()` 刻意把 SDK 等級開成可注入的參數，而不是內部直接讀
+  `Build.VERSION.SDK_INT`，只為了讓 <31 退化分支可測。
+  **round-2／round-3 審查後的最終形態**（原本是「單一函式 + `sdkInt` 帶預設值」，
+  但那讓正式呼叫端也能傳入與裝置不符的假值、把 <31 裝置推進 `@RequiresApi(S)`
+  路徑而崩潰）：拆成兩支 overload —
+  - `fun from(context, darkMode)`：正式入口，SDK 等級一律取自 `Build.VERSION.SDK_INT`，無法被覆寫。
+  - `internal fun from(context, darkMode, sdkInt)`：測試專用，標 `@VisibleForTesting`。
+    用 `internal` 而非只掛註解，是因為 `@VisibleForTesting` 只會產生 lint 警告、
+    本專案沒開 `warningsAsErrors`，擋不住模組外部呼叫；`internal` 才是編譯期強制，
+    而同 module 的 unit test source set 仍呼叫得到（已實測編譯與 31 條測試皆過）。
+
+  >=31 呼叫
   `dynamicLightColorScheme(Context)` 需要真系統資源，這條分支沒有
   Robolectric、也沒有連實機驗證，留在 `MaterialYouTheme` KDoc 與本檔明說。
 - 事後審查抓到 `PhotoBackgroundLayer` 的 KDoc 原本寫「`Modifier.blur()` 在
