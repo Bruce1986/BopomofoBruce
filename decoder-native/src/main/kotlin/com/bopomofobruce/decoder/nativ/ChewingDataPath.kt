@@ -3,6 +3,7 @@ package com.bopomofobruce.decoder.nativ
 import android.content.Context
 import android.content.res.AssetManager
 import java.io.File
+import java.io.IOException
 
 /**
  * `libbpmf.so` needs a writable filesystem directory containing the chewing dictionary files
@@ -15,32 +16,52 @@ import java.io.File
 private const val CHEWING_ASSET_SUBDIR = "chewing"
 private const val CHEWING_CACHE_DIR_NAME = "chewing"
 
+/** Serializes [extractChewingData] calls — see its KDoc for why. */
+private val extractionLock = Any()
+
 /** Convenience wrapper for production callers: extracts into `context.cacheDir/chewing`. */
 fun getDataPath(context: Context): String =
     extractChewingData(context.assets, File(context.cacheDir, CHEWING_CACHE_DIR_NAME)).absolutePath
 
 /**
  * Copies every file under the `chewing/` assets directory into [targetDir], creating it if needed.
- * Idempotent: a file already present with non-zero length is assumed up to date and skipped, so
- * repeated app starts don't re-copy multi-megabyte dictionaries every time.
+ *
+ * Self-healing / idempotent by construction, not by inspection: each asset is copied into a sibling
+ * `<name>.tmp` file first, then atomically moved into place with [File.renameTo]. A file is only
+ * ever considered "already extracted" by the FINAL name existing — never by inspecting its length —
+ * because the final name can only come into existence via a completed rename. A process kill
+ * mid-copy (e.g. low-memory kill) can therefore only ever leave behind an orphaned `.tmp` file,
+ * never a truncated file at the final name; the next call harmlessly overwrites that `.tmp` and
+ * retries. If the rename itself fails, the `.tmp` file is deleted and an [IOException] is thrown —
+ * no partial state is left at the final name either way.
+ *
+ * Synchronized on [extractionLock]: without it, two threads racing this call for the first time
+ * could both observe the final file missing, then interleave writes into (or one truncate the
+ * other's) the same `.tmp` path before either renames.
  *
  * Kept independent of [Context] (takes [AssetManager] + [File] directly) so it's testable as a
  * plain JVM unit test with a mocked [AssetManager], without needing Robolectric.
  */
-fun extractChewingData(assets: AssetManager, targetDir: File): File {
-    if (!targetDir.exists() && !targetDir.mkdirs() && !targetDir.exists()) {
-        throw IllegalStateException("Could not create chewing data dir: $targetDir")
-    }
+fun extractChewingData(assets: AssetManager, targetDir: File): File =
+    synchronized(extractionLock) {
+        if (!targetDir.exists() && !targetDir.mkdirs() && !targetDir.exists()) {
+            throw IllegalStateException("Could not create chewing data dir: $targetDir")
+        }
 
-    val assetNames = assets.list(CHEWING_ASSET_SUBDIR) ?: emptyArray()
-    for (name in assetNames) {
-        val target = File(targetDir, name)
-        if (target.exists() && target.length() > 0L) {
-            continue
+        val assetNames = assets.list(CHEWING_ASSET_SUBDIR) ?: emptyArray()
+        for (name in assetNames) {
+            val target = File(targetDir, name)
+            if (target.exists()) {
+                continue
+            }
+            val tmp = File(targetDir, "$name.tmp")
+            assets.open("$CHEWING_ASSET_SUBDIR/$name").use { input ->
+                tmp.outputStream().use { output -> input.copyTo(output) }
+            }
+            if (!tmp.renameTo(target)) {
+                tmp.delete()
+                throw IOException("Could not rename $tmp to $target")
+            }
         }
-        assets.open("$CHEWING_ASSET_SUBDIR/$name").use { input ->
-            target.outputStream().use { output -> input.copyTo(output) }
-        }
+        targetDir
     }
-    return targetDir
-}
