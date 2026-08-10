@@ -73,9 +73,17 @@ private constructor(override val id: String, val styleSheet: StyleSheet) : Keybo
                 background = scheme.surface.toKeyboardUInt(),
                 keyFill = scheme.surfaceVariant.toKeyboardUInt(),
                 keyText = scheme.onSurface.toKeyboardUInt(),
-                keyAccent = scheme.primary.toKeyboardUInt(),
+                // B22：原本用 scheme.primary，跟 BuiltInThemes 同一個誤映射——M3 primary 是配
+                // onPrimary 用的，這裡沒有 on-accent 欄位可用、按鍵文字只有 keyText，兩者對比度不足。
+                // 改用 primaryContainer，跟固定色盤（見 BuiltInThemes.kt 的 B22 修正）採同一策略。
+                // 注意：這條分支需要系統動態取色，本次只改映射邏輯，實際對比度數字未經實機驗證
+                // （見本檔 class KDoc 與 devlog 的誠實揭露）。
+                keyAccent = scheme.primaryContainer.toKeyboardUInt(),
                 candidateText = scheme.onSurface.toKeyboardUInt(),
-                candidateHighlight = scheme.primaryContainer.toKeyboardUInt(),
+                // B22：candidateHighlight 原本也用 primaryContainer，跟上面改過的 keyAccent
+                // 撞色；改用 secondaryContainer 區隔用途（沿用 M3 對 primary/secondary container
+                // 的語意分工），同樣未經實機驗證。
+                candidateHighlight = scheme.secondaryContainer.toKeyboardUInt(),
             )
         }
     }

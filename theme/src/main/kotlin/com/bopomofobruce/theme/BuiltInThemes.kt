@@ -22,9 +22,16 @@ object LightTheme : KeyboardTheme {
                     background = 0xFFF3EDF7u,
                     keyFill = 0xFFFFFFFFu,
                     keyText = 0xFF1C1B1Fu,
-                    keyAccent = 0xFF6750A4u,
+                    // B22：M3 primary (#6750A4) 是設計來配 onPrimary（白字）用的，跟 keyText
+                    // (#1C1B1F，深色) 疊在一起只有 2.66:1，遠不及 WCAG AA 文字 4.5:1 門檻——功能鍵按下時
+                    // 字幾乎看不見。改用 M3 primaryContainer 色階，keyText 疊上去是 13.28:1。
+                    keyAccent = 0xFFEADDFFu,
                     candidateText = 0xFF1C1B1Fu,
-                    candidateHighlight = 0xFFE8DEF8u,
+                    // B22：原色 #E8DEF8 直接搬 M3 secondaryContainer，跟 background (#F3EDF7)
+                    // 幾乎同色階、只有 1.13:1，不及 WCAG 1.4.11 非文字 UI 元件 3:1 門檻——candidate
+                    // 列上的游標高亮幾乎看不出邊界。改成灰紫色 #8A8196：對 background 3.23:1、
+                    // candidateText 疊上去 4.62:1（兩者皆有實測，見 BuiltInThemesContrastTest）。
+                    candidateHighlight = 0xFF8A8196u,
                 ),
             dimens = StandardDimens.default,
         )
@@ -48,9 +55,25 @@ object DarkTheme : KeyboardTheme {
                     background = 0xFF1C1B1Fu,
                     keyFill = 0xFF2B2930u,
                     keyText = 0xFFE6E1E5u,
-                    keyAccent = 0xFFD0BCFFu,
+                    // B22：M3 primary dark (#D0BCFF) 是設計來配 onPrimary（深字）用的，跟 keyText
+                    // (#E6E1E5，淺色) 疊在一起只有 1.32:1，遠不及 WCAG AA 文字 4.5:1 門檻。改用 M3
+                    // primaryContainer dark 色階，keyText 疊上去是 7.22:1。
+                    keyAccent = 0xFF4F378Bu,
                     candidateText = 0xFFE6E1E5u,
-                    candidateHighlight = 0xFF4A4458u,
+                    // B22：原色 #4A4458 直接搬 M3 secondaryContainer dark，跟 background (#1C1B1F)
+                    // 都是深色調、只有 1.84:1，不及 WCAG 1.4.11 非文字 UI 元件 3:1 門檻。
+                    //
+                    // 這裡兩個門檻在深色主題下**數學上無法同時滿足**：background 近黑
+                    // (相對亮度 0.0113)、candidateText 近白 (0.7633)，要對 background 達 3:1 需要
+                    // 亮度 >= 0.1339，要讓白字達 AA 4.5:1 需要亮度 <= 0.1307 — 可行區間是空的。
+                    // 根因是 KeyboardColors 契約沒有「高亮候選專用的文字色」(M3 的
+                    // onSecondaryContainer)，而 contracts-v1 已凍結；已登記為 W2 契約 follow-up。
+                    //
+                    // 取捨：**文字可讀性優先**。高亮的作用是指示選中，:ime 還能用邊框/底線等方式
+                    // 補強；候選字看不清楚則沒有替代方案。#656471 是「白字達 4.50:1」前提下對
+                    // background 分離度最大的值 (2.95:1，差 3:1 一點點)，兩者皆有實測守門
+                    // (見 BuiltInThemesContrastTest 與 devlog 的取捨說明)。
+                    candidateHighlight = 0xFF656471u,
                 ),
             dimens = StandardDimens.default,
         )

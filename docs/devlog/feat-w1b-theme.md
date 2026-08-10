@@ -122,3 +122,46 @@
   （`ktfmtCheck` 首次重跑抓到本回合新改的 4 個檔案格式跑紅，跑
   `:theme:ktfmtFormat` 修過後再次 `ktfmtCheck` 才綠；`lint` 重跑仍是
   `No issues found.`）。
+
+## 2026-08-10 第七輪（Opus tracer）— 對比度與弱測試
+
+- **B22（high）：三個內建主題的對比度不足，功能鍵按下時字幾乎看不見。**
+  用 WCAG 相對亮度公式實算原值：DarkTheme `keyText #E6E1E5` on `keyAccent #D0BCFF`
+  = **1.32:1**、LightTheme = **2.66:1**（AA 文字要 4.5:1）；LightTheme
+  `candidateHighlight #E8DEF8` on `background #F3EDF7` = **1.13:1**、Dark = **1.84:1**
+  （WCAG 1.4.11 非文字元件要 3:1）。根因是兩套色盤都把 M3 的 `primary` 直接搬進
+  `keyAccent`，但 M3 的 primary 是設計來配 `onPrimary` 的，而 `KeyboardColors` 契約
+  沒有 on-accent 欄位、按鍵文字只有 `keyText` 可用；`MaterialYouTheme` 用
+  `scheme.primary` 做同樣映射，所以三個主題全中。
+
+  已改：`keyAccent` 改用 container 色階（Light `#EADDFF` → 13.28:1、Dark `#4F378B`
+  → 7.22:1）；`MaterialYouTheme` 改對應 `scheme.primaryContainer`，`candidateHighlight`
+  改對應 `scheme.secondaryContainer` 以免與 keyAccent 撞色。Light 的
+  `candidateHighlight` 改 `#8A8196`（對 background 3.23:1、候選字 4.62:1）。
+
+  **深色主題的取捨（重要，非疏漏）**：Dark 的兩個門檻**數學上無法同時滿足**——
+  background 近黑（相對亮度 0.0113）、candidateText 近白（0.7633），高亮色要對
+  background 達 3:1 需要亮度 >= 0.1339，要讓白字達 AA 4.5:1 需要亮度 <= 0.1307，
+  可行區間為空。根因是 `KeyboardColors` 沒有「高亮候選專用文字色」（M3 的
+  `onSecondaryContainer`），contracts-v1 已凍結。**選擇文字可讀性優先**：高亮的作用
+  是指示選中，`:ime` 還能用邊框/底線補強；候選字看不清楚沒有替代方案。最終取
+  `#656471`——在「白字達 4.50:1」前提下對 background 分離度最大者（2.95:1）。
+  **已登記為 W2 契約 follow-up**：`KeyboardColors` 是否需要 `onCandidateHighlight`。
+
+  守門測試 `BuiltInThemesContrastTest`：純 Kotlin 的 WCAG 計算（不需 Android
+  runtime），對兩套色盤斷言 `keyText/keyAccent >= 4.5`、`candidateText/candidateHighlight
+  >= 4.5`（Dark 亦然）、`candidateHighlight/background >= 3.0`（Dark 為已論證的 2.9）。
+  **已證明會紅**：把 Dark 的 `candidateHighlight` 暫時改回舊值 `#4A4458`，
+  `DarkTheme candidateHighlight against background stays at the documented best-effort 2_9`
+  立刻 FAILED；還原後全綠。
+  動態色路徑（`MaterialYouTheme` 的 >=31 分支）**無法**用 JVM 測試（需系統資源），
+  因此它的對比度**未經驗證**，只有兩套固定色盤有守門——誠實記在此。
+
+- **B23（medium）：`LightTheme and DarkTheme use distinct colors` 守門失效。**
+  舊寫法只斷言整個 `KeyboardColors` data class 不相等，6 欄位只要 1 欄不同就綠，
+  「複製 Light 改 Dark 但漏改欄位」這個它宣稱要防的典型失誤抓不到。已改為逐欄位斷言。
+
+- **被判為範圍外、未做（登記給 W2）**：`ThemeSwatch` 未匯出成 public（DEVPLAN 的 W2-C
+  提到「套用 W1-B 的 ThemePreview」，但 W1-B 自己的交付清單只要求「三主題各有 @Preview」）；
+  `StyleSheet` → `KeyboardTheme` 的 adapter（根因是凍結契約缺 shapes/typography）。
+  兩者都不該由本包單方決定尚未存在的下游 API。
