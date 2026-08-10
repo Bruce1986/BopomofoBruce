@@ -23,9 +23,9 @@
   （`photo/PhotoBackgroundLayer.kt`）用 Coil `AsyncImage` 載入、
   `Modifier.blur()` + `.alpha()` + `ColorFilter.tint(..., BlendMode.SrcAtop)`
   套用。
-- Compose `@Preview`：`theme/.../preview/ThemePreviews.kt` 三個預覽
-  （Light / Dark / Material You fallback path）共用一個 `ThemeSwatch` 假鍵盤列
-  render。
+- Compose `@Preview`：`theme/.../preview/ThemePreviews.kt` 四個預覽
+  （Light / Dark / Material You 退化路徑 `apiLevel = 30` / Material You 動態取色
+  路徑 `apiLevel = 35`）共用一個 `ThemeSwatch` 假鍵盤列 render。
 - 32 條 unit test（style round-trip、validation、photo round-trip、color
   round-trip、內建主題、MaterialYouTheme 退化分支與值語意）。
 
@@ -33,7 +33,7 @@
 
 | 項目 | 結果 |
 |---|---|
-| 三主題各有 `@Preview` | ✅ 過（`LightThemePreview` / `DarkThemePreview` / `MaterialYouThemePreview`） |
+| 三主題各有 `@Preview` | ✅ 過（`LightThemePreview` / `DarkThemePreview` / `MaterialYouThemeFallbackPreview` + `MaterialYouThemeDynamicPreview`，共 4 個；B14 後 Material You 拆成兩條路徑各一個）。證據等級：函式存在且編譯通過，未實際在 Android Studio 內 render 過。 |
 | 主題序列化/反序列化 round-trip test | ✅ 過（`StyleSheetSerializationTest`、`PhotoBackgroundTest`，含巢狀 `UIntHexSerializer`） |
 | `./gradlew :theme:assembleDebug` | ✅ 過 |
 | `./gradlew :theme:testDebugUnitTest` | ✅ 過（32/32，見下方「踩雷」） |
