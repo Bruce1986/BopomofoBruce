@@ -387,7 +387,7 @@
     ],
     [
       {
-        "label": "符號",
+        "label": "全形",
         "action": {
           "type": "symbol_toggle"
         },

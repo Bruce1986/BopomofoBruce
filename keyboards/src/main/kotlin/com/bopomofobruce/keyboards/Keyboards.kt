@@ -48,10 +48,15 @@ object Keyboards {
      * 留白（讓鍵柱視覺對齊）留給 `:ime`（W2-B）渲染時自行處理，例如用容器 padding 或依最大列寬正規化，而不是 在 `:common`/`:keyboards`
      * 這層資料模型硬湊。`url_qwerty` 也是同樣狀況（10 / 9 / 9.6 / 8.8）。
      *
-     * **F1 已知落差**：控制列的切頁鍵標籤是「符號」（原本誤標「123」，`symbol_toggle` 這個 action 唯一的目的地是 [symbolStandard]，那頁一個
-     * ASCII 數字都沒有——見 [symbolStandard] 的 KDoc 與 `OtherKeyboardsContentTest` 釘死的「全形、非 ASCII」測試）。
-     * 也就是說**在密碼／URL 欄位按下這顆鍵，使用者得到的是全形標點頁，不是半形數字或半形符號 頁**——本模組目前沒有半形符號頁可切，這是已知落差，登記為
-     * W2-B（`:ime`）follow-up： 若要讓使用者在密碼／URL 情境切到「真正半形」的符號/數字頁，需要新增一份半形符號頁（新的 交付範圍，不在本輪處理）。
+     * **F1 已知落差**：控制列的切頁鍵標籤是「全形」（原本誤標「123」，一度改為「符號」，`symbol_toggle` 這個 action 唯一的目的地是
+     * [symbolStandard]，那頁一個 ASCII 數字都沒有——見 [symbolStandard] 的 KDoc 與 `OtherKeyboardsContentTest`
+     * 釘死的「全形、非 ASCII」測試）。 也就是說**在密碼／URL 欄位按下這顆鍵，使用者得到的是全形標點頁，不是半形數字或半形符號
+     * 頁**——本模組目前沒有半形符號頁可切，這是已知落差，登記為 W2-B（`:ime`）follow-up： 若要讓使用者在密碼／URL
+     * 情境切到「真正半形」的符號/數字頁，需要新增一份半形符號頁（新的 交付範圍，不在本輪處理）。
+     *
+     * 標籤之所以是「全形」而非「符號」：round-9 審查指出，C9/D1/D2 已經把密碼／URL 需要的 0-9 與 常用半形符號全部用 longPress
+     * 掛在主鍵列上，使用者其實不需要離開這份鍵盤；此時把這顆通往 全形頁的鍵標成「符號」，等於用更精確、更吸引人的字眼把使用者導向一個對他無用的頁面——比
+     * 原本明顯文不對題的「123」更容易誤觸。標成「全形」讓使用者在按下之前就知道那不是 ASCII 符號。
      */
     val passwordQwerty: KeyboardDef by lazy {
         KeyboardLoader.loadFromResource("keyboards/password_qwerty.json")
