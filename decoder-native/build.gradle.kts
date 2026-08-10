@@ -111,58 +111,57 @@ val fetchChewingData by tasks.registering(Exec::class) {
 // NOT wired to preBuild: preBuild runs for every variant task graph,
 // including plain-JVM `testDebugUnitTest`/`testReleaseUnitTest` (e.g.
 // ChewingDataPathTest), which touch no assets and must be runnable offline
-// from a clean checkout. See ADR-0006 / devlog A4/A12.
+// from a clean checkout. See ADR-0006 / devlog A4.
 //
-// The asset-merge pipeline (merge*Assets, then a later package*Assets step
-// that re-reads src/main/assets independently of merge's output) reads
-// src/main/assets directly, so Gradle's task validation requires *some*
-// declared dependency or it fails the build with an "implicit dependency"
-// error. But package*Assets is shared by both real builds
-// (assembleDebug/Release) *and* lint's per-variant unit-test/androidTest
-// analysis tasks (lintAnalyzeDebugUnitTest/lintAnalyzeDebugAndroidTest —
-// AGP wires those to depend on package*Assets unconditionally, for the
-// compiled test artifacts' resource classpath). Since it's the same task
-// instance either way, we can't make it fetch real data only for "real
-// build" callers — so it depends on the lightweight mkdir task, keeping
-// *lint's* path fully offline (see devlog A12 dry-run evidence: this is
-// exactly the edge that made `:lint` transitively require network before
-// this fix).
+// package*Assets — NOT :decoder-native's own assembleDebug/assembleRelease
+// lifecycle task — is what a downstream consumer (:app, via :decoder)
+// actually schedules when it builds against this module as a regular AAR
+// dependency. `--dry-run` evidence: both `:app:assembleDebug --dry-run`
+// and `:app:assembleRelease --dry-run` schedule
+// `:decoder-native:packageDebugAssets` but never
+// `:decoder-native:assembleDebug`/`assembleRelease`. A prior round of this
+// fix wired fetchChewingData only onto the assemble*/connected*/install*
+// lifecycle tasks below and left package*Assets depending on the
+// lightweight mkdir-only task — which meant a clean-checkout :app build
+// packaged an *empty* assets/chewing/ directory; it only worked locally
+// because word.dat/tsi.dat were already on disk from a previous fetch.
+// package*Assets must therefore depend on the real fetch, not just the
+// mkdir.
 //
-// mustRunAfter(fetchChewingData) is ordering-only: it does NOT pull
-// fetchChewingData into a plain `:lint` invocation's task graph, but when a
-// real-build task also schedules fetchChewingData in the same invocation
-// (see below), this fixes the run order — merge/package never reads a
-// half-written directory — and satisfies Gradle's overlapping-outputs
-// validation between the two tasks.
+// package*Assets is ALSO what AGP unconditionally wires
+// lintAnalyzeDebugUnitTest/lintAnalyzeDebugAndroidTest to (for the
+// compiled test artifacts' resource classpath) — that wiring lives inside
+// AGP and this build script cannot sever it. Since it is the same task
+// instance either way, making package*Assets depend on the real fetch
+// means `:lint` now transitively requires network too. That is an
+// accepted, deliberate trade-off, not an oversight: APK correctness
+// outranks lint being offline-runnable. See ADR-0006 for the record of
+// this decision (downgraded from "solved" to "known trade-off").
 tasks.matching { it.name.contains("Assets") }.configureEach {
     dependsOn(ensureChewingDataDir)
-    mustRunAfter(fetchChewingData)
+    dependsOn(fetchChewingData)
 }
 
-// lint's model builder (lintAnalyze*/lintReport*/lint*/lint) also reads the
-// source set's assets dir directly (not through the asset-merge pipeline),
-// so it needs the same treatment as above, for the same reason: it only
-// cares that the directory exists, not that it holds the real dictionary
-// content.
+// lint's own model-builder tasks (lintAnalyzeDebug, generateDebugLintReportModel — as opposed
+// to lintAnalyzeDebugUnitTest/lintAnalyzeDebugAndroidTest, which reach the assets dir
+// transitively through package*Assets above) also read src/main/assets/chewing directly and do
+// NOT contain "Assets" in their task name, so Gradle's task-validation still flags them as an
+// "implicit dependency" without this. Wiring them straight to fetchChewingData (not just
+// ensureChewingDataDir) is consistent with the accepted trade-off above: :lint already requires
+// network transitively via package*Assets, so there is no remaining "keep lint offline" case
+// left to preserve by splitting these two off onto the mkdir-only task.
 tasks
     .matching { it.name.contains("Lint", ignoreCase = true) }
-    .configureEach {
-        dependsOn(ensureChewingDataDir)
-        mustRunAfter(fetchChewingData)
-    }
+    .configureEach { dependsOn(fetchChewingData) }
 
-// Tasks that actually produce or install a real artifact DO need the real
-// dictionary content — wire fetchChewingData in directly here rather than
-// via the shared Assets/Lint task-name matching above.
-//
-// `connected*`/`install*` are listed explicitly and NOT assumed to inherit
-// from `assembleDebug`: `--dry-run` on `:decoder-native:connectedAndroidTest`
-// showed fetchChewingData absent from its task graph when only the two
-// assemble* lifecycle tasks were wired, i.e. the instrumented test would have
-// packaged an empty assets dir on a clean checkout (it only passes locally
-// because the dictionary happens to already be on disk). Verified after this
-// change: lint = absent, testDebugUnitTest = absent, assembleDebug = present,
-// connectedAndroidTest = present. See ADR-0006 / devlog A12.
+// Tasks that actually produce or install a real artifact also get
+// fetchChewingData wired in directly. This is redundant with the
+// Assets-matching block above (assemble*/connected*/install* all pull in
+// package*Assets transitively) but is kept as an explicit, self-documenting
+// safety net — `--dry-run` on `:decoder-native:connectedAndroidTest` is
+// asserted to include fetchChewingData in CI/manual checks, and this line
+// is what guarantees that independent of how AGP wires package*Assets in a
+// future version.
 tasks
     .matching {
         it.name == "assembleDebug" ||
