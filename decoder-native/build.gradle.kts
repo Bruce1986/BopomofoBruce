@@ -68,7 +68,22 @@ val fetchChewingData by tasks.registering(Exec::class) {
     outputs.dir("src/main/assets/chewing")
 }
 
-tasks.matching { it.name.startsWith("merge") && it.name.contains("Assets") }.configureEach {
-    dependsOn(fetchChewingData)
-}
-tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(fetchChewingData) }
+// NOT wired to preBuild: preBuild runs for every variant task graph,
+// including plain-JVM `testDebugUnitTest`/`testReleaseUnitTest` (e.g.
+// ChewingDataPathTest), which touch no assets and must be runnable offline
+// from a clean checkout. Wiring only into the tasks that actually read
+// src/main/assets keeps the network fetch scoped to what needs the
+// extracted dictionary data (assembleDebug/Release, connectedAndroidTest,
+// lint) — see ADR-0006 / devlog A4.
+//
+// Two different AGP task families read src/main/assets directly and both
+// need the explicit dependency, or Gradle's task validation fails the
+// build with an "implicit dependency" error:
+//   - the asset-merge pipeline: merge*Assets, then a later package*Assets
+//     step that re-reads src/main/assets independently of merge's output;
+//   - lint's model builder: lintAnalyze*/lintReport*/lint*/lint, which
+//     reads the source set's assets dir directly (not through the asset
+//     pipeline at all).
+tasks
+    .matching { it.name.contains("Assets") || it.name.contains("Lint", ignoreCase = true) }
+    .configureEach { dependsOn(fetchChewingData) }
