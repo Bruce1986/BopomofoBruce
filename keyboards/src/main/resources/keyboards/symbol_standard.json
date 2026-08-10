@@ -1,0 +1,258 @@
+{
+  "id": "symbol-standard-page1",
+  "rows": [
+    [
+      {
+        "label": "，",
+        "action": {
+          "type": "character",
+          "char": "，"
+        }
+      },
+      {
+        "label": "。",
+        "action": {
+          "type": "character",
+          "char": "。"
+        }
+      },
+      {
+        "label": "、",
+        "action": {
+          "type": "character",
+          "char": "、"
+        }
+      },
+      {
+        "label": "；",
+        "action": {
+          "type": "character",
+          "char": "；"
+        }
+      },
+      {
+        "label": "：",
+        "action": {
+          "type": "character",
+          "char": "："
+        }
+      },
+      {
+        "label": "？",
+        "action": {
+          "type": "character",
+          "char": "？"
+        }
+      },
+      {
+        "label": "！",
+        "action": {
+          "type": "character",
+          "char": "！"
+        }
+      },
+      {
+        "label": "…",
+        "action": {
+          "type": "character",
+          "char": "…"
+        }
+      },
+      {
+        "label": "・",
+        "action": {
+          "type": "character",
+          "char": "・"
+        }
+      },
+      {
+        "label": "～",
+        "action": {
+          "type": "character",
+          "char": "～"
+        }
+      }
+    ],
+    [
+      {
+        "label": "「",
+        "action": {
+          "type": "character",
+          "char": "「"
+        }
+      },
+      {
+        "label": "」",
+        "action": {
+          "type": "character",
+          "char": "」"
+        }
+      },
+      {
+        "label": "『",
+        "action": {
+          "type": "character",
+          "char": "『"
+        }
+      },
+      {
+        "label": "』",
+        "action": {
+          "type": "character",
+          "char": "』"
+        }
+      },
+      {
+        "label": "（",
+        "action": {
+          "type": "character",
+          "char": "（"
+        }
+      },
+      {
+        "label": "）",
+        "action": {
+          "type": "character",
+          "char": "）"
+        }
+      },
+      {
+        "label": "【",
+        "action": {
+          "type": "character",
+          "char": "【"
+        }
+      },
+      {
+        "label": "】",
+        "action": {
+          "type": "character",
+          "char": "】"
+        }
+      },
+      {
+        "label": "《",
+        "action": {
+          "type": "character",
+          "char": "《"
+        }
+      },
+      {
+        "label": "》",
+        "action": {
+          "type": "character",
+          "char": "》"
+        }
+      }
+    ],
+    [
+      {
+        "label": "－",
+        "action": {
+          "type": "character",
+          "char": "－"
+        }
+      },
+      {
+        "label": "／",
+        "action": {
+          "type": "character",
+          "char": "／"
+        }
+      },
+      {
+        "label": "＆",
+        "action": {
+          "type": "character",
+          "char": "＆"
+        }
+      },
+      {
+        "label": "＠",
+        "action": {
+          "type": "character",
+          "char": "＠"
+        }
+      },
+      {
+        "label": "＃",
+        "action": {
+          "type": "character",
+          "char": "＃"
+        }
+      },
+      {
+        "label": "％",
+        "action": {
+          "type": "character",
+          "char": "％"
+        }
+      },
+      {
+        "label": "＋",
+        "action": {
+          "type": "character",
+          "char": "＋"
+        }
+      },
+      {
+        "label": "＝",
+        "action": {
+          "type": "character",
+          "char": "＝"
+        }
+      },
+      {
+        "label": "＿",
+        "action": {
+          "type": "character",
+          "char": "＿"
+        }
+      },
+      {
+        "label": "＊",
+        "action": {
+          "type": "character",
+          "char": "＊"
+        }
+      }
+    ],
+    [
+      {
+        "label": "注音",
+        "action": {
+          "type": "language_toggle"
+        },
+        "weight": 1.2
+      },
+      {
+        "label": "ABC",
+        "action": {
+          "type": "symbol_toggle"
+        },
+        "weight": 1.2
+      },
+      {
+        "label": "　",
+        "action": {
+          "type": "space"
+        },
+        "weight": 4.0
+      },
+      {
+        "label": "⌫",
+        "action": {
+          "type": "backspace"
+        },
+        "weight": 1.2
+      },
+      {
+        "label": "⏎",
+        "action": {
+          "type": "enter"
+        },
+        "weight": 1.4
+      }
+    ]
+  ]
+}
