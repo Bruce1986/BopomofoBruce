@@ -81,10 +81,15 @@ void* bpmf_init(const char* data_path);
  * syllables too.
  *
  * Returns the candidate count and writes the joined string to
- * *candidates_out (see ownership contract above). Returns 0 (with
- * *candidates_out == "") if `handle`/`zhuyin`/`candidates_out` is NULL, if
- * `zhuyin` contains a character outside the mapping table, or if
- * libchewing produced no candidates.
+ * *candidates_out (see ownership contract above).
+ *
+ * Returns 0 with *candidates_out set to "" (never NULL) if `handle` or
+ * `zhuyin` is NULL, if `zhuyin` contains a character outside the mapping
+ * table, or if libchewing produced no candidates.
+ *
+ * If `candidates_out` itself is NULL, returns 0 without dereferencing it —
+ * there is nothing to write to, so the "*candidates_out == \"\"" guarantee
+ * above does not (and cannot) apply to that case.
  */
 size_t bpmf_input(void* handle, const char* zhuyin, char** candidates_out);
 

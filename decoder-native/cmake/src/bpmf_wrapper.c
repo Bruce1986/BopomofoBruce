@@ -53,7 +53,10 @@ static const BopomofoKey kBopomofoKeys[] = {
     {0x3122, '0'}, /* ㄢ AN */ {0x3123, 'p'}, /* ㄣ EN */
     {0x3124, ';'}, /* ㄤ ANG */ {0x3125, '/'}, /* ㄥ ENG */
     {0x3126, '-'}, /* ㄦ ER */
-    /* Tones (tone 1 / no mark is intentionally unsupported — see bpmf.h) */
+    /* Tones. Tone 1 (陰平) has no mark and therefore no entry in this table:
+     * in the DaChen layout it is KEY_SPACE, committed via the
+     * chewing_zuin_Check()-gated space forwarding in
+     * bpmf_forward_space_if_pending() below (see also bpmf.h). */
     {0x02CA, '6'}, /* ˊ tone 2 */
     {0x02C7, '3'}, /* ˇ tone 3 */
     {0x02CB, '4'}, /* ˋ tone 4 */
