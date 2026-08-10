@@ -67,6 +67,33 @@ class PhotoBackgroundTest {
     }
 
     @Test
+    fun `rejects blur radius above max`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            PhotoBackground(
+                uri = "content://x",
+                blurRadiusDp = PhotoBackground.MAX_BLUR_RADIUS_DP + 0.1f,
+            )
+        }
+    }
+
+    @Test
+    fun `accepts blur radius at max`() {
+        val background =
+            PhotoBackground(uri = "content://x", blurRadiusDp = PhotoBackground.MAX_BLUR_RADIUS_DP)
+        assertEquals(PhotoBackground.MAX_BLUR_RADIUS_DP, background.blurRadiusDp)
+    }
+
+    @Test
+    fun `rejects non-finite blur radius`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            PhotoBackground(uri = "content://x", blurRadiusDp = Float.NaN)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            PhotoBackground(uri = "content://x", blurRadiusDp = Float.POSITIVE_INFINITY)
+        }
+    }
+
+    @Test
     fun `rejects out-of-range opacity`() {
         assertThrows(IllegalArgumentException::class.java) {
             PhotoBackground(uri = "content://x", opacity = 1.5f)
