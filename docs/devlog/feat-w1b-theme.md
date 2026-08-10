@@ -37,8 +37,8 @@
 | 主題序列化/反序列化 round-trip test | ✅ 過（`StyleSheetSerializationTest`、`PhotoBackgroundTest`，含巢狀 `UIntHexSerializer`） |
 | `./gradlew :theme:assembleDebug` | ✅ 過 |
 | `./gradlew :theme:testDebugUnitTest` | ✅ 過（26/26，見下方「踩雷」） |
-| `./gradlew ktfmtCheck` | 見下方指令輸出摘要 |
-| `./gradlew lint` | 見下方指令輸出摘要 |
+| `./gradlew :theme:ktfmtCheck` | ✅ 過（`BUILD SUCCESSFUL`；期間跑過 `:theme:ktfmtFormat` 修過兩檔格式後才綠） |
+| `./gradlew :theme:lint` | ✅ 過（`BUILD SUCCESSFUL`，`lint-results-debug.txt`：`No issues found.`） |
 | PhotoBackground 實機渲染 < 200 ms | ❌ **沒有量測**——沒有連上 Pixel 6 / 任何實機做這項；本 session 只跑到 JVM unit test 與 AGP 編譯層級，誠實回報未驗證，不編數字。 |
 
 ## 踩雷 / 決定
@@ -55,3 +55,12 @@
   內部直接讀 `Build.VERSION.SDK_INT`，只為了讓 <31 退化分支可測；>=31 呼叫
   `dynamicLightColorScheme(Context)` 需要真系統資源，這條分支沒有
   Robolectric、也沒有連實機驗證，留在 `MaterialYouTheme` KDoc 與本檔明說。
+- 事後審查抓到 `PhotoBackgroundLayer` 的 KDoc 原本寫「`Modifier.blur()` 在
+  API<31 用軟體 fallback，這層不需要自己分支」——**這句是錯的**。
+  `Modifier.blur()` 在 API<31 是純粹的 no-op（沒有任何模糊效果），Compose
+  沒有軟體 fallback 這種東西，`RenderEffect` 硬體合成只在 API 31+ 存在。本模組
+  `minSdk = 28`，代表 28–30 的裝置在修正前會「看起來設了模糊、實際上完全沒
+  模糊」且沒人發現。已修正：(1) KDoc 改寫成誠實描述限制；(2) 程式碼加
+  `Build.VERSION.SDK_INT >= 31` 判斷，<31 時不套 `.blur()`、只疊
+  `.alpha()` / `tint` 當降級效果；(3) `AsyncImage` 加 `onError` 記 log，圖片
+  載入失敗時至少可觀測、且不擋住底層主題色。
