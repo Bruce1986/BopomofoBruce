@@ -94,6 +94,34 @@ class OtherKeyboardsContentTest {
     }
 
     @Test
+    fun `url keyboard can type the half-width symbols needed for a query string`() {
+        // D1: url_qwerty could reach only '/' and '.' beyond letters/digits (C9's fix). The
+        // keyboard's only escape hatch to another page is "123" -> symbol_standard, whose glyphs
+        // are entirely full-width (：－＆＝...) -- visually similar to their ASCII twins but the
+        // wrong code point for a URL. Without half-width ': - _ ? = & # % ~ @' reachable directly
+        // on url_qwerty, "http://" and any query string are simply untypeable. Added as longPress
+        // on the (shared-with-password) a-l and z-m letter rows.
+        val required = setOf(':', '-', '_', '?', '=', '&', '#', '%', '~', '@')
+        val chars = reachableChars(Keyboards.urlQwerty.rows).toSet()
+        for (c in required) {
+            assertTrue(c in chars, "url keyboard cannot type '$c' (short or long press)")
+        }
+    }
+
+    @Test
+    fun `password keyboard can type common half-width special symbols`() {
+        // D2: same problem as D1 but for password_qwerty -- most password policies require a
+        // special symbol from roughly '! @ # $ % ^ & * ( )', none of which were reachable. Because
+        // the field is masked, a user who instead sent a full-width look-alike would have no way to
+        // notice. Added as longPress on the (shared-with-url) a-l and z-m letter rows.
+        val required = setOf('!', '@', '#', '$', '%', '^', '&', '*', '(', ')')
+        val chars = reachableChars(Keyboards.passwordQwerty.rows).toSet()
+        for (c in required) {
+            assertTrue(c in chars, "password keyboard cannot type '$c' (short or long press)")
+        }
+    }
+
+    @Test
     fun `password keyboard covers all 26 lowercase letters`() {
         val letters =
             Keyboards.passwordQwerty.rows.flatten().mapNotNull { key ->
@@ -168,11 +196,13 @@ class OtherKeyboardsContentTest {
         // Catches copy-paste mistakes (e.g. password_qwerty / url_qwerty share their first three
         // rows verbatim) that a presence-only assertion (`c in chars`) would miss: a duplicated key
         // still contains every required character, just also contains an extra copy of one.
+        //
+        // D4: uses reachableChars (short-press + longPress) rather than scanning only key.action.
+        // C9/D1/D2 added 20+ longPress Character keys to password_qwerty/url_qwerty (copy-pasted
+        // across the two files), which is exactly the kind of paste-error-prone spot this test
+        // exists to catch -- a short-press-only scan would never see a duplicated longPress char.
         for (keyboard in Keyboards.all) {
-            val charActions =
-                keyboard.rows.flatten().mapNotNull { key ->
-                    (key.action as? KeyAction.Character)?.char
-                }
+            val charActions = reachableChars(keyboard.rows)
             val duplicates = charActions.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
             assertTrue(
                 duplicates.isEmpty(),
