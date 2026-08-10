@@ -42,10 +42,33 @@ class StyleSheetValidationTest {
     }
 
     @Test
+    fun `KeyboardShapes rejects negative or non-finite candidate row corner radius`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            KeyboardShapes(candidateRowCornerRadiusDp = -1f)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            KeyboardShapes(candidateRowCornerRadiusDp = Float.NaN)
+        }
+    }
+
+    @Test
     fun `KeyboardTypography rejects zero or negative font sizes`() {
         assertThrows(IllegalArgumentException::class.java) { KeyboardTypography(keyLabelSp = 0f) }
         assertThrows(IllegalArgumentException::class.java) {
             KeyboardTypography(candidateTextSp = -5f)
+        }
+    }
+
+    @Test
+    fun `KeyboardTypography rejects zero, negative or non-finite sub label size`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            KeyboardTypography(keySubLabelSp = 0f)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            KeyboardTypography(keySubLabelSp = -1f)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            KeyboardTypography(keySubLabelSp = Float.NaN)
         }
     }
 
