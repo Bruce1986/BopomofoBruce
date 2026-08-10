@@ -23,7 +23,21 @@ owner 已就此裁示（見 devlog 2026-08-10 段）：**採用 v0.12.0（commit
 
 - `decoder-native/cmake/CMakeLists.txt`（AGP `externalNativeBuild.cmake.path` 指到這裡）用 `FetchContent` 拉 Corrosion，`corrosion_import_crate()` 把 vendored 的 `chewing_capi` crate（`decoder-native/cmake/libchewing/capi`，`[lib] crate-type = ["rlib", "staticlib"]`）依 AGP 傳入的 `CMAKE_ANDROID_ARCH_ABI` 交叉編譯成對應 ABI 的 Rust staticlib。Corrosion 原生支援從 `CMAKE_ANDROID_ARCH_ABI` 推導 Rust target triple（`aarch64-linux-android` / `armv7-linux-androideabi`），不需要額外的 cargo-ndk 或手寫 `.cargo/config.toml` target 對照。
 - 我們自己寫的一個薄 C wrapper（`decoder-native/cmake/src/bpmf_wrapper.c`，含 DaChen 鍵盤對照表 — 對照表直接照抄 vendored `src/editor/zhuyin_layout/standard.rs`，不是憑記憶重建）`#include` 上游的 `capi/include/chewing.h`，呼叫 `chewing_new3`/`chewing_handle_Default`/`chewing_cand_*`/`chewing_commit_String`/`chewing_delete` 等公開 C API，`target_link_libraries` 連結剛剛的 `chewing_capi` staticlib，一起編成單一 `libbpmf.so`。這條路線完全比照 upstream 自己的 `CMakeLists.txt`（`add_library(libchewing capi/src/chewing.c)` 接 `chewing_capi`），只是我們的 C 檔案換成 `bpmf_wrapper.c` 輸出 DEVPLAN 指定的 4 個簡化 API，而不是把全部 ~60 個 libchewing C API 都轉出去。
-- 字典資料（`word.dat`/`tsi.dat`）**不**在 CMake/cargo 建置流程裡現編（那需要另外跑 `chewing-cli`，等於再多一個 host-side Rust 建置目標）。改用 `decoder-native/scripts/fetch_chewing_data.sh` 下載 upstream 發布的 prebuilt "Generic" 資料包（`chewing/libchewing-data` release `v2026.3.22`），sha256 校驗後解壓進 `decoder-native/src/main/assets/chewing/`。已驗證這個 `v2026.3.22` release 的 commit（`c44e81aef24b06f1509f19e1be54c99812d0c43f`）與我們 vendor 的 `data` submodule commit **完全一致**，不是版本混搭。二進位資料不進 git（見 `.gitignore`），靠腳本可重現下載。Gradle 只把這個 script 掛在真正需要字典**內容**的 task 上（`assembleDebug`/`assembleRelease`/`connected*`/`install*`）；只需要 assets 目錄存在的 task（`merge*Assets`/`package*Assets` 與 lint 的 model builder）改依附一個純 `mkdir`、不連網的 `ensureChewingDataDir`。
+- 字典資料（`word.dat`/`tsi.dat`）**不**在 CMake/cargo 建置流程裡現編（那需要另外跑 `chewing-cli`，等於再多一個 host-side Rust 建置目標）。改用 `decoder-native/scripts/fetch_chewing_data.sh` 下載 upstream 發布的 prebuilt "Generic" 資料包（`chewing/libchewing-data` release `v2026.3.22`），sha256 校驗後解壓進 `decoder-native/src/main/assets/chewing/`。已驗證這個 `v2026.3.22` release 的 commit（`c44e81aef24b06f1509f19e1be54c99812d0c43f`）與我們 vendor 的 `data` submodule commit **完全一致**，不是版本混搭。二進位資料不進 git（見 `.gitignore`），靠腳本可重現下載。
+  **（2026-08-11 第五階段更正，見 devlog E1）**：Gradle 把這個 script 真正掛在 `package*Assets`
+  上——**不是**只掛在 decoder-native 自己的 `assembleDebug`/`assembleRelease`/`connected*`/
+  `install*` 上。原因：下游 `:app`（經 `:decoder`）把 `:decoder-native` 當一般 AAR 依賴消費時，
+  排進 task graph 的是 `:decoder-native:packageDebugAssets` 這類 artifact task，根本不會經過
+  `:decoder-native` 自己的 `assembleDebug`/`assembleRelease`——只掛在後者上，會讓乾淨 checkout
+  組出的 `:app` APK 打包一個空的 `assets/chewing/`（`getDataPath()` 解壓不出東西、
+  `bpmf_init()` 在真機回 NULL）。`ensureChewingDataDir`（純 `mkdir`、不連網）仍是
+  `src/main/assets/chewing` 目錄本身唯一的 `outputs.dir` 擁有者，`package*Assets`/`Lint*`
+  兩類 task 現在**同時**依附 `ensureChewingDataDir`（先 mkdir）與 `fetchChewingData`（真下載）。
+  這個决定的直接後果是 **`:lint` 又重新透支需要連網**（AGP 把
+  `lintAnalyzeDebugUnitTest`/`lintAnalyzeDebugAndroidTest`/`lintAnalyzeDebug`/
+  `generateDebugLintReportModel` 都無條件連到 `package*Assets` 或直接讀 assets 目錄，這條
+  耦合是 AGP 內建、這份 build script 無法切斷）——這是**刻意接受的取捨，不是疏忽**：APK 正確性
+  優先於 lint 可離線執行。lint 需要連網因此從第四階段（A12）的「已解決」明確降級為「已知取捨」。
 
 **（2026-08-10 修正輪的詳細理由）** 這個 fetch task **不**掛在 `preBuild`：`preBuild` 也在純 JVM 的
 `testDebugUnitTest`/`testReleaseUnitTest`（例如 `ChewingDataPathTest`）task graph 裡，這些測試
@@ -45,6 +59,16 @@ owner 已就此裁示（見 devlog 2026-08-10 段）：**採用 v0.12.0（commit
 修正後 `--dry-run` 實測：`lint` 無、`testDebugUnitTest` 無、`assembleDebug` 有、`assembleRelease`
 有、`connectedAndroidTest` 有。詳見 devlog A4/A12。
 
+**（2026-08-11 第五階段更正，見 devlog E1）**：以上第二輪審查（A12）與其「最終形態」在
+2026-08-11 被 Opus 級驗證者指出是不完整的——它只驗證了 `:decoder-native` 自己的
+`assembleDebug`/`assembleRelease`/`connectedAndroidTest`，沒有驗證下游 `:app` 實際消費
+`:decoder-native` 時走的是 `packageDebugAssets`（不是 `assembleDebug`），導致乾淨 checkout 組
+出的 `:app` APK 仍打包空字典。本節「`ensureChewingDataDir` ← `merge*Assets`/`package*Assets`/
+`lint*` 依附它；`fetchChewingData` ← 只有 `assembleDebug`/`assembleRelease`/`connected*`/
+`install*` 依附它」這個分工方案已不再是現行狀態——見本 ADR 前面 Decision 段落「（2026-08-11
+第五階段更正）」，`package*Assets`/`Lint*` 現在都直接依附 `fetchChewingData`（真下載），`lint`
+需要連網是刻意接受的取捨。這段歷史敘述保留是為了記錄 A12 當時的推理過程，不代表現行行為。
+
 一句話：**上游已經把「編譯」這件事的重心從 C 編譯器搬到 cargo，我們的建置管線只是如實反映這件事，同時盡量重用上游自己驗證過的 Corrosion 配方，而不是自己發明一套。**
 
 ## Consequences（後果）
@@ -58,6 +82,7 @@ owner 已就此裁示（見 devlog 2026-08-10 段）：**採用 v0.12.0（commit
 - 多一層工具鏈依賴：本機需要 rustup 管理的 Rust toolchain + `aarch64-linux-android`／`armv7-linux-androideabi` target（見下方「本機 Homebrew rustc/cargo 衝突」），CI（GitHub Actions）目前**還沒有**裝這些，這是本 ADR 留下的已知缺口，不在 W1-A 範圍內解決。
 - `chewing_capi` 依賴（`env_logger`／`der`／`regex` 等一串 crates.io 套件）比純 C 版多一層供應鏈面（crates.io 套件完整性），不像純 C 版只依賴 libc。
 - 字典資料改用「下載 prebuilt release」而非「自己跑 chewing-cli 從 `.src` 建」，意味著我們現在信任 upstream release 流程的完整性，而不是自己重新產生一份可完全稽核的建置鏈；若未來要換字典內容（例如加自訂詞），需要另外處理（跑 chewing-cli 或直接編輯 .dat，兩者都超出 W1-A 範圍）。
+- **（2026-08-11 第五階段新增）`:lint` 需要連網**：`package*Assets`/`Lint*` 兩類 task 現在都直接依附 `fetchChewingData`，這是修正下游 `:app` 拿不到字典（見 devlog E1）的必然代價——AGP 把 lint 的 model builder 無條件連到 `package*Assets`，這份 build script 無法切斷這條耦合，只能整批接受或整批拒絕。已刻意選擇「整批接受」：APK 正確性優先於 lint 可離線執行。離線環境跑 `:decoder-native:lint` 會失敗；CI 或斷網環境需注意這點。
 
 **開放問題 / 風險**
 - **本機 Homebrew rustc/cargo 與 rustup 衝突**：這台機器（M1 MBA，本次 W1-A 施工機）`brew install rustup` 後，`/opt/homebrew/bin/cargo`／`rustc` 仍然指向 Homebrew 自己的 `rust` formula（1.96.1，keg-only 但先佔用了 `bin` 的 symlink），rustup 管理的工具鏈（1.97.1，含 Android target）被安裝到 `/opt/homebrew/opt/rustup/bin/`，不在預設 `PATH` 順位前面。**解法**：不動全域 Homebrew link 狀態（`brew unlink rust` 影響其他 session/專案，超出這包授權），改為每次跑 native build 時把 `/opt/homebrew/opt/rustup/bin` 加到 `PATH` 前面：

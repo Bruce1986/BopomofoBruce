@@ -4,7 +4,9 @@
 - 期間：2026-08-10 14:5x – 16:1x (UTC+8)（分兩段：14:5x–15:0x 調查+停工回報，
   15:1x–16:1x owner 裁示後續跑）
 - 狀態：**驗收標準全數通過（實機 connectedAndroidTest 綠、assembleDebug 兩
-  ABI 皆產出 .so、ktfmtCheck/lint 綠）。細節與已知缺口見下方「第二階段」。**
+  ABI 皆產出 .so、ktfmtCheck/lint 綠）。細節與已知缺口見下方「第二階段」。
+  第五階段（2026-08-11）修正下游 `:app` 拿不到字典等 5 條 finding，其中 E1 把
+  `lint` 需要連網從「已解決」降級為「已知取捨」，見該節。**
 
 ## 環境確認（動工前）
 
@@ -414,8 +416,18 @@ ADR-0001 本體。詳細裁示內容見 lead 轉達訊息（本檔不重抄，�
   `package*Assets` 也只依附 `ensureChewingDataDir`，`fetchChewingData` 改為只掛在
   `assembleDebug`/`assembleRelease` 上，並用 `mustRunAfter` 讓「若兩者都被排進同一次
   Gradle 呼叫」時保持正確順序（例如 `./gradlew lint assembleDebug` 合跑一次也核對過綠）。
-  `connected*`/`install*` 未額外明列——已用 `--dry-run` 確認 `assembleDebug`
-  依賴鏈已涵蓋，`connectedAndroidTest` 實跑亦綠（見下方）。
+  `connected*`/`install*` 額外明列（不假設從 `assembleDebug` 繼承），並用 `--dry-run` 核對過
+  `fetchChewingData` 在它們的 task graph 裡。
+
+  **（2026-08-11 第五階段更正，見下方 E1）**：這裡當時只驗證了
+  `:decoder-native:assembleDebug`/`assembleRelease`/`connectedAndroidTest` 這幾個
+  **decoder-native 自己的** task 本身的 `--dry-run`，沒有驗證下游 `:app`（經 `:decoder`）消費
+  `:decoder-native` 時實際排進 task graph 的是 `packageDebugAssets` 這類 artifact task，根本不
+  會經過 `:decoder-native:assembleDebug`/`assembleRelease`——`--dry-run` 顯示乾淨 checkout 組出
+  的 `:app:assembleDebug`/`:app:assembleRelease` 依賴鏈裡都**沒有** `fetchChewingData`，
+  只會 mkdir 出一個空的 `assets/chewing/`。原句「`connectedAndroidTest` 實跑亦綠」也已在
+  Opus 級驗證者複查時指出不具鑑別力：`word.dat`/`tsi.dat` 當時早就留在本機磁碟上，「跑得動、
+  測試綠」不代表 fetch 真的被排進圖裡，兩者被本輪誤當同一件事。詳見下方「第五階段」E1。
 
 ### A10/A12 驗證指令與輸出
 
@@ -466,3 +478,182 @@ armeabi-v7a release: bpmf_commit / bpmf_free / bpmf_init / bpmf_input（4 個，
 - A12 修正過程中發現的兩個坑（task 命名撞上自己的 matcher、AGP 內建的
   `lintAnalyzeDebug{UnitTest,AndroidTest}→package*Assets` 依賴）finding 本身沒有點名，
   是動手驗證時才浮現，記錄在上面供之後回頭查證參考。
+
+---
+
+## 第五階段（Opus 級驗證者查證後的 5 條 finding 修正輪，2026-08-11，分支
+`feat/w1a-decoder-native`）
+
+以下 5 條 finding（E1–E5），E1 由 lead 親自實測確認，其餘皆逐條動手查證/重現後才修。
+
+- **E1〔high〕下游 `:app` 拿不到字典**：`:decoder-native` 是 library module，`:app`（經
+  `:decoder`）消費它時，Gradle 排進 task graph 的是 `packageDebugAssets` 這類 artifact
+  task，**不會**經過 `:decoder-native:assembleDebug`。第四階段（A12）把 `fetchChewingData`
+  從 `package*Assets`/`lint*` 移開、只留在 `assembleDebug`/`assembleRelease`/`connected*`/
+  `install*` 上，副作用是下游 `:app` build 再也拿不到真字典——只掛回 `assemble*` 沒用，因為
+  `:app` 根本不跑 `:decoder-native` 自己的 `assembleDebug`。本機沒察覺，純粹因為
+  `word.dat`/`tsi.dat` 早就留在磁碟上。
+
+  **選擇的作法**：(a)（finding 建議的三選項之一）——把 `fetchChewingData` 掛回
+  `package*Assets`/`Lint*`（連 `lintAnalyzeDebug`/`generateDebugLintReportModel` 這兩個不含
+  `"Assets"` 字樣、直接讀 assets 目錄因而被 Gradle implicit-dependency 驗證擋下的 lint
+  子 task 也一併掛上），接受 `:lint` 因此又需要連網。沒有選 (b)（AGP
+  `androidComponents.onVariants` 的 `addGeneratedSourceDirectory`）：這個 API 讓字典成為
+  variant 的 generated asset source，一樣會被併進 `mergeDebugAssets` → `packageDebugAssets`
+  這條鏈（打包一定要有真內容），所以並不能避開「lint 也連到 package\*Assets」這個 AGP 內建耦合，
+  改動幅度卻大得多（要把 `outputs.file` 改到 `layout.buildDirectory` 底下、重寫整個
+  fetch task 的路徑假設），對這個具體問題沒有額外好處，故未採用。優先序照 finding 明講：APK 正確性
+  優先於 lint 可離線執行，已誠實記進 ADR-0006（把 A12「已解決」降級為「已知取捨」）與本檔第四階段
+  A12 段落的更正註記（見上方）。
+
+  驗收證據（五項 `--dry-run`，皆在本輪修正**之後**實測，逐項核對）：
+
+  ```
+  $ ./gradlew :app:assembleDebug --dry-run | grep -i fetchChewingData
+  :decoder-native:fetchChewingData SKIPPED
+
+  $ ./gradlew :app:assembleRelease --dry-run | grep -i fetchChewingData
+  :decoder-native:fetchChewingData SKIPPED
+
+  $ ./gradlew :decoder-native:connectedAndroidTest --dry-run | grep -i fetchChewingData
+  :decoder-native:fetchChewingData SKIPPED
+
+  $ ./gradlew :decoder-native:testDebugUnitTest --dry-run | grep -i fetchChewingData
+  （空——純 JVM 單元測試維持離線可跑，符合預期）
+
+  $ ./gradlew :decoder-native:lint --dry-run | grep -i fetchChewingData
+  :decoder-native:fetchChewingData SKIPPED
+  ```
+
+  `:lint` 最後一項**非空**是刻意接受的取捨，不是遺漏——已在 ADR-0006 明文記錄。
+
+  過程中踩了一個新坑：把 `Lint*`-matching 區塊直接刪掉（誤以為 `package*Assets` 依賴
+  `fetchChewingData` 後，`lintAnalyzeDebugUnitTest`/`lintAnalyzeDebugAndroidTest` 會透過
+  `package*Assets` 間接連到）忽略了 `lintAnalyzeDebug`（無 UnitTest/AndroidTest 後綴）與
+  `generateDebugLintReportModel` 這兩個 task 名稱不含 `"Assets"`、直接讀
+  `src/main/assets` 卻完全沒有任何宣告依賴——`./gradlew :decoder-native:lint` 因此被 Gradle
+  的 implicit-dependency 驗證擋下（`generateDebugLintReportModel`/`lintAnalyzeDebug` 各噴兩個
+  "uses this output ... without declaring an explicit or implicit dependency" 錯誤）。修法是
+  用 `it.name.contains("Lint", ignoreCase = true)`（注意 `ignoreCase`——`lintAnalyzeDebug`
+  的 `l` 是小寫，第一次漏寫 `ignoreCase = true` 導致 matcher 完全沒抓到任何 task，同一個
+  validation 錯誤又復現了一次）把這兩個 task 也直接掛上 `fetchChewingData`。
+
+- **E2〔high〕一聲（陰平）靜默回傳「上一個音節」的候選**：`bpmf_wrapper.c` 原本把 ASCII 空白
+  當純分隔符 `continue`，從不餵給 `chewing_handle_Default`。查證 vendored
+  `src/editor/zhuyin_layout/standard.rs`（`SyllableEditor::key_press`）確認
+  `KEY_SPACE => Bopomofo::TONE1`：syllable 非空時回傳 `KeyBehavior::Commit`（不更新聲調，
+  等於用隱含的一聲提交當前音節）；syllable 空時回傳 `KeyBehavior::KeyError`（`standard.rs`
+  自己的 `space` unit test 也斷言這點）。finding 指出的因果成立。
+
+  第一版修法（naive）——不分狀態一律把空白餵給 `chewing_handle_Default`——**在裝置上實測後發現
+  不安全**，比 finding 本身的建議更深一層：`standard.rs` 只是最底層的 `SyllableEditor`；空白鍵
+  在整個 Editor 狀態機（`src/editor/mod.rs`）裡還有另一條路徑——一旦音節已透過顯式聲調鍵提交、
+  Editor 回到 `Entering` 狀態，`Entering::next()` 會把 `SYM_SPACE` 導去
+  `start_selecting_or_input_space()`，只要組字區（`shared.com`，不是單一音節緩衝區）非空且游標
+  下有可選字符，就會把**整個 Editor**切換進 `Selecting`（候選視窗）狀態——跟 `bpmf_input()`
+  自己稍後呼叫的 `chewing_cand_open()` 衝突（等於開兩次候選視窗），實測導致
+  `bpmf_input(handle, "ㄋㄧˇㄏㄠˇ")`（純既有的、不涉一聲的案例）從原本正確的
+  `[好, 郝, 㚼, 㝀]` 退化成 `[]`。修正：改用 `chewing_zuin_Check()`（chewing.h 明文：
+  「回傳 0 代表 true〔有待決音節〕、1 代表 false」）閘門——只在真的有待決音節（真的還在
+  `EnteringSyllable` composing 狀態）時才把空白轉發給 `chewing_handle_Default`，其餘一律不轉發
+  （純分隔符 no-op）。裝置上重新核對 5 組輸入，結果與預期一致：
+
+  ```
+  input=[ㄍㄨㄥ]         -> [工, 公, 功, 供, 攻, ...]        （純一聲，靠結尾自動 flush 提交）
+  input=[ㄋㄧˇㄍㄨㄥ]    -> [工, 公, 功, 供, 攻, ...]        （前一音節有顯式聲調、正常 commit；
+                                                              第二音節一聲，未混進「你/妳」）
+  input=[ㄋㄧˇㄏㄠˇ]     -> [好, 郝, 㚼, 㝀]                 （既有案例維持正確，未被閘門修正改壞）
+  input=[abc]            -> []                                （unmapped，fail closed）
+  ```
+
+  （`input=[ㄍㄨㄥㄏㄠˇ]`〔兩音節之間無任何分隔符/聲調鍵〕回傳 `[]`——查證後確認這不是本輪
+  修正造成的迴歸，而是真實 DaChen 輸入法本來就有的行為：兩個初聲/介音/韻母鍵在沒有聲調鍵或空白
+  分隔的情況下會直接覆寫同一個待決音節的對應槽位，不會自動斷字，這點在修正前後皆然，只是刻意排除
+  在測試設計外。）
+
+  `bpmf_input()` 結尾也補了一次同樣受 `chewing_zuin_Check()` 閘門保護的 flush，讓字串結尾沒有
+  分隔符的一聲音節（例如純 `"ㄍㄨㄥ"`）也能被提交，不強制呼叫端加尾隨空白。`bpmf.h`
+  同步改寫，移除「一聲不支援」的舊敘述，改成準確描述現行行為與 `chewing_zuin_Check()` 閘門的
+  安全保證。
+
+  **測試證明會紅（實機 `R6AIB700988748X`）**：把 `bpmf_forward_space_if_pending()`
+  的呼叫點還原成單純 `continue`（不轉發空白）並跑
+  `bpmfInput_forFirstToneSyllable_commitsPendingSyllableNotPreviousOne`：
+
+  ```
+  FAILED: expected 工 (gong1) among the candidates, got
+  [你, 妳, 擬, 禰, 儗, 旎, 昵, 坭, 柅, 薿, 檷, 抳, 苨, 馜, 隬, 譺, 尼, 泥, ...]
+  ```
+
+  換回修正版重測，5 個測試（含此測試）全綠。
+
+- **E3〔medium〕`bpmf.h` 的 NULL 契約與實作不符**：`bpmf_wrapper.c:bpmf_input()` 開頭
+  `*candidates_out = NULL`，NULL handle/zhuyin/candidates_out 與 `strdup("")` OOM 兩條路徑
+  都提早 `return 0` 卻從未把 `*candidates_out` 改回 `""`，與 `bpmf.h`「回傳 0 時
+  `*candidates_out == ""`」的承諾不符。選 (a)：新增一個檔案作用域的
+  `static const char kEmptyCandidates[] = "";`，**不**存進 `handle->last_candidates`（避免
+  下次 `bpmf_input()`/`bpmf_free()` 對這個非堆積指標呼叫 `free()`），NULL 前置檢查與 OOM
+  分支都指向它。`bpmf_test_jni.c` 裡原本防禦性的 `joined != NULL` 檢查加了註解，說明現在這是
+  defense-in-depth（契約已保證非 NULL），不是繞過某個真實 NULL 路徑的權宜之計。
+
+- **E4〔medium〕devlog 與 ADR/程式碼互相矛盾**：第四階段 A12 段原文「`connectedAndroidTest`
+  實跑亦綠（見下方）」與 ADR-0006 記載的「實測顯示只掛 assemble\* 時 connectedAndroidTest
+  沒有 fetch」直接互斥，且「實跑亦綠」在字典早已在磁碟上時完全不具鑑別力。已直接改寫上方第四階段
+  A12 段落最後兩句，移除這個不具鑑別力的證據，改成如實描述「當時只驗證了 decoder-native 自己的
+  task、沒驗證下游 `:app` 實際走的路徑」，並交叉引用本節 E1。ADR-0006 對應段落也同步加了
+  「第五階段更正」註記，兩份文件現在對「最終狀態」的敘述一致（`package*Assets`/`Lint*` 依附
+  `fetchChewingData`，`lint` 需要連網是刻意取捨）。
+
+- **E5〔medium〕實機測試斷言對本包最高風險項零鑑別力**：`BpmfNativeSmokeTest.kt` 原本只斷言
+  「非空 + 每個候選非空白」——E2 那種「靜默回傳錯誤音節的候選」完全不會被抓到，因為錯誤音節的
+  候選一樣非空白。改法：
+  1. 既有 `bpmfInput_forNiHao_returnsNonEmptyCandidates` 追加斷言 `candidates.contains("好")`
+     （裝置實測固定輸出），並在註解說明「非空+非空白」為何不具鑑別力。
+  2. 新增 `bpmfInput_forFirstToneSyllable_commitsPendingSyllableNotPreviousOne`（E2 的
+     regression test，見上方）。
+  3. 新增 `bpmfInput_forUnmappedCharacters_failsClosedWithNoCandidates`（fail-closed 的
+     negative case）——**第一版用純 `"abc"` 當輸入，裝置實測發現這個案例本身不具鑑別力**：全
+     ASCII 輸入從頭到尾一個鍵都沒按進 `chewing_handle_Default`，composition 全程是空的，就算
+     把 `bopomofo_key_for() < 0` 的 fail-closed 分支整段改成 `continue`（不提早 return），
+     這條測試依然回傳 0 個候選、照樣綠燈——驗證不出任何東西。改成混合輸入
+     `"ㄏㄠˇx"`（先組出真實有候選的 hao3，再接一個 unmapped 字元），這樣 fail-closed 分支必須
+     主動丟棄已經組好的候選才能通過。
+
+  **測試證明會紅（實機）**：
+  - `candidates.contains("好")` 改成斷言一個不存在的假字串 → `bpmfInput_forNiHao_...`
+    立刻紅（`AssertionError: expected 工 ... got [你, 妳, 擬, ...]`已在 E2 段展示同機制；
+    此處另外對「好」assertion 本身也單獨跑過一次紅/綠，行為一致）。
+  - 把 `bopomofo_key_for(codepoint) < 0` 的 fail-closed 分支改成 `continue`（不 return）→
+    `bpmfInput_forUnmappedCharacters_failsClosedWithNoCandidates` 紅：
+    ```
+    FAILED: expected fail-closed (zero candidates) once an unmapped character appears,
+    even with an already-valid hao3 prefix; got [好, 郝, 㚼, 㝀]
+    expected:<0> but was:<4>
+    ```
+  - 兩處都已還原回修正後版本並重新確認 5/5 綠（見下方收尾指令結果）。
+
+### 收尾指令結果
+
+- `:decoder-native:assembleDebug` → `BUILD SUCCESSFUL`
+- `:decoder-native:assembleRelease` → `BUILD SUCCESSFUL`
+- `:decoder-native:testDebugUnitTest` → `BUILD SUCCESSFUL`
+- `:decoder-native:ktfmtCheck` → `BUILD SUCCESSFUL`
+- `:decoder-native:lint` → `BUILD SUCCESSFUL`（需連網，見 E1 取捨）
+- 實機 `R6AIB700988748X`（ASUS_AI2302, API 15）`:decoder-native:connectedAndroidTest` →
+  `BUILD SUCCESSFUL`，`BpmfNativeSmokeTest` **5/5 綠**（新增 2 個：E2 的一聲 regression test、
+  E5 的 fail-closed negative test；原 3 個維持綠，其中 `bpmfInput_forNiHao_...`
+  追加了 E5 的「好」斷言）。
+
+### 對 finding 本身的補充意見
+
+- E1、E3、E4、E5 皆屬實，沒有需要 push back 之處。
+- E2 的因果查證（`standard.rs` 的 `KEY_SPACE => Bopomofo::TONE1`）finding 本身完全正確，但
+  finding 建議的「把空白原樣餵給 `chewing_handle_Default`」若不加任何閘門，會在裝置上引入一個
+  finding 沒有預見的新迴歸（`Entering::next()` 的 `start_selecting_or_input_space()` 把整個
+  Editor 切進 Selecting 狀態、與 `bpmf_input()` 自己的 `chewing_cand_open()` 衝突）。這不是
+  finding 判斷錯誤——finding 本來就要求「你自行評估、若不可行則 fail closed」——只是記錄下這個
+  額外查證步驟（讀 `editor/mod.rs` 的 `Entering`/`EnteringSyllable` 兩個 state 的完整
+  `next()` 實作，不只是 `standard.rs` 一層）供之後回頭查證參考。
+- E5 建議的 negative case 範例（`"abc"`）本身經查證不具鑑別力（見上方 E5 段），已換成
+  `"ㄏㄠˇx"` 這種「先有效、後 unmapped」的混合輸入；這不影響 finding 判斷本身（fail-closed
+  斷言確實需要，且原本完全缺這類測試），只是 finding 給的範例字串需要替換才能真正驗證到目標。
