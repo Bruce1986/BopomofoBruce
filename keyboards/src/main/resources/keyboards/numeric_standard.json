@@ -76,6 +76,13 @@
         "action": {
           "type": "character",
           "char": "."
+        },
+        "longPress": {
+          "label": "-",
+          "action": {
+            "type": "character",
+            "char": "-"
+          }
         }
       },
       {
