@@ -18,7 +18,9 @@ import org.junit.jupiter.api.Test
  * `candidateText/candidateHighlight` 也用 AA 的 4.5——高亮候選的字是主要內容。它與「`candidateHighlight` 對
  * `background` ≥3:1」在深色主題下數學上互斥（可行亮度區間為空，推導見 [DarkTheme] 的註解），取捨是 文字優先、非文字門檻退到已論證的 2.9。
  *
- * `keyText/keyFill` 沒有被回報過問題，只用寬鬆的 3.0 當回歸警戒。
+ * `keyText/keyFill` 是一般鍵的字疊在一般鍵底色上，鍵盤上被讀最多次的畫素，門檻同樣是 AA 的 4.5 （G1：原本只鎖 3.0，Light 17.1:1／Dark 11.1:1
+ * 的實測餘裕巨大，鬆門檻擋不住「keyFill 調到 3.x:1 仍全綠」的回歸）。`candidateText` 對 `background`（候選列上未被選中、也就是大多數候選字
+ * 畫在背景上的組合）過去完全沒有門檻，一併補上 AA 的 4.5——Light/Dark 現值皆遠高於此。
  */
 class BuiltInThemesContrastTest {
 
@@ -109,23 +111,25 @@ class BuiltInThemesContrastTest {
         )
     }
 
+    /** G1：一般鍵的字疊在一般鍵底色上，鍵盤上被讀最多次的畫素，門檻是 WCAG AA 的 4.5。 */
     @Test
-    fun `LightTheme keyText on keyFill has healthy contrast`() {
+    fun `LightTheme keyText on keyFill meets WCAG AA text contrast`() {
         val ratio = contrastRatio(LightTheme.colors.keyText, LightTheme.colors.keyFill)
-        assertTrue(ratio >= 3.0, "expected >= 3.0, was $ratio")
+        assertTrue(ratio >= 4.5, "expected >= 4.5, was $ratio")
     }
 
     @Test
-    fun `DarkTheme keyText on keyFill has healthy contrast`() {
+    fun `DarkTheme keyText on keyFill meets WCAG AA text contrast`() {
         val ratio = contrastRatio(DarkTheme.colors.keyText, DarkTheme.colors.keyFill)
-        assertTrue(ratio >= 3.0, "expected >= 3.0, was $ratio")
+        assertTrue(ratio >= 4.5, "expected >= 4.5, was $ratio")
     }
 
+    /** 高亮候選的字是主要內容，門檻是 WCAG AA 的 4.5（取捨說明見 [DarkTheme] 版本測試的 KDoc）。 */
     @Test
-    fun `LightTheme candidateText on candidateHighlight has healthy contrast`() {
+    fun `LightTheme candidateText on candidateHighlight meets WCAG AA`() {
         val ratio =
             contrastRatio(LightTheme.colors.candidateText, LightTheme.colors.candidateHighlight)
-        assertTrue(ratio >= 3.0, "expected >= 3.0, was $ratio")
+        assertTrue(ratio >= 4.5, "expected >= 4.5, was $ratio")
     }
 
     /** 高亮候選的字是主要內容，門檻是 WCAG AA 的 4.5（取捨說明見上一條測試的 KDoc）。 */
@@ -133,6 +137,22 @@ class BuiltInThemesContrastTest {
     fun `DarkTheme candidateText on candidateHighlight meets WCAG AA`() {
         val ratio =
             contrastRatio(DarkTheme.colors.candidateText, DarkTheme.colors.candidateHighlight)
+        assertTrue(ratio >= 4.5, "expected >= 4.5, was $ratio")
+    }
+
+    /**
+     * G1：候選列上「未被選中」的候選字（也就是大多數候選字）是直接畫在 `background` 上，過去完全 沒有門檻守著。門檻是 WCAG AA 的 4.5，Light/Dark
+     * 現值皆遠高於此。
+     */
+    @Test
+    fun `LightTheme candidateText on background meets WCAG AA text contrast`() {
+        val ratio = contrastRatio(LightTheme.colors.candidateText, LightTheme.colors.background)
+        assertTrue(ratio >= 4.5, "expected >= 4.5, was $ratio")
+    }
+
+    @Test
+    fun `DarkTheme candidateText on background meets WCAG AA text contrast`() {
+        val ratio = contrastRatio(DarkTheme.colors.candidateText, DarkTheme.colors.background)
         assertTrue(ratio >= 4.5, "expected >= 4.5, was $ratio")
     }
 }
