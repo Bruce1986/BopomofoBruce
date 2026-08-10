@@ -657,3 +657,22 @@ armeabi-v7a release: bpmf_commit / bpmf_free / bpmf_init / bpmf_input（4 個，
 - E5 建議的 negative case 範例（`"abc"`）本身經查證不具鑑別力（見上方 E5 段），已換成
   `"ㄏㄠˇx"` 這種「先有效、後 unmapped」的混合輸入；這不影響 finding 判斷本身（fail-closed
   斷言確實需要，且原本完全缺這類測試），只是 finding 給的範例字串需要替換才能真正驗證到目標。
+
+## 第六階段（round-5 審查，2026-08-11）
+
+- **[high] E3 的 `kEmptyCandidates` fallback 漏了一條路徑。** 上一輪把 `bpmf_input()` 開頭的
+  NULL 前置檢查與結尾 `strdup("")` 的 OOM 分支都改指向 static 空字串，但**迴圈中段「未對照到
+  表格字元」的 fail-closed 分支**仍是舊寫法（`handle->last_candidates = strdup(""); *candidates_out
+  = handle->last_candidates;`）。那個 `strdup("")` 一旦 OOM 就會讓 `*candidates_out` 變成 NULL，
+  違反 `bpmf.h` 與本檔案開頭註解重申的「回傳 0 時 `*candidates_out` 必為 `""`、絕不是 NULL」
+  契約——而這正是 E3 要修的那一類 bug，只是漏了這一條分支。
+  連帶地，`bpmf_test_jni.c` 的註解與本 devlog E3 段當時宣稱「所有回傳 0 的路徑都已涵蓋」
+  **在修正前並不成立**；本階段修掉該分支後才真正成立。
+
+  已修：該分支改為 `*candidates_out = (char*)kEmptyCandidates;`，不再 `strdup`。
+  `handle->last_candidates` 維持在稍早已被 free 並設回 NULL 的狀態，沒有東西需要之後釋放。
+  全檔現在只剩結尾 `joined = strdup("")` 一處會配置空字串，且其 OOM 分支已指向 static 空字串。
+
+  驗證：`assembleDebug`/`assembleRelease`/`testDebugUnitTest`/`ktfmtCheck`/`lint` 全綠；
+  實機 `R6AIB700988748X` `connectedAndroidTest` 5/5 綠（含 E2 一聲迴歸測試與 fail-closed
+  negative test，後者走的正是本次修改的這條分支）。

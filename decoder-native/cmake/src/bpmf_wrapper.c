@@ -237,9 +237,14 @@ size_t bpmf_input(void* opaque_handle, const char* zhuyin, char** candidates_out
         }
         int key = bopomofo_key_for(codepoint);
         if (key < 0) {
-            /* Unmapped character (not bopomofo/tone) — spec says fail closed. */
-            handle->last_candidates = strdup("");
-            *candidates_out = handle->last_candidates;
+            /* Unmapped character (not bopomofo/tone) — spec says fail closed.
+             * Point at the static empty string rather than strdup(""): a
+             * strdup here could itself fail under OOM and hand the caller a
+             * NULL, violating the "returns 0 => *candidates_out is \"\", never
+             * NULL" contract this very branch is meant to honour.
+             * handle->last_candidates stays NULL (freed above), so there is
+             * nothing for bpmf_free/the next call to release. */
+            *candidates_out = (char*)kEmptyCandidates;
             return 0;
         }
         chewing_handle_Default(ctx, key);
