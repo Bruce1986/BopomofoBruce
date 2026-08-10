@@ -64,6 +64,22 @@ class OtherKeyboardsContentTest {
     }
 
     @Test
+    fun `password and url keyboards share identical qwerty letter rows`() {
+        // password_qwerty.json and url_qwerty.json's first three rows (q-p, a-l, z-m plus
+        // shift/backspace) are copy-pasted verbatim from one another. Nothing else pins them
+        // together, so a future edit to one without the other would silently diverge. Compare the
+        // full per-key (label, action, weight) tuple, not just the letters, so a weight/shift/
+        // backspace edit on only one side is also caught.
+        val passwordLetterRows = Keyboards.passwordQwerty.rows.take(3)
+        val urlLetterRows = Keyboards.urlQwerty.rows.take(3)
+        assertEquals(
+            passwordLetterRows,
+            urlLetterRows,
+            "password_qwerty and url_qwerty letter rows have diverged",
+        )
+    }
+
+    @Test
     fun `phone dialpad has 0-9, star and pound`() {
         val chars =
             Keyboards.phoneDialpad.rows.flatten().mapNotNull { key ->
@@ -99,6 +115,24 @@ class OtherKeyboardsContentTest {
         }
         for (sep in listOf('/', ':', '-')) {
             assertTrue(sep in chars, "datetime keyboard missing separator '$sep'")
+        }
+    }
+
+    @Test
+    fun `no keyboard has a duplicate Character key`() {
+        // Catches copy-paste mistakes (e.g. password_qwerty / url_qwerty share their first three
+        // rows verbatim) that a presence-only assertion (`c in chars`) would miss: a duplicated key
+        // still contains every required character, just also contains an extra copy of one.
+        for (keyboard in Keyboards.all) {
+            val charActions =
+                keyboard.rows.flatten().mapNotNull { key ->
+                    (key.action as? KeyAction.Character)?.char
+                }
+            val duplicates = charActions.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+            assertTrue(
+                duplicates.isEmpty(),
+                "keyboard ${keyboard.id} has duplicate Character key(s): $duplicates",
+            )
         }
     }
 

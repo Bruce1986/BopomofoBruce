@@ -19,6 +19,12 @@ object KeyboardLoader {
      * @param resourcePath classpath-relative path, e.g. `"keyboards/zhuyin_4x10_portrait.json"`.
      * @throws IllegalArgumentException if [resourcePath] isn't found on the classpath.
      * @throws SerializationException if the JSON doesn't match the [StaticKeyboardDef] schema.
+     * @throws java.io.IOException if the resource stream can't be read (e.g. the classpath jar/apk
+     *   is corrupt or truncated). Left as the raw exception rather than wrapped: it's a low-level
+     *   I/O failure distinct from the schema/lookup failures above, callers that specifically want
+     *   to handle "resource unreadable" shouldn't have to unwrap a custom exception type to get to
+     *   it, and it's rare enough in practice (bundled classpath resources, not user-supplied files)
+     *   that adding a wrapper type here isn't worth the extra API surface.
      */
     fun loadFromResource(resourcePath: String): KeyboardDef {
         val text =

@@ -101,10 +101,11 @@ class KeyboardLoaderTest {
 
     @Test
     fun `every key on every catalog keyboard has a positive finite weight`() {
-        // KeyData's own init{} block already enforces this at construction time (see :common);
-        // this test is a second, independent check exercised against the real bundled JSON rather
-        // than a hand-built KeyData, so it would fail if a future JSON edit slipped past that guard
-        // via some decode path that skips the constructor validation.
+        // KeyData's own init{} block enforces this at construction time (see :common), and every
+        // decode path (including KeyboardLoader.loadFromResource) goes through that constructor, so
+        // Keyboards.all can never contain a non-positive/non-finite weight. What we can actually
+        // verify is that decoding JSON with a bad weight fails loudly rather than silently — the
+        // two cases below.
         for (keyboard in Keyboards.all) {
             for (row in keyboard.rows) {
                 for (key in row) {
@@ -114,6 +115,36 @@ class KeyboardLoaderTest {
                     )
                 }
             }
+        }
+    }
+
+    @Test
+    fun `decoding a key with zero weight throws`() {
+        val malformed =
+            """
+            {
+              "id": "broken",
+              "rows": [[{"label": "a", "action": {"type": "character", "char": "a"}, "weight": 0.0}]]
+            }
+            """
+                .trimIndent()
+        assertThrows(IllegalArgumentException::class.java) {
+            json.decodeFromString(StaticKeyboardDef.serializer(), malformed)
+        }
+    }
+
+    @Test
+    fun `decoding a key with negative weight throws`() {
+        val malformed =
+            """
+            {
+              "id": "broken",
+              "rows": [[{"label": "a", "action": {"type": "character", "char": "a"}, "weight": -1.0}]]
+            }
+            """
+                .trimIndent()
+        assertThrows(IllegalArgumentException::class.java) {
+            json.decodeFromString(StaticKeyboardDef.serializer(), malformed)
         }
     }
 }
