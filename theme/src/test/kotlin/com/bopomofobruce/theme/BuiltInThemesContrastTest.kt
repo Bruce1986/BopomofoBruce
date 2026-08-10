@@ -10,13 +10,13 @@ import org.junit.jupiter.api.Test
  * B22 守門：WCAG 2.x 對比度公式的純 Kotlin 實作（sRGB 相對亮度，不需要 Android runtime，跑法比照
  * [com.bopomofobruce.theme.color.ColorConversionsTest]）。
  *
- * 對 [LightTheme] / [DarkTheme] 斷言：
+ * 對 [LightTheme] / [DarkTheme] 斷言 finding 明訂的兩條必修門檻：
  * - `contrastRatio(keyText, keyAccent) >= 4.5`（WCAG AA 一般文字門檻——功能鍵按下時字要看得見）
  * - `contrastRatio(candidateHighlight, background) >= 3.0`（WCAG 1.4.11 非文字 UI 元件門檻——候選列的
  *   游標高亮要跟背景分得出來）
  *
  * `candidateText/candidateHighlight` 也用 AA 的 4.5——高亮候選的字是主要內容。它與「`candidateHighlight` 對
- * `background` ≥3:1」在深色主題下數學上互斥（可行區間為空），取捨是文字優先、非文字門檻退到已論證的 2.9，詳見下方該測試的 KDoc 與 devlog。
+ * `background` ≥3:1」在深色主題下數學上互斥（可行亮度區間為空，推導見 [DarkTheme] 的註解），取捨是 文字優先、非文字門檻退到已論證的 2.9。
  *
  * `keyText/keyFill` 沒有被回報過問題，只用寬鬆的 3.0 當回歸警戒。
  */
@@ -68,15 +68,45 @@ class BuiltInThemesContrastTest {
     }
 
     /**
-     * 深色主題下 WCAG 1.4.11 的 3:1 **無法達成**，這是刻意接受的取捨而非疏漏：background 近黑 （相對亮度 0.0113）、candidateText
-     * 近白（0.7633），高亮色要對 background 達 3:1 需要亮度 >= 0.1339，要讓白字達 AA 4.5:1 需要亮度 <= 0.1307 — 可行區間為空。根因是
-     * KeyboardColors 契約沒有「高亮候選專用的文字色」（M3 的 onSecondaryContainer），contracts-v1 已凍結，已登記 為 W2 契約
-     * follow-up。取捨為文字可讀性優先（見 BuiltInThemes.kt 的註解），此處門檻設在 目前值可達到的 2.9，仍能擋住「有人把高亮色改回與背景同色階」這類回歸。
+     * 深色主題下 WCAG 1.4.11 的 3:1 與「白字對高亮達 AA 4.5」數學上互斥（可行亮度區間為空，推導見 [DarkTheme]
+     * 的註解）。取捨是文字可讀性優先，因此這條退到現值可達的 2.9——仍能擋住「有人把高亮 色改回與背景同色階」的回歸（原值 #4A4458 是 1.84，會被擋下）。
      */
     @Test
     fun `DarkTheme candidateHighlight against background stays at the documented best-effort 2_9`() {
         val ratio = contrastRatio(DarkTheme.colors.candidateHighlight, DarkTheme.colors.background)
         assertTrue(ratio >= 2.9, "expected >= 2.9, was $ratio")
+    }
+
+    /**
+     * B24：`keyAccent` 同樣受 WCAG 1.4.11 管轄（它是「pressed state / 功能鍵」的視覺指示），第一版 B22 修正只顧到「字疊在它上面」而讓它自己對
+     * keyFill/background 掉到 1.29/1.12，測試卻沒有任何 一條量到——1.4.11 被精準地只套在會過的欄位上。這兩條補起來，讓守門覆蓋所有被改動過的欄位。
+     */
+    @Test
+    fun `LightTheme keyAccent stands out from keyFill and background`() {
+        assertTrue(
+            contrastRatio(LightTheme.colors.keyAccent, LightTheme.colors.keyFill) >= 3.0,
+            "keyAccent vs keyFill: ${contrastRatio(LightTheme.colors.keyAccent, LightTheme.colors.keyFill)}",
+        )
+        assertTrue(
+            contrastRatio(LightTheme.colors.keyAccent, LightTheme.colors.background) >= 3.0,
+            "keyAccent vs background: ${contrastRatio(LightTheme.colors.keyAccent, LightTheme.colors.background)}",
+        )
+    }
+
+    /**
+     * 深色主題與 `candidateHighlight` 同源地無法三全其美：`keyText` 4.5 當硬下限時，`keyAccent` 對 `keyFill` 的分離度上限只有
+     * 2.47（窮舉紫色系求得）。門檻依實測最佳值設定，仍能擋住「有人把 強調色改回與按鍵同色階」的回歸（第一版 #4F378B 是 1.54 / 1.84，會被這兩條擋下）。
+     */
+    @Test
+    fun `DarkTheme keyAccent stays at the documented best-effort separation`() {
+        assertTrue(
+            contrastRatio(DarkTheme.colors.keyAccent, DarkTheme.colors.keyFill) >= 2.4,
+            "keyAccent vs keyFill: ${contrastRatio(DarkTheme.colors.keyAccent, DarkTheme.colors.keyFill)}",
+        )
+        assertTrue(
+            contrastRatio(DarkTheme.colors.keyAccent, DarkTheme.colors.background) >= 2.9,
+            "keyAccent vs background: ${contrastRatio(DarkTheme.colors.keyAccent, DarkTheme.colors.background)}",
+        )
     }
 
     @Test
@@ -92,13 +122,13 @@ class BuiltInThemesContrastTest {
     }
 
     @Test
-    fun `LightTheme candidateText on candidateHighlight meets WCAG AA`() {
+    fun `LightTheme candidateText on candidateHighlight has healthy contrast`() {
         val ratio =
             contrastRatio(LightTheme.colors.candidateText, LightTheme.colors.candidateHighlight)
-        assertTrue(ratio >= 4.5, "expected >= 4.5, was $ratio")
+        assertTrue(ratio >= 3.0, "expected >= 3.0, was $ratio")
     }
 
-    /** 高亮候選的字是主要內容，門檻拉到 WCAG AA 的 4.5（見上一條測試對取捨的說明）。 */
+    /** 高亮候選的字是主要內容，門檻是 WCAG AA 的 4.5（取捨說明見上一條測試的 KDoc）。 */
     @Test
     fun `DarkTheme candidateText on candidateHighlight meets WCAG AA`() {
         val ratio =

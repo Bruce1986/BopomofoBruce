@@ -165,3 +165,43 @@
   提到「套用 W1-B 的 ThemePreview」，但 W1-B 自己的交付清單只要求「三主題各有 @Preview」）；
   `StyleSheet` → `KeyboardTheme` 的 adapter（根因是凍結契約缺 shapes/typography）。
   兩者都不該由本包單方決定尚未存在的下游 API。
+
+## 2026-08-11 第八輪（Opus tracer）— B22 的修正自己製造了新缺陷
+
+- **B24（high）：`keyAccent` 改用 container 色階後，強調色自己看不見了。**
+  B22 只顧「字疊在強調色上」，把 `keyAccent` 換成 M3 container 端點，結果強調色**自身**
+  對周邊的分離度崩掉——實算：Light `#EADDFF` 對 `keyFill` 1.29:1、對 `background` 1.12:1
+  （原 primary 是 6.44 / 5.60）；Dark `#4F378B` 對 `keyFill` 1.54:1、對 `background`
+  1.84:1（原 8.42 / 10.05）。而 `keyAccent` 的契約語意正是「pressed state / 功能鍵」，
+  它的首要功能就是要跟一般鍵分得出來——等於按下去看不出按鍵有變色。
+  諷刺的是 Dark 的 1.84 正是 B22 拿來當缺陷證據的同一個數字：修掉一個 1.84、又造出另一個。
+
+  更根本的問題是**守門測試只斷言了會過的配對**：WCAG 1.4.11 被套在
+  `candidateHighlight/background`（剛好過），卻沒有套在本輪唯一被改動的 `keyAccent` 上
+  ——也就是新測試對它會慘敗的欄位保持沉默。
+
+  已修：
+  - Light 並不存在深色那種數學互斥（可行亮度區間 L∈[0.226, 0.254] 非空），改用中間調
+    `#9179BE`：keyText 4.64、對 keyFill 3.70、對 background 3.21，**三項同時達標**。
+    第一版直接跳到 container 端點是偷懶。
+  - Dark 套用與 `candidateHighlight` 相同的規則（文字 4.5 當硬下限、在此前提下最大化分離度），
+    窮舉紫色系得 `#855196`：keyText 4.50、對 keyFill 2.47、對 background 2.95。後兩項仍
+    不及 3:1，但已是此契約下的最佳值。
+  - 補 `LightTheme keyAccent stands out from keyFill and background`（3.0/3.0）與
+    `DarkTheme keyAccent stays at the documented best-effort separation`（2.4/2.9）兩條守門。
+    **已證明會紅**：把兩個 keyAccent 改回第一版的 container 色階，兩條立刻 FAILED，還原後綠。
+
+- **深色 `candidateHighlight` 的取捨在本輪定案為「文字優先」**：兩個候選值
+  `#6F6A76`（背景 3.26 / 白字 4.07）與 `#656471`（背景 2.95 / 白字 4.50），**選 #656471**。
+  理由：候選字看不清楚沒有替代方案，而「這一個被選中」`:ime` 還能用邊框／底線／字重表達。
+  兩個選項與切換方式都寫在 `BuiltInThemes.kt` 註解裡，owner 若要反過來以 1.4.11 為硬門檻，
+  改色值 + 對調兩條 Dark 門檻即可。
+  （過程註記：本輪一度有兩個 session 並行動到同一個 worktree，`#656471` 曾被覆寫回
+  `#6F6A76`；已比對還原，最終狀態如上。）
+
+- **動態色路徑的已知結構性限制（tracer 的推理，非實測）**：M3 的 `*Container` 與 `surface`
+  是固定 tone 目標（light 下 surface≈tone98 / container≈tone90，dark 下 10 / 30），桌布只換
+  色相與彩度、不換 tone，因此 `MaterialYouTheme` 的 `keyAccent`/`candidateHighlight` 對
+  `background` 的分離度在**任何**桌布下都落在 1.2～1.9 量級——固定色盤剛修掉的缺陷，在動態
+  路徑上原封不動存在。這條無法用 JVM 測試驗證，標為推理；一併掛在既有的 W2 契約 follow-up
+  （`KeyboardColors` 缺 on-accent / on-candidate-highlight 色）之下。
