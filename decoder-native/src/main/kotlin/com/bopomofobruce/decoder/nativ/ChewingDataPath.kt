@@ -39,6 +39,15 @@ fun getDataPath(context: Context): String =
  * could both observe the final file missing, then interleave writes into (or one truncate the
  * other's) the same `.tmp` path before either renames.
  *
+ * **The guarantees above hold within a single process only.** [extractionLock] is an ordinary JVM
+ * monitor, so two processes each get their own instance and neither blocks the other; they can
+ * interleave writes into the same `.tmp` path and then both rename, atomically publishing
+ * half-written content under the final name. No module currently declares `android:process`
+ * (checked across all seven manifests), so this is not reachable today — but if the IME service is
+ * ever split into its own process, this must move to a file lock
+ * ([java.nio.channels.FileChannel.lock]) or the extraction must be funnelled through a single
+ * designated component.
+ *
  * Kept independent of [Context] (takes [AssetManager] + [File] directly) so it's testable as a
  * plain JVM unit test with a mocked [AssetManager], without needing Robolectric.
  */
