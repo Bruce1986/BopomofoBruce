@@ -64,11 +64,21 @@ void* bpmf_init(const char* data_path);
  * the resulting candidate phrases.
  *
  * `zhuyin` is UTF-8, each syllable made of consonant/vowel bopomofo
- * characters (U+3105-U+3129) followed by an explicit tone mark
- * (U+02CA/U+02C7/U+02CB/U+02D9 for tone 2/3/4/5; first tone has no mark and
- * is not currently supported by this wrapper — see devlog). ASCII spaces in
- * `zhuyin` are treated as syllable separators and ignored (not fed to
- * libchewing as physical keystrokes).
+ * characters (U+3105-U+3129) optionally followed by an explicit tone mark
+ * (U+02CA/U+02C7/U+02CB/U+02D9 for tone 2/3/4/5). First tone (陰平) has no
+ * diacritic in standard zhuyin orthography and is committed by an ASCII
+ * space (U+0020, ' ') immediately after the syllable's bopomofo characters —
+ * mirroring libchewing's own DaChen keyboard layout, where the space bar IS
+ * the tone-1 key (see vendored cmake/libchewing/src/editor/zhuyin_layout/
+ * standard.rs). A trailing first-tone syllable with no following character
+ * at all (i.e. it's the last thing in `zhuyin`) does not need an explicit
+ * trailing space either — bpmf_input() always checks for one still-pending
+ * syllable at the end of the buffer and commits it the same way. A space
+ * anywhere else — after a syllable that already carries an explicit tone
+ * 2-5 mark, or with nothing typed yet — is a true no-op: it is only ever
+ * forwarded to libchewing while a syllable is actually mid-composition, so
+ * it is always safe to use purely as a visual/structural separator between
+ * syllables too.
  *
  * Returns the candidate count and writes the joined string to
  * *candidates_out (see ownership contract above). Returns 0 (with

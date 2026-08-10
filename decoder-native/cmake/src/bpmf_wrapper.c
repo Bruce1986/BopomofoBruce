@@ -63,6 +63,19 @@ static const BopomofoKey kBopomofoKeys[] = {
 
 static const size_t kBopomofoKeyCount = sizeof(kBopomofoKeys) / sizeof(kBopomofoKeys[0]);
 
+/*
+ * bpmf.h promises *candidates_out == "" (not NULL) whenever bpmf_input()
+ * returns 0. That promise has to hold even on paths that run BEFORE we have
+ * a handle to own a heap string in (NULL handle/zhuyin/candidates_out — see
+ * below) or when strdup("") itself fails (OOM). Point at this static,
+ * process-lifetime empty string in those two cases instead of NULL: it is
+ * NOT stored into handle->last_candidates (so bpmf_free()/the next
+ * bpmf_input() never free()s it — only genuinely heap-allocated strings are
+ * ever assigned there), and the caller must not free it either (same
+ * ownership contract as the heap-backed candidates strings — see bpmf.h).
+ */
+static const char kEmptyCandidates[] = "";
+
 /** Decodes one UTF-8 codepoint starting at `s`; advances `*len` past it. Returns 0 on invalid/empty input. */
 static uint32_t next_utf8_codepoint(const char* s, size_t* len) {
     const unsigned char* p = (const unsigned char*)s;
@@ -152,11 +165,54 @@ void* bpmf_init(const char* data_path) {
     return handle;
 }
 
-size_t bpmf_input(void* opaque_handle, const char* zhuyin, char** candidates_out) {
-    if (candidates_out != NULL) {
-        *candidates_out = NULL;
+/*
+ * Forwards a space keystroke to libchewing IF AND ONLY IF there is currently
+ * a non-empty pending phonetic (bopomofo) syllable buffer — gated on
+ * chewing_zuin_Check(), which the header (capi/include/chewing.h) documents
+ * as "returns 0 when true [there IS a pending phonetic pre-edit string], 1
+ * when false".
+ *
+ * This gate is required, not optional. ASCII space is our
+ * syllable-separator convention AND libchewing's DaChen KEY_SPACE, a real
+ * keystroke (Bopomofo::TONE1 — see vendored cmake/libchewing/src/editor/
+ * zhuyin_layout/standard.rs's SyllableEditor::key_press). But that mapping
+ * is only safe to forward while the low-level SyllableEditor is actively
+ * composing (editor state EnteringSyllable): there, a pending syllable gets
+ * committed with the implied first tone, and an *empty* pending syllable is
+ * a harmless KeyError no-op purely at the SyllableEditor level (see
+ * standard.rs's own `space` unit test).
+ *
+ * Once that per-syllable composition is done and the editor has returned to
+ * its `Entering` state, though, Space stops being routed to the
+ * SyllableEditor at all — editor/mod.rs's `Entering::next()` handles
+ * SYM_SPACE itself via `start_selecting_or_input_space()`, which — whenever
+ * the overall composition buffer is non-empty and has a symbol under the
+ * cursor to select from — transitions the WHOLE EDITOR into its Selecting
+ * (candidate-window) state. That collides with bpmf_input()'s own explicit
+ * chewing_cand_open() call further down (verified on-device: forwarding an
+ * unconditional trailing space made bpmf_input() return 0 candidates for
+ * strings whose last syllable already had an explicit tone mark, e.g.
+ * "ㄋㄧˇㄏㄠˇ", by opening — and thereby double-opening — the candidate
+ * window before this function's own open call runs). Gating on
+ * chewing_zuin_Check() means a space here is a genuine "commit the pending
+ * syllable" only when there IS one, and a true no-op (nothing forwarded to
+ * the editor at all) once composition has already settled back into
+ * `Entering` — exactly the separator behaviour the rest of this file
+ * assumes.
+ */
+static void bpmf_forward_space_if_pending(ChewingContext* ctx) {
+    if (chewing_zuin_Check(ctx) == 0) {
+        chewing_handle_Default(ctx, ' ');
     }
-    if (opaque_handle == NULL || zhuyin == NULL || candidates_out == NULL) {
+}
+
+size_t bpmf_input(void* opaque_handle, const char* zhuyin, char** candidates_out) {
+    if (candidates_out == NULL) {
+        return 0;
+    }
+    /* See bpmf.h: 0 candidates always means *candidates_out == "", never NULL. */
+    *candidates_out = (char*)kEmptyCandidates;
+    if (opaque_handle == NULL || zhuyin == NULL) {
         return 0;
     }
     BpmfHandle* handle = (BpmfHandle*)opaque_handle;
@@ -176,7 +232,8 @@ size_t bpmf_input(void* opaque_handle, const char* zhuyin, char** candidates_out
         }
         cursor += consumed;
         if (codepoint == ' ') {
-            continue; /* syllable separator, not a real keystroke */
+            bpmf_forward_space_if_pending(ctx);
+            continue;
         }
         int key = bopomofo_key_for(codepoint);
         if (key < 0) {
@@ -188,9 +245,20 @@ size_t bpmf_input(void* opaque_handle, const char* zhuyin, char** candidates_out
         chewing_handle_Default(ctx, key);
     }
 
+    /*
+     * Flush a still-pending syllable at the very end of the buffer: a
+     * trailing syllable with an implied first tone and no following
+     * separator (e.g. "ㄍㄨㄥ" with no diacritic and no trailing space) would
+     * otherwise never receive its TONE1 commit keystroke. See
+     * bpmf_forward_space_if_pending() for why this must stay gated the same
+     * way as the mid-string case.
+     */
+    bpmf_forward_space_if_pending(ctx);
+
     size_t count = 0;
     char* joined = strdup("");
     if (joined == NULL) {
+        /* OOM: *candidates_out is already the static empty string set above. */
         return 0;
     }
 
