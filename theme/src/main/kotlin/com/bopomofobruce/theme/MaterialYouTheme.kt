@@ -3,6 +3,7 @@ package com.bopomofobruce.theme
 import android.content.Context
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.annotation.VisibleForTesting
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import com.bopomofobruce.common.KeyboardColors
@@ -32,14 +33,19 @@ class MaterialYouTheme private constructor(override val id: String, val styleShe
     companion object {
         const val ID: String = "material-you"
 
-        fun from(
-            context: Context,
-            darkMode: Boolean,
-            sdkInt: Int = Build.VERSION.SDK_INT,
-        ): MaterialYouTheme {
+        /** 正式呼叫端用這支：SDK 等級一律取自實際裝置，無法被覆寫。 */
+        fun from(context: Context, darkMode: Boolean): MaterialYouTheme =
+            from(context, darkMode, Build.VERSION.SDK_INT)
+
+        /**
+         * 測試用的 SDK 注入版本。**不要在正式程式碼呼叫**——傳入與裝置實際 API 等級不符的 [sdkInt] 會讓 `< 31` 的裝置走進
+         * `@RequiresApi(S)` 的動態取色路徑而在執行期崩潰。
+         */
+        @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+        fun from(context: Context, darkMode: Boolean, sdkInt: Int): MaterialYouTheme {
             val fallback = if (darkMode) DarkTheme.styleSheet else LightTheme.styleSheet
             // Lint 的 NewApi 資料流分析只認得對 `Build.VERSION.SDK_INT` 的直接比較；這裡刻意透過
-            // `sdkInt` 參數（預設值即 `Build.VERSION.SDK_INT`）注入，讓 <31 退化分支能在純 JVM unit
+            // `sdkInt` 參數（正式路徑由上面的兩參數版本填入 `Build.VERSION.SDK_INT`）注入，讓 <31 退化分支能在純 JVM unit
             // test 驗證（見 class KDoc）。實際執行路徑與直接寫 `Build.VERSION.SDK_INT >= S` 等價，
             // 手動抑制這條誤報。
             @Suppress("NewApi")
