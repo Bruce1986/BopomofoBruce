@@ -78,3 +78,7 @@ libchewing 的 source-level 可行性檢查通過（尚未做完整 NDK build）
 - [DEVPLAN W2-A 子代理 spec](../DEVPLAN-SubagentFanout-20260620-0851.md#w2-a--decoderjni--個人字典)
 - libchewing 上游：<https://github.com/chewing/libchewing>
 - libchewing License (LGPL-2.1)：<https://github.com/chewing/libchewing/blob/master/COPYING>
+
+---
+
+Superseded in part by [ADR-0006](0006-libchewing-rust-build-pipeline.md)（建置管線部分）。

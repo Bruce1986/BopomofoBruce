@@ -6,6 +6,7 @@ plugins {
 android {
     namespace = "com.bopomofobruce.decoder.nativ"
     compileSdk = 35
+    ndkVersion = "27.2.12479018"
 
     defaultConfig {
         minSdk = 28
@@ -17,10 +18,22 @@ android {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
         }
 
-        // CMake wiring is intentionally deferred to W1-A. Leaving the block
-        // out (rather than adding a placeholder CMakeLists.txt) keeps the
-        // skeleton green without inventing native sources that don't exist
-        // yet. W1-A will add `externalNativeBuild { cmake { ... } }` here.
+        externalNativeBuild {
+            cmake {
+                // AGP passes CMAKE_ANDROID_ARCH_ABI / CMAKE_SYSTEM_NAME=Android
+                // automatically per abiFilters entry; Corrosion (see
+                // cmake/CMakeLists.txt) reads those to pick the matching Rust
+                // target triple.
+                arguments += listOf("-DANDROID_STL=c++_shared")
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("cmake/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     compileOptions {
@@ -37,4 +50,25 @@ dependencies {
 
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
+    testImplementation(libs.mockk)
+
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
 }
+
+// Downloads + sha256-verifies the libchewing dictionary data into
+// src/main/assets/chewing/ (see scripts/fetch_chewing_data.sh + ADR-0006).
+// Wired ahead of asset merging so `assembleDebug` / unit & instrumented
+// tests are reproducible from a clean checkout without a manual step.
+val fetchChewingData by tasks.registering(Exec::class) {
+    description = "Downloads the prebuilt libchewing dictionary data (word.dat/tsi.dat)."
+    workingDir = projectDir
+    commandLine("scripts/fetch_chewing_data.sh")
+    inputs.file("scripts/fetch_chewing_data.sh")
+    outputs.dir("src/main/assets/chewing")
+}
+
+tasks.matching { it.name.startsWith("merge") && it.name.contains("Assets") }.configureEach {
+    dependsOn(fetchChewingData)
+}
+tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(fetchChewingData) }
