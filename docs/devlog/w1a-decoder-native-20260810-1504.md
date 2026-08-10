@@ -367,3 +367,102 @@ ADR-0001 本體。詳細裁示內容見 lead 轉達訊息（本檔不重抄，�
 - A6 舊測試「零長度殘檔會重新解壓」與 A6 修正後的新不變量（最終檔名存在即信任）在語意上
   互斥，這點 finding 本身沒有明講但邏輯上必然如此；已在上面 A6 段落記錄取捨，供之後回頭
   查證時參考，不是我自己新發現的額外缺陷。
+
+---
+
+## 第四階段（獨立驗證者第二輪查證的 4 條 finding 修正輪，2026-08-10～11，commit `f01fce3`）
+
+以下 4 條 finding（A9–A12）皆經獨立驗證者查證屬實（含查 AOSP 原始碼、`--dry-run` 實測）才動手修，逐條記錄處理方式與證據。
+
+- **A9〔medium〕ADR-0006 自相矛盾**：Decision 本體原文「Gradle 把這個 script 掛在
+  `preBuild`/`mergeAssets` 前」與「（2026-08-10 修正輪更新）」追記段落「這個 fetch task
+  **不**掛在 `preBuild`」直接矛盾。已改寫 Decision 本體第一段，直接敘述最終狀態（只掛在真正
+  需要字典內容的 task 上），並把追記段落的標題從「更新」改成「詳細理由」，內容同步改成描述
+  A12 完成後的最終形態（`ensureChewingDataDir` vs `fetchChewingData` 兩個 task 的分工），
+  消除了原本的矛盾。
+
+- **A10〔medium〕CMake 閘門綁的是 AGP 的 isDebuggable fallback**：查證 AOSP
+  `CreateCxxVariantModel.kt` 確認 AGP 先用變體名稱字串比對（含 debug/release/
+  relwithdebinfo/minsizerel 關鍵字），只有名稱不含這些關鍵字時才 fallback 到
+  `if (isDebuggable) "Debug" else "RelWithDebInfo"`——採首選改法：
+  `decoder-native/build.gradle.kts` 的 `buildTypes { debug {} / release {} }` 各自用
+  `externalNativeBuild.cmake.arguments` 顯式傳 `-DBPMF_BUILD_TEST_BRIDGE=ON`/`OFF`；
+  `cmake/CMakeLists.txt` 的閘門條件從 `CMAKE_BUILD_TYPE STREQUAL "Debug"` 改成
+  `if(BPMF_BUILD_TEST_BRIDGE)`，不再依賴 AGP 的隱含變體名稱推導。用 NDK 的
+  `llvm-nm -D --defined-only` 對 release 產物重新核對（兩個 ABI 皆只有 4 個 `bpmf_*`、
+  0 個 `Java_*`/`nativeTest*`；debug 兩個 ABI 皆有 4 個 `Java_..._nativeTest*`），輸出見下方。
+
+- **A11〔medium〕KDoc 語氣超出鎖的保證範圍**：`ChewingDataPath.kt` 的
+  `synchronized(extractionLock)` 只擋同 process，跨 process 兩個寫入者仍可能交錯寫壞
+  `.tmp` 後各自原子 rename。KDoc 補了一段明寫「保證僅限單一 process」，並記錄若 IME 與其他
+  元件日後分成不同 process，需改用 `FileChannel.lock()` 或約定單一元件觸發（不現在就實作
+  檔案鎖，屬過度設計）。已查證目前 7 個模組的 AndroidManifest 皆未宣告 `android:process`。
+
+- **A12〔medium〕lint 被綁上網路**：原本 `it.name.contains("Lint", ignoreCase = true)` 讓
+  `lintAnalyzeDebugUnitTest`/`lintAnalyzeDebugAndroidTest` 都依賴 `fetchChewingData`，
+  使純靜態分析的 `:lint` 永遠需要連網。改法：拆成兩個 task——`ensureChewingDataDir`（純
+  `mkdir`、不連網，是 `src/main/assets/chewing` 目錄本身唯一的擁有者）與 `fetchChewingData`
+  （下載＋sha256 校驗，`outputs.file` 宣告 `word.dat`/`tsi.dat` 兩個具體檔案，不再宣告整個
+  目錄，避免與 `ensureChewingDataDir` 的 `outputs.dir` 重疊）。`merge*Assets`/
+  `package*Assets`/`lint*` 只依附 `ensureChewingDataDir`（+ `mustRunAfter(fetchChewingData)`
+  純排序，不拉依賴）；只有 `assembleDebug`/`assembleRelease` 直接依附 `fetchChewingData`。
+  過程中踩了兩個坑，都已修正並重新驗證：(1) 若把「建目錄」task 命名為
+  `ensureChewingAssetsDir`，名字裡含 "Assets" 會被自己的 `contains("Assets")` matcher
+  抓到，形成循環依賴——改名 `ensureChewingDataDir` 避開；(2) `lintAnalyzeDebugUnitTest`/
+  `lintAnalyzeDebugAndroidTest` 是 AGP 內建就依賴 `package*Assets`（非本次改動造成），若
+  `package*Assets` 依附 `fetchChewingData`，這兩個 lint 子 task 會透過它間接連網——改成
+  `package*Assets` 也只依附 `ensureChewingDataDir`，`fetchChewingData` 改為只掛在
+  `assembleDebug`/`assembleRelease` 上，並用 `mustRunAfter` 讓「若兩者都被排進同一次
+  Gradle 呼叫」時保持正確順序（例如 `./gradlew lint assembleDebug` 合跑一次也核對過綠）。
+  `connected*`/`install*` 未額外明列——已用 `--dry-run` 確認 `assembleDebug`
+  依賴鏈已涵蓋，`connectedAndroidTest` 實跑亦綠（見下方）。
+
+### A10/A12 驗證指令與輸出
+
+`--dry-run` 三項核對（修正後）：
+
+```
+$ ./gradlew :decoder-native:lint --dry-run | grep -iE "fetchChewingData|ensureChewingDataDir"
+:decoder-native:ensureChewingDataDir SKIPPED
+（fetchChewingData 不在圖上）
+
+$ ./gradlew :decoder-native:testDebugUnitTest --dry-run | grep -iE "fetchChewingData|ensureChewingDataDir"
+（都不在圖上）
+
+$ ./gradlew :decoder-native:assembleDebug --dry-run | grep -iE "fetchChewingData|ensureChewingDataDir"
+:decoder-native:ensureChewingDataDir SKIPPED
+:decoder-native:fetchChewingData SKIPPED
+```
+
+另外針對 A12 提到的兩個具名 lint 子 task 也各自 `--dry-run` 核對過，`fetchChewingData`
+均不在圖上：`lintAnalyzeDebugUnitTest`、`lintAnalyzeDebugAndroidTest`。
+
+`llvm-nm -D --defined-only` 對 release stripped `.so` 核對（A10）：
+
+```
+arm64-v8a release: bpmf_commit / bpmf_free / bpmf_init / bpmf_input（4 個，僅此 4 個）
+armeabi-v7a release: bpmf_commit / bpmf_free / bpmf_init / bpmf_input（4 個，僅此 4 個）
+```
+
+`nativeTest*`/`Java_*` 在兩個 release ABI 上皆為 0；debug arm64-v8a 核對出 4 個：
+`Java_com_bopomofobruce_decoder_nativ_testbridge_BpmfTestBridge_nativeTestCommit`、
+`nativeTestFree`、`nativeTestInit`、`nativeTestInput`。
+
+### 收尾指令結果
+
+- `:decoder-native:assembleDebug` → `BUILD SUCCESSFUL`
+- `:decoder-native:assembleRelease` → `BUILD SUCCESSFUL`
+- `:decoder-native:testDebugUnitTest` → `BUILD SUCCESSFUL`
+- `:decoder-native:ktfmtCheck` → `BUILD SUCCESSFUL`
+- `:decoder-native:lint` → `BUILD SUCCESSFUL`
+- `:decoder-native:lint :decoder-native:assembleDebug`（合跑，驗證 A12 排序修正）→
+  `BUILD SUCCESSFUL`
+- 實機 `R6AIB700988748X`（ASUS_AI2302, API 15）`:decoder-native:connectedAndroidTest` →
+  `BUILD SUCCESSFUL`，`BpmfNativeSmokeTest` 3/3 綠，與第三階段的結果一致，沒有改壞。
+
+### 對 finding 本身的補充意見
+
+- 4 條 finding 皆屬實，沒有需要 push back 之處。
+- A12 修正過程中發現的兩個坑（task 命名撞上自己的 matcher、AGP 內建的
+  `lintAnalyzeDebug{UnitTest,AndroidTest}→package*Assets` 依賴）finding 本身沒有點名，
+  是動手驗證時才浮現，記錄在上面供之後回頭查證參考。
