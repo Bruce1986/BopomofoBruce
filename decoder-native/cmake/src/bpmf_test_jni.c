@@ -69,6 +69,14 @@ Java_com_bopomofobruce_decoder_nativ_testbridge_BpmfTestBridge_nativeTestInput(
 
     jobjectArray result = (*env)->NewObjectArray(env, (jsize)count, string_class, NULL);
 
+    /*
+     * bpmf.h's contract guarantees *candidates_out (`joined` here) is never
+     * NULL as long as the &joined pointer we passed isn't NULL itself — see
+     * bpmf_wrapper.c's bpmf_input(), which always points it at either a
+     * heap-allocated string or the static empty-string sentinel. The
+     * `joined != NULL` check is therefore defense-in-depth, not a
+     * workaround for a real NULL path.
+     */
     if (count > 0 && joined != NULL) {
         char* cursor = joined;
         for (jsize i = 0; i < (jsize)count; i++) {
