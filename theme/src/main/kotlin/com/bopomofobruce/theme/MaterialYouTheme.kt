@@ -9,6 +9,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import com.bopomofobruce.common.KeyboardColors
 import com.bopomofobruce.common.KeyboardDimens
 import com.bopomofobruce.common.KeyboardTheme
+import com.bopomofobruce.theme.color.pickAccentColor
 import com.bopomofobruce.theme.color.toKeyboardUInt
 import com.bopomofobruce.theme.style.StyleSheet
 import kotlin.ConsistentCopyVisibility
@@ -69,21 +70,63 @@ private constructor(override val id: String, val styleSheet: StyleSheet) : Keybo
         private fun dynamicColorsFor(context: Context, darkMode: Boolean): KeyboardColors {
             val scheme =
                 if (darkMode) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            val background = scheme.surface.toKeyboardUInt()
+            val keyFill = scheme.surfaceVariant.toKeyboardUInt()
+            val keyText = scheme.onSurface.toKeyboardUInt()
+
+            // G3（codex 獨立審查 + 第八輪 Opus tracer 的推理）：B22 把 keyAccent 寫死映到
+            // scheme.primaryContainer、candidateHighlight 寫死映到 scheme.secondaryContainer，跟
+            // BuiltInThemes 修掉的缺陷同源——M3 的 *Container 與 surface 是固定 tone 目標（light 下
+            // surface≈98/container≈90，dark 下 10/30），桌布只換色相與彩度、不換 tone，所以這個映射
+            // 在任何桌布下都只有約 1–2:1 的自身分離度。改成用 pickAccentColor 從多個候選角色中選：
+            // 保留文字達 AA 4.5 的候選，其中挑與 keyFill/background（keyAccent）或 background
+            // （candidateHighlight）分離度最大的一個。這個選色函式本身是純數學，已用假造的色彩組合在
+            // JVM 覆蓋（見 AccentColorSelectionTest，含「container 與 surface 同 tone」的極端情境）。
+            // 注意：dynamicDarkColorScheme/dynamicLightColorScheme 呼叫本身仍需要系統資源，本檔仍然
+            // 沒有 Robolectric、也沒有實機驗證，只有「給定一組桌布色彩，選色函式會不會選對」是有守門的
+            // ——實際桌布數字未經實機驗證（見本檔 class KDoc 與 devlog 的誠實揭露）。
+            val accentCandidates =
+                listOf(
+                        scheme.primaryContainer,
+                        scheme.tertiaryContainer,
+                        scheme.secondaryContainer,
+                        scheme.primary,
+                        scheme.tertiary,
+                        scheme.secondary,
+                        scheme.inversePrimary,
+                        scheme.onSurfaceVariant,
+                    )
+                    .map { it.toKeyboardUInt() }
+            val highlightCandidates =
+                listOf(
+                        scheme.secondaryContainer,
+                        scheme.tertiaryContainer,
+                        scheme.primaryContainer,
+                        scheme.secondary,
+                        scheme.tertiary,
+                        scheme.primary,
+                        scheme.inversePrimary,
+                        scheme.onSurfaceVariant,
+                    )
+                    .map { it.toKeyboardUInt() }
+
             return KeyboardColors(
-                background = scheme.surface.toKeyboardUInt(),
-                keyFill = scheme.surfaceVariant.toKeyboardUInt(),
-                keyText = scheme.onSurface.toKeyboardUInt(),
-                // B22：原本用 scheme.primary，跟 BuiltInThemes 同一個誤映射——M3 primary 是配
-                // onPrimary 用的，這裡沒有 on-accent 欄位可用、按鍵文字只有 keyText，兩者對比度不足。
-                // 改用 primaryContainer，跟固定色盤（見 BuiltInThemes.kt 的 B22 修正）採同一策略。
-                // 注意：這條分支需要系統動態取色，本次只改映射邏輯，實際對比度數字未經實機驗證
-                // （見本檔 class KDoc 與 devlog 的誠實揭露）。
-                keyAccent = scheme.primaryContainer.toKeyboardUInt(),
-                candidateText = scheme.onSurface.toKeyboardUInt(),
-                // B22：candidateHighlight 原本也用 primaryContainer，跟上面改過的 keyAccent
-                // 撞色；改用 secondaryContainer 區隔用途（沿用 M3 對 primary/secondary container
-                // 的語意分工），同樣未經實機驗證。
-                candidateHighlight = scheme.secondaryContainer.toKeyboardUInt(),
+                background = background,
+                keyFill = keyFill,
+                keyText = keyText,
+                keyAccent =
+                    pickAccentColor(
+                        candidates = accentCandidates,
+                        textPartner = keyText,
+                        separationReferences = listOf(keyFill, background),
+                    ),
+                candidateText = keyText,
+                candidateHighlight =
+                    pickAccentColor(
+                        candidates = highlightCandidates,
+                        textPartner = keyText,
+                        separationReferences = listOf(background),
+                    ),
             )
         }
     }
