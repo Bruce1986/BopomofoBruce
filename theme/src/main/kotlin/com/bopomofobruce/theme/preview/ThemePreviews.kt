@@ -76,12 +76,24 @@ private fun DarkThemePreview() {
 }
 
 /**
- * Preview tooling 環境跑在 API < 31 的 host 上，所以這個預覽實際展示的是 [MaterialYouTheme] 的 「讀不到動態色時退化為 Light
- * 色盤」路徑，不是真正的桌布取色（那要實機驗證，見 devlog）。
+ * 用 `@Preview(apiLevel = 30)` 明確釘住 API 30（<31）host，走 [MaterialYouTheme] 「讀不到動態色時退化為 Light
+ * 色盤」的路徑；`apiLevel` 不釘的話由 tooling 自行決定實際跑在哪個等級，不能保證這個預覽展示的是 退化路徑。實際桌布取色（>=31 分支）仍須實機驗證，見 devlog。
  */
-@Preview(name = "Material You theme (fallback path)", showBackground = true)
+@Preview(name = "Material You (fallback)", showBackground = true, apiLevel = 30)
 @Composable
-private fun MaterialYouThemePreview() {
+private fun MaterialYouThemeFallbackPreview() {
+    val context = LocalContext.current
+    val theme = remember { MaterialYouTheme.from(context, darkMode = false) }
+    ThemeSwatch(theme = theme)
+}
+
+/**
+ * 用 `@Preview(apiLevel = 35)` 釘住 >=31 的 host，走 [MaterialYouTheme]
+ * 的動態取色分支（`dynamicLightColorScheme`）。 Preview tooling 對動態色的模擬桌布不等於實機真實桌布色，實際渲染結果仍須實機驗證，見 devlog。
+ */
+@Preview(name = "Material You (dynamic)", showBackground = true, apiLevel = 35)
+@Composable
+private fun MaterialYouThemeDynamicPreview() {
     val context = LocalContext.current
     val theme = remember { MaterialYouTheme.from(context, darkMode = false) }
     ThemeSwatch(theme = theme)
