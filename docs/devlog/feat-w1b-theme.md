@@ -1,0 +1,57 @@
+# W1-B devlog — `:theme` 主題引擎
+
+- 分支：`feat/w1b-theme`
+- 期間：2026-08-10（單一子代理 session）
+
+## 交付
+
+- 實作 `:common` 契約介面 `KeyboardTheme`（唯讀，未改動 contracts-v1）。
+- `StyleSheet` schema（`theme/src/main/kotlin/com/bopomofobruce/theme/style/`）：
+  複用 `:common` 已凍結的 `KeyboardColors` / `KeyboardDimens`，新增 `:theme`
+  自己擁有的 `KeyboardShapes`（圓角）、`KeyboardTypography`（字級/字重），全部
+  kotlinx.serialization `@Serializable`。
+- 三個內建主題（`theme/src/main/kotlin/com/bopomofobruce/theme/BuiltInThemes.kt`
+  / `MaterialYouTheme.kt`）：
+  - `LightTheme` / `DarkTheme`：固定色盤（Material 3 baseline 近似值）。
+  - `MaterialYouTheme`：Android 12+（API 31）用
+    `androidx.compose.material3.dynamicLightColorScheme` /
+    `dynamicDarkColorScheme` 讀系統桌布色；<31 退化為 `LightTheme` /
+    `DarkTheme` 色盤，id 仍回報 `"material-you"`。`sdkInt` 開成建構參數
+    （預設 `Build.VERSION.SDK_INT`），讓退化分支可在純 JVM unit test 驗證。
+- 自訂相片背景：`PhotoBackground`（`theme/.../photo/PhotoBackground.kt`，uri /
+  blurRadiusDp / opacity / tint）+ `PhotoBackgroundLayer`
+  （`photo/PhotoBackgroundLayer.kt`）用 Coil `AsyncImage` 載入、
+  `Modifier.blur()` + `.alpha()` + `ColorFilter.tint(..., BlendMode.SrcAtop)`
+  套用。
+- Compose `@Preview`：`theme/.../preview/ThemePreviews.kt` 三個預覽
+  （Light / Dark / Material You fallback path）共用一個 `ThemeSwatch` 假鍵盤列
+  render。
+- 26 條 unit test（style round-trip、validation、photo round-trip、color
+  round-trip、內建主題、MaterialYouTheme 退化分支）。
+
+## 驗收結果
+
+| 項目 | 結果 |
+|---|---|
+| 三主題各有 `@Preview` | ✅ 過（`LightThemePreview` / `DarkThemePreview` / `MaterialYouThemePreview`） |
+| 主題序列化/反序列化 round-trip test | ✅ 過（`StyleSheetSerializationTest`、`PhotoBackgroundTest`，含巢狀 `UIntHexSerializer`） |
+| `./gradlew :theme:assembleDebug` | ✅ 過 |
+| `./gradlew :theme:testDebugUnitTest` | ✅ 過（26/26，見下方「踩雷」） |
+| `./gradlew ktfmtCheck` | 見下方指令輸出摘要 |
+| `./gradlew lint` | 見下方指令輸出摘要 |
+| PhotoBackground 實機渲染 < 200 ms | ❌ **沒有量測**——沒有連上 Pixel 6 / 任何實機做這項；本 session 只跑到 JVM unit test 與 AGP 編譯層級，誠實回報未驗證，不編數字。 |
+
+## 踩雷 / 決定
+
+- 第一輪 `StyleSheetSerializationTest` 對 hex wire format 的斷言字串少寫了
+  alpha byte（斷言 `"0x1E1E1E`、實際輸出 `"0xFF1E1E1E`），JVM unit test 直接
+  跑紅抓到，修正斷言字串後綠。記錄這條是提醒自己：連「順手加的字串斷言」都要
+  真的核對過 wire format，不能憑印象。
+- 原本擔心 `androidx.compose.ui.graphics.Color` / `toArgb()` 在沒有
+  Robolectric 的純 JVM unit test 下會因缺 Android runtime 而炸掉；實測
+  `ColorConversionsTest` 直接綠燈通過，Compose UI graphics 這層的 sRGB 轉換是
+  純 Kotlin 數學運算，不需要 Android framework stub。
+- `MaterialYouTheme.from()` 刻意把 `sdkInt` 開成帶預設值的建構參數，而不是
+  內部直接讀 `Build.VERSION.SDK_INT`，只為了讓 <31 退化分支可測；>=31 呼叫
+  `dynamicLightColorScheme(Context)` 需要真系統資源，這條分支沒有
+  Robolectric、也沒有連實機驗證，留在 `MaterialYouTheme` KDoc 與本檔明說。
