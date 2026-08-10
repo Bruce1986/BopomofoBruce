@@ -68,10 +68,15 @@ static const size_t kBopomofoKeyCount = sizeof(kBopomofoKeys) / sizeof(kBopomofo
 
 /*
  * bpmf.h promises *candidates_out == "" (not NULL) whenever bpmf_input()
- * returns 0. That promise has to hold even on paths that run BEFORE we have
- * a handle to own a heap string in (NULL handle/zhuyin/candidates_out — see
- * below) or when strdup("") itself fails (OOM). Point at this static,
- * process-lifetime empty string in those two cases instead of NULL: it is
+ * returns 0. Rather than enumerating which branches those are (that list has
+ * already drifted once), the rule is simply: EVERY path that returns 0 before
+ * a real candidate list exists points *candidates_out at this static,
+ * process-lifetime empty string. Today that covers the NULL handle/zhuyin
+ * pre-checks, the fail-closed branch for characters outside the mapping
+ * table, and strdup("") failing under OOM — but new early-return paths must
+ * follow the same rule rather than strdup("") their own copy (a strdup there
+ * can itself fail and hand the caller a NULL, breaking the very promise the
+ * branch exists to honour). Pointing here instead of NULL is safe because it is
  * NOT stored into handle->last_candidates (so bpmf_free()/the next
  * bpmf_input() never free()s it — only genuinely heap-allocated strings are
  * ever assigned there), and the caller must not free it either (same
