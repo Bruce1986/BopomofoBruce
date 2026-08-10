@@ -24,7 +24,7 @@
   KDoc 補一段「F1 已知落差」，說明按下該鍵在密碼／URL 欄位只會得到全形符號頁，登記為 W2-B
   follow-up。
 - `keyboards/src/test/kotlin/com/bopomofobruce/keyboards/OtherKeyboardsContentTest.kt`：更新
-  D1 測試上方的 comment，把提到的 `"123"` 改成 `"符號"` 並註記 F1。
+  D1 測試上方的 comment，把提到的 `"123"` 改成 `"符號"` 並註記 F1。（round-10 後再次更名為 `"全形"`，該 comment 與本行已一併更正——理由見 `Keyboards.kt` 的 `urlQwerty` KDoc。）
 
 沒有新增測試——原本就沒有測試斷言這顆鍵的 `label` 字面值是 `"123"`（已用
 `grep -rn '"123"' keyboards/src/test/kotlin/` 確認），改標籤本身不影響任何既有測試的紅綠。

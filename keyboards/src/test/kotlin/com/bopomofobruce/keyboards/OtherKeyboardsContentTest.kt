@@ -112,8 +112,9 @@ class OtherKeyboardsContentTest {
     @Test
     fun `url keyboard can type the half-width symbols needed for a query string`() {
         // D1: url_qwerty could reach only '/' and '.' beyond letters/digits (C9's fix). The
-        // keyboard's only escape hatch to another page is "符號" (F1: relabelled from the
-        // misleading "123") -> symbol_standard, whose glyphs are entirely full-width
+        // keyboard's only escape hatch to another page is "全形" (originally the misleading
+        // "123", briefly "符號" -- see Keyboards.kt urlQwerty KDoc for why it ended up as
+        // "全形") -> symbol_standard, whose glyphs are entirely full-width
         // (：－＆＝...) -- visually similar to their ASCII twins but the
         // wrong code point for a URL. Without half-width ': - _ ? = & # % ~ @' reachable directly
         // on url_qwerty, "http://" and any query string are simply untypeable. Added as longPress
