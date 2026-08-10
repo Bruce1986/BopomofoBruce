@@ -32,6 +32,17 @@ object KeyboardLoader {
                 ->
                 stream.readBytes().toString(Charsets.UTF_8)
             } ?: throw IllegalArgumentException("Keyboard layout resource not found: $resourcePath")
-        return json.decodeFromString(StaticKeyboardDef.serializer(), text)
+        return decode(text)
     }
+
+    /**
+     * Parses raw JSON text through the same [json] instance [loadFromResource] uses.
+     *
+     * `internal` (not `private`) specifically so tests in this module can exercise the strict
+     * `ignoreUnknownKeys=false` contract *through this class* instead of maintaining their own
+     * separate `Json` instance — a separate test-owned `Json` would drift from this one silently
+     * and end up testing nothing about [KeyboardLoader] itself.
+     */
+    internal fun decode(text: String): KeyboardDef =
+        json.decodeFromString(StaticKeyboardDef.serializer(), text)
 }

@@ -71,6 +71,14 @@ class KeyboardLoaderTest {
     fun `strict schema validation actually rejects an unknown field`() {
         // Proves the "strict schema validation" acceptance criterion can fail, not just pass:
         // a typo'd/unexpected field must be rejected, not silently ignored.
+        //
+        // Goes through KeyboardLoader.decode (the seam KeyboardLoader.loadFromResource itself
+        // calls)
+        // rather than a test-local Json instance, so this actually pins KeyboardLoader's own
+        // ignoreUnknownKeys=false contract instead of a copy that could silently drift from it. See
+        // C8 in docs/devlog/W1-C-keyboards-20260810-1531.md for why the previous version (a
+        // test-owned `json` val, unrelated to KeyboardLoader) didn't prove anything about the
+        // loader.
         val malformed =
             """
             {
@@ -79,13 +87,16 @@ class KeyboardLoaderTest {
             }
             """
                 .trimIndent()
-        assertThrows(SerializationException::class.java) {
-            json.decodeFromString(StaticKeyboardDef.serializer(), malformed)
-        }
+        assertThrows(SerializationException::class.java) { KeyboardLoader.decode(malformed) }
     }
 
     @Test
     fun `strict schema validation rejects an unknown KeyAction discriminator`() {
+        // Also routed through KeyboardLoader.decode — see comment above. Note: this failure comes
+        // from the polymorphic KeyAction serializer failing to resolve an unknown "type"
+        // discriminator,
+        // which happens regardless of ignoreUnknownKeys; it is NOT itself evidence that
+        // ignoreUnknownKeys=false is doing anything (only the "unknown field" test above is).
         val malformed =
             """
             {
@@ -94,9 +105,7 @@ class KeyboardLoaderTest {
             }
             """
                 .trimIndent()
-        assertThrows(SerializationException::class.java) {
-            json.decodeFromString(StaticKeyboardDef.serializer(), malformed)
-        }
+        assertThrows(SerializationException::class.java) { KeyboardLoader.decode(malformed) }
     }
 
     @Test
