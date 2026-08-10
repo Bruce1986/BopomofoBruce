@@ -50,7 +50,20 @@ corrosion_import_crate(
 # bpmf_test_jni.c is a TEST-ONLY JNI bridge (see its header comment) that
 # lets connectedAndroidTest exercise the four bpmf_* functions on-device; it
 # is not part of the public C API in bpmf.h and W2-A is free to delete it.
-add_library(bpmf SHARED src/bpmf_wrapper.c src/bpmf_test_jni.c)
+#
+# It is compiled in ONLY for Debug builds (AGP sets CMAKE_BUILD_TYPE per
+# variant; connectedAndroidTest runs against the debug variant by default).
+# This keeps the four Java_..._BpmfTestBridge_nativeTest* JNI symbols —
+# including nativeTestFree(), which trusts its jlong argument as a raw
+# pointer to free() — out of the release .so entirely, instead of merely
+# being undocumented in a shipping artifact. Verify with
+# `nm -D libbpmf.so | grep nativeTest` on the release output whenever this
+# gate changes (see devlog A5).
+set(BPMF_SOURCES src/bpmf_wrapper.c)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    list(APPEND BPMF_SOURCES src/bpmf_test_jni.c)
+endif()
+add_library(bpmf SHARED ${BPMF_SOURCES})
 target_include_directories(bpmf
     PRIVATE
         include

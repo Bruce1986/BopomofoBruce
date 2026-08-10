@@ -15,6 +15,15 @@
  * the same libbpmf.so as the public bpmf_* C API for build simplicity —
  * W2-A is free to delete this file once `:decoder` has its own real
  * binding and its own connectedAndroidTest coverage.
+ *
+ * Exposure: cmake/CMakeLists.txt only adds this translation unit to the
+ * `bpmf` target for Debug builds (CMAKE_BUILD_TYPE == "Debug"), so these
+ * four Java_..._BpmfTestBridge_nativeTest* symbols are absent from release
+ * .so output — verified with `nm -D` (see devlog A5). `nativeTestFree`
+ * treats its jlong argument as a raw pointer and calls free() on it, so
+ * keeping it out of release builds matters: with it present a release APK
+ * would expose an arbitrary-address free() primitive to anything that can
+ * dlsym() the .so.
  */
 
 #include "bpmf.h"
@@ -27,7 +36,14 @@ JNIEXPORT jlong JNICALL
 Java_com_bopomofobruce_decoder_nativ_testbridge_BpmfTestBridge_nativeTestInit(
     JNIEnv* env, jclass clazz, jstring data_path) {
     (void)clazz;
+    if (data_path == NULL) {
+        return 0;
+    }
     const char* path = (*env)->GetStringUTFChars(env, data_path, NULL);
+    if (path == NULL) {
+        /* OOM converting the jstring; GetStringUTFChars already threw OutOfMemoryError. */
+        return 0;
+    }
     void* handle = bpmf_init(path);
     (*env)->ReleaseStringUTFChars(env, data_path, path);
     return (jlong)(intptr_t)handle;
@@ -37,13 +53,20 @@ JNIEXPORT jobjectArray JNICALL
 Java_com_bopomofobruce_decoder_nativ_testbridge_BpmfTestBridge_nativeTestInput(
     JNIEnv* env, jclass clazz, jlong handle, jstring zhuyin) {
     (void)clazz;
+    jclass string_class = (*env)->FindClass(env, "java/lang/String");
+    if (zhuyin == NULL) {
+        return (*env)->NewObjectArray(env, 0, string_class, NULL);
+    }
     const char* zhuyin_utf8 = (*env)->GetStringUTFChars(env, zhuyin, NULL);
+    if (zhuyin_utf8 == NULL) {
+        /* OOM converting the jstring; GetStringUTFChars already threw OutOfMemoryError. */
+        return (*env)->NewObjectArray(env, 0, string_class, NULL);
+    }
 
     char* joined = NULL;
     size_t count = bpmf_input((void*)(intptr_t)handle, zhuyin_utf8, &joined);
     (*env)->ReleaseStringUTFChars(env, zhuyin, zhuyin_utf8);
 
-    jclass string_class = (*env)->FindClass(env, "java/lang/String");
     jobjectArray result = (*env)->NewObjectArray(env, (jsize)count, string_class, NULL);
 
     if (count > 0 && joined != NULL) {
