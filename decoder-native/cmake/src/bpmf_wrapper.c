@@ -119,7 +119,21 @@ void* bpmf_init(const char* data_path) {
     if (data_path == NULL) {
         return NULL;
     }
-    ChewingContext* ctx = chewing_new3(data_path, data_path, "word.dat,tsi.dat", NULL, NULL);
+    /*
+     * userpath (2nd arg) is intentionally NULL, not data_path: libchewing's
+     * userpath is a FILE path (capi/include/chewing.h), not a directory —
+     * passing our directory there silently fails to enable a user
+     * dictionary at all (loader.rs dispatches on file extension; a
+     * directory never matches, and editor/mod.rs swallows the resulting
+     * error with `.ok()`, so nothing is logged either). Verified against
+     * the vendored capi/src/io.rs: chewing_new3() treats a NULL userpath as
+     * "no custom user dictionary", and editor/mod.rs's Editor::chewing()
+     * then skips creating/loading one entirely — a clean, well-defined
+     * no-op, not a silent failure. W1-A deliberately does not enable
+     * libchewing's built-in user dictionary; personal-phrase learning is
+     * W2-A's responsibility (Room-backed, per DEVPLAN). See bpmf.h.
+     */
+    ChewingContext* ctx = chewing_new3(data_path, NULL, "word.dat,tsi.dat", NULL, NULL);
     if (ctx == NULL) {
         return NULL;
     }

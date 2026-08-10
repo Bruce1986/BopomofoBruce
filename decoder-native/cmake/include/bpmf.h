@@ -5,6 +5,15 @@
  * `:decoder` (W2-A) is expected to JNI-bind exactly these four functions;
  * nothing else from libchewing is re-exported.
  *
+ * Thread-safety contract:
+ *   - This handle is NOT thread-safe. Every call on a given handle (from
+ *     bpmf_init() through bpmf_free()) must be serialised onto a single
+ *     dispatcher/thread — mirrors the contract ZhuyinDecoder.kt states at
+ *     the Kotlin level (common/src/main/kotlin/com/bopomofobruce/common/
+ *     ZhuyinDecoder.kt: "實作不保證 thread-safe, ... serialise"). Do NOT add
+ *     a mutex inside BpmfHandle to compensate — that would duplicate the
+ *     caller-side serialisation instead of replacing it.
+ *
  * Ownership / memory contract:
  *   - bpmf_init() returns an opaque handle owned by the caller. Pass it to
  *     every subsequent call; release it exactly once with bpmf_free().
@@ -34,11 +43,17 @@ extern "C" {
 /**
  * Creates a decoder instance backed by libchewing.
  *
- * `data_path` must be a writable, absolute filesystem directory containing
+ * `data_path` must be a readable, absolute filesystem directory containing
  * the extracted chewing dictionary files (word.dat, tsi.dat — see
- * ChewingDataPath.kt's getDataPath()). It is used as both syspath and
- * userpath, so it must be writable (Android cacheDir, not an APK asset
- * path).
+ * ChewingDataPath.kt's getDataPath()). It is passed to libchewing as
+ * syspath only. userpath is passed as NULL: libchewing's userpath is a
+ * *file* path (not a directory — see capi/include/chewing.h), and W1-A
+ * deliberately does not enable libchewing's built-in user dictionary at
+ * all (NULL userpath means "no user dictionary", not "use the default
+ * one" — see capi/src/io.rs's chewing_new3() and editor/mod.rs's
+ * Editor::chewing()). Personal-phrase learning/storage is W2-A's
+ * responsibility (a Room-backed dictionary per DEVPLAN), not libchewing's.
+ * `data_path` therefore only needs to be readable, not writable.
  *
  * Returns NULL on failure (e.g. dictionaries missing/corrupt).
  */
