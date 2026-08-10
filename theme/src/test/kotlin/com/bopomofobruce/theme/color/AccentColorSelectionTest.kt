@@ -153,4 +153,61 @@ class AccentColorSelectionTest {
 
         assertEquals(onlyCandidate, picked)
     }
+
+    /**
+     * I1（第十二輪審查）：H1 用 `excluded` 硬性把 `keyAccent` 已選中的顏色從候選清單移除、再重新評分—— 這個「先過濾、再評分」的順序本身會讓分離度倒退，重現
+     * B22 修掉的缺陷（見 [com.bopomofobruce.theme.MaterialYouTheme] 呼叫處註解的 M3 baseline 實算數字：light 下從
+     * 1.66:1 倒退到 1.26:1，dark 下倒退到 B22 明講「不及 3:1」的 1.84:1 那個色值）。
+     *
+     * 這裡用專門構造的候選集合重現同一種結構：`keyAccentColor` 是唯一通過文字門檻、且對 background
+     * 分離度最好（2.17:1）的候選；`weakerFailingCandidate`／`weakestFailingCandidate` 兩個都不過文字
+     * 門檻，但**越接近文字門檻的那個（`weakerFailingCandidate`）分離度反而越差**（1.69:1，比 `weakestFailingCandidate` 的
+     * 2.31:1 還差）——這種「文字對比與背景分離度方向相反」的關係， 用 Python 對這三個色值重算過 WCAG 相對亮度與對比度確認存在（不是隨手編的巧合）。
+     *
+     * 舊呼叫方式（`excluded = setOf(keyAccentColor)`，`separationReferences = listOf(background)`， 對應 H1
+     * 修正前的 `dynamicColorsFor()`）：`keyAccentColor` 被排除後，剩下兩個候選都不過文字門檻， 退回「文字對比度最高」的 fallback 分支，選中
+     * `weakerFailingCandidate`——分離度只有 1.69:1， 明顯比 `keyAccentColor` 自己的 2.17:1 差。
+     *
+     * 新呼叫方式（I1 修正後：不排除，`separationReferences = listOf(background, keyAccentColor)`）： 三個候選都不排除，只有
+     * `keyAccentColor` 過文字門檻，函式選中它自己（分離度 2.17:1）—— 沒有為了避開撞色（`candidateHighlight` 與 `keyAccent`
+     * 撞成同一個值）而選到分離度更差的顏色。
+     *
+     * **已證明會紅**：把下面「新呼叫方式」暫時改成舊呼叫方式（`excluded = setOf(keyAccentColor)`， `separationReferences =
+     * listOf(background)`），重跑本測試， `org.opentest4j.AssertionFailedError: expected: <8721210> but
+     * was: <14156436>` FAILED （`8721210` = `keyAccentColor` 0x18143A，`14156436` =
+     * `weakerFailingCandidate` 0xD80C94， 證明舊呼叫方式選到分離度更差的候選）；改回新呼叫方式後綠。
+     */
+    @Test
+    fun `does not sacrifice separation from background just to dodge a collision with keyAccent`() {
+        val keyAccentTextPartner = 0xF5F5F5u
+        val backgroundRef = 0x683E82u
+        val keyAccentColor = 0x18143Au // text 16.05（通過），對 background 2.17:1（三者中最好）
+        val weakerFailingCandidate = 0xD80C94u // text 4.38（不通過，最接近門檻），對 background 1.69:1（三者中最差）
+        val weakestFailingCandidate = 0xE06244u // text 3.21（不通過，離門檻更遠），對 background 2.31:1（比上面好）
+
+        val pickedWithOldExcludedStyle =
+            pickAccentColor(
+                candidates =
+                    listOf(keyAccentColor, weakerFailingCandidate, weakestFailingCandidate),
+                textPartner = keyAccentTextPartner,
+                separationReferences = listOf(backgroundRef),
+                excluded = setOf(keyAccentColor),
+            )
+        assertEquals(
+            weakerFailingCandidate,
+            pickedWithOldExcludedStyle,
+            "sanity check：H1 修正前的舊呼叫方式應該選到分離度較差的 weakerFailingCandidate，" +
+                "藉此證明下面的新呼叫方式確實選到不同、更好的結果",
+        )
+
+        val pickedWithNewSeparationReferenceStyle =
+            pickAccentColor(
+                candidates =
+                    listOf(keyAccentColor, weakerFailingCandidate, weakestFailingCandidate),
+                textPartner = keyAccentTextPartner,
+                separationReferences = listOf(backgroundRef, keyAccentColor),
+            )
+
+        assertEquals(keyAccentColor, pickedWithNewSeparationReferenceStyle)
+    }
 }

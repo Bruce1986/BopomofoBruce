@@ -29,9 +29,11 @@
   只有第一個候選套 `candidateHighlight`、其餘留在 `background`（契約語意是「標示
   cursor 位置」，不是整列都選中）；按鍵列多一顆 `keyAccent` 底色的功能鍵（模擬
   ⌫），是全模組唯一引用 `keyAccent` 的渲染程式碼。
-- 48 條 unit test（style round-trip、validation、photo round-trip、color
+- unit test 全綠（style round-trip、validation、photo round-trip、color
   round-trip、內建主題對比度守門、MaterialYouTheme 退化分支與值語意、動態取色
-  選色函式 `pickAccentColor`）。
+  選色函式 `pickAccentColor`）。**條數不在此處寫死**（第十二輪審查，I3：曾經在「交付」/「驗收結果」/
+  各輪紀錄三處各寫一個數字、每輪都要手動同步卻每輪都漏），實際條數與最新一輪的紅綠驗證結果見本檔
+  最新一輪紀錄（目前最新：下方「2026-08-11 第十二輪」）。
 
 ## 驗收結果
 
@@ -40,7 +42,7 @@
 | 三主題各有 `@Preview` | ✅ 過（`LightThemePreview` / `DarkThemePreview` / `MaterialYouThemeFallbackPreview` + `MaterialYouThemeDynamicPreview`，共 4 個；B14 後 Material You 拆成兩條路徑各一個）。證據等級：函式存在且編譯通過，未實際在 Android Studio 內 render 過。 |
 | 主題序列化/反序列化 round-trip test | ✅ 過（`StyleSheetSerializationTest`、`PhotoBackgroundTest`，含巢狀 `UIntHexSerializer`） |
 | `./gradlew :theme:assembleDebug` | ✅ 過 |
-| `./gradlew :theme:testDebugUnitTest` | ✅ 過（48/48，見下方「踩雷」與 2026-08-11 第九輪紀錄） |
+| `./gradlew :theme:testDebugUnitTest` | ✅ 全綠（條數見各輪紀錄，第十二輪審查 I3 後不在此處寫死絕對條數，避免每輪手動同步漏更新——見下方最新一輪「2026-08-11 第十二輪」） |
 | `./gradlew :theme:ktfmtCheck` | ✅ 過（`BUILD SUCCESSFUL`；期間跑過 `:theme:ktfmtFormat` 修過格式後才綠——含 2026-08-10 B12/B14/B15 修正後、最後一次 commit 之後重跑的結果） |
 | `./gradlew :theme:lint` | ✅ 過（`BUILD SUCCESSFUL`，`lint-results-debug.txt`：`No issues found.`——2026-08-10 B12/B14/B15 修正後、最後一次 commit 之後重跑的結果） |
 | PhotoBackground 實機渲染 < 200 ms | ❌ **沒有量測**——沒有連上 Pixel 6 / 任何實機做這項；本 session 只跑到 JVM unit test 與 AGP 編譯層級，誠實回報未驗證，不編數字。 |
@@ -295,8 +297,14 @@
   4.5，最後只剩 `inversePrimary` 同時通過文字門檻且分離度最好——**兩次呼叫都選中
   `0xFFD0BCFF`**。結果是功能鍵按下的底色與候選列選中游標的底色變成同一個顏色，使用者無法用
   顏色區分「這是功能鍵」還是「這是被選中的候選字」。這正是 G3／B22 註解裡明講要避免的事
-  （「改對應 `secondaryContainer` 以免與 `keyAccent` 撞色」），繞一圈又回來了。兩者各自的
-  對比度都合格，純粹是語意撞色的 UX 缺陷，不違反 WCAG。
+  （「改對應 `secondaryContainer` 以免與 `keyAccent` 撞色」），繞一圈又回來了。
+
+  **更正（第十二輪審查，I2）**：本段原本在此處寫「兩者各自的對比度都合格，純粹是語意撞色的 UX
+  缺陷，不違反 WCAG」——這句沒有查證過，且是錯的。撞色情境下兩者都是 `inversePrimary`：依本檔
+  M3 baseline tone 分布推算（**非實機量測**）——light 下對 background 只有 1.66:1、dark 下對
+  background 只有 2.66:1，兩者都不及本檔 `BuiltInThemesContrastTest` 對
+  `candidateHighlight`/`background` 設的 WCAG 1.4.11 非文字元件 3:1 門檻。撞色當下就已經不合格，
+  不只是「兩者都合格、純粹語意」的 UX 問題。
 
   已修：`pickAccentColor`（`theme/src/main/kotlin/com/bopomofobruce/theme/color/DynamicAccentSelection.kt`）
   新增 `excluded: Set<UInt> = emptySet()` 參數——排除後的候選清單非空就從中選；若排除後變空
@@ -344,3 +352,72 @@
   `:theme:ktfmtFormat` 後重新完整跑一次四項確認全綠（`lint-results-debug.txt`：
   `No issues found.`）。
 - **本輪額外查核**：兩條 finding 逐條核對後，內容與程式碼現況一致，沒有發現 finding 本身有誤的地方。
+
+## 2026-08-11 第十二輪（Opus tracer）— I1 撞色排除的解法本身讓分離度倒退
+
+- **I1（high）：H1 的硬性排除讓分離度倒退，重現了 B22 修掉的缺陷。**
+  H1（第十一輪）用 `pickAccentColor(excluded = setOf(keyAccent))` 解決撞色，這是「先硬性過濾、
+  再評分」——排除後剩下的候選不管有多差都不會回頭選。用本檔 KDoc 假設的 M3 baseline tone 分布實算：
+  light 下 `keyAccent` 選中 `inversePrimary #D0BCFF`（對 background 1.66:1），排除後
+  `candidateHighlight` 落到 `tertiaryContainer #FFD8E4`（對 background只剩 1.26:1，**比排除前更
+  差**）；dark 下落到 `secondaryContainer #4A4458`（對 background 1.84:1）——正是 `BuiltInThemes.kt`
+  註解裡寫著「原色 #4A4458…只有 1.84:1，不及 3:1」的那個色值與數字，被動態路徑原封不動撿回來。三個
+  container 候選彼此 tone 相同，所以只要 `keyAccent` 選中 `inversePrimary`，第二次呼叫幾乎必然落進
+  container 群——這是 baseline 下的預設結果，不是罕見路徑。
+
+  **已採用審查者建議的第二個方案**：完全不用 `excluded`，改成 `candidateHighlight` 呼叫時傳
+  `separationReferences = listOf(background, keyAccent)`——讓「與 keyAccent 分得開」變成與
+  background 同級的評分項而非硬約束。這同時解掉「只排除完全相同 UInt、視覺上幾乎相同的顏色排不掉」
+  的問題。改動：`theme/src/main/kotlin/com/bopomofobruce/theme/MaterialYouTheme.kt`
+  （`candidateHighlight` 呼叫處，第 128–134 行一帶，移除 `excluded` 參數、`separationReferences`
+  改傳 `listOf(background, keyAccent)`）。
+
+  **`excluded` 參數是否保留**：`pickAccentColor` 的 `excluded` 參數本身**予以保留**（
+  `theme/src/main/kotlin/com/bopomofobruce/theme/color/DynamicAccentSelection.kt`），只是
+  `dynamicColorsFor()` 這個呼叫處不再使用它。理由：`excluded` 是描述明確、已有兩條既有測試覆蓋（
+  `excludes an already-chosen color and picks the next best candidate`／
+  `falls back to ignoring the exclusion when every candidate is excluded`）的通用純函式功能，硬性
+  排除（「絕不可以是這個顏色」）跟軟性評分（「盡量分得開，但分離度優先」）是兩種不同語意，各自有合理
+  使用情境；拿掉整個參數只是為了消化這次呼叫端不用它，會連帶刪掉這兩條測試、縮小已測試過的公開 API，
+  沒有相稱的好處。
+
+  **必加測試**：`theme/src/test/kotlin/com/bopomofobruce/theme/color/AccentColorSelectionTest.kt`
+  新增 `does not sacrifice separation from background just to dodge a collision with keyAccent`。
+  構造三個候選：`keyAccentColor`（唯一過文字門檻、對 background 分離度最好 2.17:1）、
+  `weakerFailingCandidate`（不過文字門檻但最接近門檻，分離度反而最差 1.69:1）、
+  `weakestFailingCandidate`（不過文字門檻、離門檻更遠，分離度較好 2.31:1）——三個色值用 Python 重算過
+  WCAG 相對亮度與對比度，不是隨手編的。測試內同時保留一條 sanity check：直接呼叫舊式
+  `excluded = setOf(keyAccentColor)` 寫法，斷言它會選到分離度較差的 `weakerFailingCandidate`（用來
+  證明新舊兩種呼叫方式的結果確實不同），再斷言新式 `separationReferences = listOf(background,
+  keyAccentColor)`（不排除）寫法選中 `keyAccentColor` 本身，分離度 2.17:1，沒有為了避開撞色而選到
+  分離度更差的顏色。
+
+  **已證明會紅**：把測試裡「新呼叫方式」暫時改回舊式（`excluded = setOf(keyAccentColor)`，
+  `separationReferences = listOf(background)`），重跑
+  `AccentColorSelectionTest`——`does not sacrifice separation from background just to dodge a
+  collision with keyAccent()` FAILED：
+  `org.opentest4j.AssertionFailedError: expected: <1578042> but was: <14158996>`
+  （`1578042` = `keyAccentColor` 0x18143A，`14158996` = `weakerFailingCandidate` 0xD80C94，證明
+  舊式呼叫方式選到分離度更差的候選）；改回新式呼叫方式後，7 條全綠。
+
+- **I2（medium）：devlog 未查證地宣稱「不違反 WCAG」。**
+  第十一輪 H1 段落原寫「兩者各自的對比度都合格，純粹是語意撞色的 UX 缺陷，不違反 WCAG」——這句沒有
+  查證過，且是錯的：撞色情境下兩者都是 `inversePrimary`，依本檔 M3 baseline tone 分布推算（**非實機
+  量測**），light 下對 background 只有 1.66:1、dark 下對 background 只有 2.66:1，兩者都不及
+  `BuiltInThemesContrastTest` 對 `candidateHighlight`/`background` 設的 WCAG 1.4.11 非文字元件
+  3:1 門檻——撞色當下就已經不合格。已在原段落原地更正（見上方第十一輪 H1 段落），標明數字為推算、
+  非實機量測，不另寫一份。
+
+- **I3（medium）：測試條數三處不一致——B19 抓過的同一類缺陷重演。**
+  「交付」段原寫「48 條 unit test」、驗收表原寫「✅ 過（48/48）」，但第十一輪紀錄寫「從 48 增至
+  50」，同一份檔案三處兩個答案；驗收表原本交叉指引到「第九輪紀錄」也已過期（最後一次四項完整重跑在
+  第十一輪）。已從結構上斷開這個每輪都要手動同步、每輪都漏的來源：「交付」段與驗收表都改成不寫死絕對
+  條數，改寫成「條數見各輪紀錄」並指向本檔**最新一輪**（目前即本輪，第十二輪），之後每輪只要在自己
+  的段落記實際條數即可，不用回頭改「交付」/驗收表這兩處共用欄位。
+
+- **本輪驗收**：`AccentColorSelectionTest` 從 6 條增至 7 條，`:theme` 模組總測試數從 50 增至 51。
+  `./gradlew :theme:assembleDebug :theme:testDebugUnitTest :theme:ktfmtCheck :theme:lint`
+  第一次跑，`ktfmtCheckMain`／`ktfmtCheckTest` 因新加的 KDoc 換行未套用 ktfmt 而 FAILED（分別是
+  `DynamicAccentSelection.kt`／`AccentColorSelectionTest.kt`），跑 `:theme:ktfmtFormat` 後重新
+  完整跑一次四項，全部 `BUILD SUCCESSFUL`（`lint-results-debug.txt`：`No issues found.`）。
+- **本輪額外查核**：三條 finding 逐條核對後，內容與程式碼現況一致，沒有發現 finding 本身有誤的地方。

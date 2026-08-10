@@ -53,10 +53,20 @@ internal fun contrastRatio(a: UInt, b: UInt): Double {
  * H1（第十一輪審查）：`keyAccent` 與 `candidateHighlight` 這兩個用途各自呼叫一次本函式，候選清單 成員相同（只是排序不同），用貼近真實 M3 baseline
  * 的 tone 分布實測會發現兩次呼叫**選中同一個 顏色**（container 系 tone 跟 surface 幾乎同 tone、primary/secondary/tertiary
  * 系文字對比不到 4.5，最後只剩 `inversePrimary` 同時通過文字門檻且分離度最好，兩次都選中它）——功能鍵按下的底色
- * 與候選列選中游標的底色因此變成同一個顏色，使用者無法用顏色區分兩者，是 B22 註解明講要避免、 繞一圈又回來的撞色缺陷。加了 [excluded] 參數讓呼叫端排除已經被另一個用途選中的顏色。
- * **退化語意**：若排除 [excluded] 之後候選清單變成空的（代表所有候選角色的顏色都撞在一起，理論上 只有桌布配色高度單調的極端情境才會發生），本函式**放棄排除限制、忽略
- * [excluded] 走原本規則**選 色，不會丟例外、也不會偽造一個不在 [candidates] 裡的假顏色。這代表撞色在這個退化情境下無法避免 （回傳值可能等於 [excluded]
- * 裡的顏色），呼叫端可以自行比對回傳值與 [excluded] 判斷是否真的撞色、 要不要另外提示使用者。
+ * 與候選列選中游標的底色因此變成同一個顏色，使用者無法用顏色區分兩者，是 B22 註解明講要避免、 繞一圈又回來的撞色缺陷。當時加了 [excluded]
+ * 參數讓呼叫端排除已經被另一個用途選中的顏色。
+ *
+ * **I1（第十二輪審查，修正 H1 的解法）**：[excluded] 是「先硬性過濾、再評分」，排除後剩下的候選 有多差都不會回頭選，實測會讓分離度倒退到比排除前更差（見
+ * [com.bopomofobruce.theme.MaterialYouTheme] 的呼叫處註解，附 M3 baseline 實算數字）。
+ * [com.bopomofobruce.theme.MaterialYouTheme.dynamicColorsFor] 已改成**不用** [excluded]，改為把 `keyAccent`
+ * 併入 [separationReferences]，讓「與 keyAccent 分得開」變成跟「與 background 分得開」同級的評分項，而不是二元的硬性排除／不排除。[excluded]
+ * 參數本身**保留在本函式的公開 API**（見下方 KDoc 與 `AccentColorSelectionTest` 既有的兩條測試），因為它是描述明確、已有測試覆蓋
+ * 的通用純函式功能——之後若有呼叫端需要「絕對不可以跟某個顏色相同」這種硬性排除語意（跟 `candidateHighlight` 這種「盡量分得開但分離度優先」的語意不同），仍可以直接重用；只是
+ * `dynamicColorsFor()` 這個呼叫處不再使用它。
+ *
+ * **退化語意**（[excluded] 仍適用此段）：若排除 [excluded] 之後候選清單變成空的（代表所有候選角色的顏色都撞在一起，理論上
+ * 只有桌布配色高度單調的極端情境才會發生），本函式**放棄排除限制、忽略 [excluded] 走原本規則**選 色，不會丟例外、也不會偽造一個不在 [candidates]
+ * 裡的假顏色。這代表撞色在這個退化情境下無法避免 （回傳值可能等於 [excluded] 裡的顏色），呼叫端可以自行比對回傳值與 [excluded] 判斷是否真的撞色、 要不要另外提示使用者。
  *
  * @param candidates 依優先序排列的候選色（ARGB [UInt]），不可為空。
  * @param textPartner 候選色要承載的文字顏色（`keyText` 或 `candidateText`）。

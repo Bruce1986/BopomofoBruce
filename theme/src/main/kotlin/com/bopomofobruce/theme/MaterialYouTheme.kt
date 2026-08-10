@@ -120,17 +120,33 @@ private constructor(override val id: String, val styleSheet: StyleSheet) : Keybo
             // H1（第十一輪審查）：accentCandidates 與 highlightCandidates 成員相同（只是排序不同），
             // 用貼近真實 M3 baseline 的 tone 分布實測，兩次呼叫最後都只剩 inversePrimary 同時通過
             // 文字門檻且分離度最好，於是 keyAccent 與 candidateHighlight 撞成同一個顏色——功能鍵按下
-            // 的底色跟候選列選中游標的底色分不出來，正是 B22 註解要避免、繞一圈又回來的缺陷。這裡把
-            // keyAccent 已選中的顏色排除掉再選一次；若排除後沒有候選可用（所有候選角色顏色都撞在
-            // 一起的極端桌布），pickAccentColor 會忽略排除限制退回原規則選色（見它的 KDoc），此時
-            // candidateHighlight 仍可能等於 keyAccent——這是已知、已記載的退化情境，不強行偽造一個
-            // 不在候選清單裡的顏色。
+            // 的底色跟候選列選中游標的底色分不出來，正是 B22 註解要避免、繞一圈又回來的缺陷。
+            //
+            // I1（第十二輪審查）：H1 當時用 excluded = setOf(keyAccent) 硬性把 keyAccent 選中的顏色
+            // 從候選清單移除、再重新評分，結果**先過濾、再評分**這個順序本身會讓分離度倒退：用本檔
+            // KDoc 假設的 M3 baseline tone 分布實算，light 下 keyAccent 選中 inversePrimary（對
+            // background 1.66:1），排除後 candidateHighlight 落到 tertiaryContainer（對 background
+            // 只剩 1.26:1，比排除前更差）；dark 下落到 secondaryContainer（1.84:1，正是 B22 註解裡
+            // `BuiltInThemes.kt` 記載「只有 1.84:1，不及 3:1」的同一個色值/數字，被動態路徑撿回來）。
+            // 根因：excluded 是硬性排除，不管排除之後剩下的候選有多差都不會回頭；而三個 container
+            // 候選彼此 tone 相近，只要 keyAccent 選中 inversePrimary，第二次呼叫幾乎必然落進這個分離
+            // 度差的 container 群，不是罕見路徑。
+            //
+            // 已改：不再用 excluded 硬性過濾，改成把 keyAccent 併入 separationReferences——讓「與
+            // keyAccent 分得開」變成跟「與 background 分得開」同級的評分項，而不是二元的
+            // 排除／不排除。這同時解掉「excluded 只比對完全相同的 UInt，視覺上幾乎相同但不是同一個
+            // UInt 的顏色排不掉」的問題（見 pickAccentColor 的 KDoc）。若排除後只剩 keyAccent
+            // 自己一個候選通過文字門檻（見 DynamicAccentSelection.kt 的 AccentColorSelectionTest
+            // 案例），candidateHighlight 會等於 keyAccent（撞色），但這是候選清單本身別無選擇下最好
+            // 的結果，不是本函式為了避開撞色硬推去一個分離度更差的顏色——已用
+            // `keyAccent excluded from candidates causes a worse pick than scoring against it as a
+            // separation reference` 測試證明：舊的 excluded 呼叫方式在這個候選集合下會選到分離度
+            // 明顯更差的顏色，新的呼叫方式不會。
             val candidateHighlight =
                 pickAccentColor(
                     candidates = highlightCandidates,
                     textPartner = keyText,
-                    separationReferences = listOf(background),
-                    excluded = setOf(keyAccent),
+                    separationReferences = listOf(background, keyAccent),
                 )
 
             return KeyboardColors(
