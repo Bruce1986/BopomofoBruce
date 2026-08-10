@@ -7,6 +7,13 @@
         "action": {
           "type": "character",
           "char": "q"
+        },
+        "longPress": {
+          "label": "1",
+          "action": {
+            "type": "character",
+            "char": "1"
+          }
         }
       },
       {
@@ -14,6 +21,13 @@
         "action": {
           "type": "character",
           "char": "w"
+        },
+        "longPress": {
+          "label": "2",
+          "action": {
+            "type": "character",
+            "char": "2"
+          }
         }
       },
       {
@@ -21,6 +35,13 @@
         "action": {
           "type": "character",
           "char": "e"
+        },
+        "longPress": {
+          "label": "3",
+          "action": {
+            "type": "character",
+            "char": "3"
+          }
         }
       },
       {
@@ -28,6 +49,13 @@
         "action": {
           "type": "character",
           "char": "r"
+        },
+        "longPress": {
+          "label": "4",
+          "action": {
+            "type": "character",
+            "char": "4"
+          }
         }
       },
       {
@@ -35,6 +63,13 @@
         "action": {
           "type": "character",
           "char": "t"
+        },
+        "longPress": {
+          "label": "5",
+          "action": {
+            "type": "character",
+            "char": "5"
+          }
         }
       },
       {
@@ -42,6 +77,13 @@
         "action": {
           "type": "character",
           "char": "y"
+        },
+        "longPress": {
+          "label": "6",
+          "action": {
+            "type": "character",
+            "char": "6"
+          }
         }
       },
       {
@@ -49,6 +91,13 @@
         "action": {
           "type": "character",
           "char": "u"
+        },
+        "longPress": {
+          "label": "7",
+          "action": {
+            "type": "character",
+            "char": "7"
+          }
         }
       },
       {
@@ -56,6 +105,13 @@
         "action": {
           "type": "character",
           "char": "i"
+        },
+        "longPress": {
+          "label": "8",
+          "action": {
+            "type": "character",
+            "char": "8"
+          }
         }
       },
       {
@@ -63,6 +119,13 @@
         "action": {
           "type": "character",
           "char": "o"
+        },
+        "longPress": {
+          "label": "9",
+          "action": {
+            "type": "character",
+            "char": "9"
+          }
         }
       },
       {
@@ -70,6 +133,13 @@
         "action": {
           "type": "character",
           "char": "p"
+        },
+        "longPress": {
+          "label": "0",
+          "action": {
+            "type": "character",
+            "char": "0"
+          }
         }
       }
     ],
