@@ -50,23 +50,39 @@ internal fun contrastRatio(a: UInt, b: UInt): Double {
  * 同分（含 fallback 分支同分）時保留 [candidates] 中排序在前的那個，讓呼叫端能用候選清單的順序表達 「這個角色比較符合語意」的偏好（例如
  * `primaryContainer` 排在 `onSurfaceVariant` 前面）。
  *
+ * H1（第十一輪審查）：`keyAccent` 與 `candidateHighlight` 這兩個用途各自呼叫一次本函式，候選清單 成員相同（只是排序不同），用貼近真實 M3 baseline
+ * 的 tone 分布實測會發現兩次呼叫**選中同一個 顏色**（container 系 tone 跟 surface 幾乎同 tone、primary/secondary/tertiary
+ * 系文字對比不到 4.5，最後只剩 `inversePrimary` 同時通過文字門檻且分離度最好，兩次都選中它）——功能鍵按下的底色
+ * 與候選列選中游標的底色因此變成同一個顏色，使用者無法用顏色區分兩者，是 B22 註解明講要避免、 繞一圈又回來的撞色缺陷。加了 [excluded] 參數讓呼叫端排除已經被另一個用途選中的顏色。
+ * **退化語意**：若排除 [excluded] 之後候選清單變成空的（代表所有候選角色的顏色都撞在一起，理論上 只有桌布配色高度單調的極端情境才會發生），本函式**放棄排除限制、忽略
+ * [excluded] 走原本規則**選 色，不會丟例外、也不會偽造一個不在 [candidates] 裡的假顏色。這代表撞色在這個退化情境下無法避免 （回傳值可能等於 [excluded]
+ * 裡的顏色），呼叫端可以自行比對回傳值與 [excluded] 判斷是否真的撞色、 要不要另外提示使用者。
+ *
  * @param candidates 依優先序排列的候選色（ARGB [UInt]），不可為空。
  * @param textPartner 候選色要承載的文字顏色（`keyText` 或 `candidateText`）。
  * @param separationReferences 候選色需要與之區分開來的底色（`keyAccent` 傳 `listOf(keyFill,
  *   background)`；`candidateHighlight` 依契約只需要對 `background` 有分離度，傳 `listOf(background)` 即可），不可為空。
  * @param textThreshold WCAG AA 一般文字門檻，預設 4.5。
+ * @param excluded 要排除的顏色集合（例如另一個用途已經選中的顏色，避免撞色）。若排除後候選清單變空， 見上方
+ *   KDoc「退化語意」——會忽略這個排除限制。預設空集合，等同不排除任何顏色。
  */
 fun pickAccentColor(
     candidates: List<UInt>,
     textPartner: UInt,
     separationReferences: List<UInt>,
     textThreshold: Double = 4.5,
+    excluded: Set<UInt> = emptySet(),
 ): UInt {
     require(candidates.isNotEmpty()) { "candidates must not be empty" }
     require(separationReferences.isNotEmpty()) { "separationReferences must not be empty" }
 
-    val passingTextThreshold = candidates.filter { contrastRatio(it, textPartner) >= textThreshold }
-    val pool = if (passingTextThreshold.isNotEmpty()) passingTextThreshold else candidates
+    val afterExclusion = candidates.filterNot { it in excluded }
+    // 排除後沒東西可選：所有候選都撞色到一起，退回忽略排除限制、依原本規則選（見 KDoc「退化語意」）。
+    val effectiveCandidates = if (afterExclusion.isNotEmpty()) afterExclusion else candidates
+
+    val passingTextThreshold =
+        effectiveCandidates.filter { contrastRatio(it, textPartner) >= textThreshold }
+    val pool = if (passingTextThreshold.isNotEmpty()) passingTextThreshold else effectiveCandidates
     val scoreBy =
         if (passingTextThreshold.isNotEmpty()) {
             { candidate: UInt -> separationReferences.minOf { contrastRatio(candidate, it) } }
@@ -74,5 +90,5 @@ fun pickAccentColor(
             { candidate: UInt -> contrastRatio(candidate, textPartner) }
         }
 
-    return pool.maxWithOrNull(compareBy(scoreBy)) ?: candidates.first()
+    return pool.maxWithOrNull(compareBy(scoreBy)) ?: effectiveCandidates.first()
 }

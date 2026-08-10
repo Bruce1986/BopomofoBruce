@@ -110,23 +110,36 @@ private constructor(override val id: String, val styleSheet: StyleSheet) : Keybo
                     )
                     .map { it.toKeyboardUInt() }
 
+            val keyAccent =
+                pickAccentColor(
+                    candidates = accentCandidates,
+                    textPartner = keyText,
+                    separationReferences = listOf(keyFill, background),
+                )
+
+            // H1（第十一輪審查）：accentCandidates 與 highlightCandidates 成員相同（只是排序不同），
+            // 用貼近真實 M3 baseline 的 tone 分布實測，兩次呼叫最後都只剩 inversePrimary 同時通過
+            // 文字門檻且分離度最好，於是 keyAccent 與 candidateHighlight 撞成同一個顏色——功能鍵按下
+            // 的底色跟候選列選中游標的底色分不出來，正是 B22 註解要避免、繞一圈又回來的缺陷。這裡把
+            // keyAccent 已選中的顏色排除掉再選一次；若排除後沒有候選可用（所有候選角色顏色都撞在
+            // 一起的極端桌布），pickAccentColor 會忽略排除限制退回原規則選色（見它的 KDoc），此時
+            // candidateHighlight 仍可能等於 keyAccent——這是已知、已記載的退化情境，不強行偽造一個
+            // 不在候選清單裡的顏色。
+            val candidateHighlight =
+                pickAccentColor(
+                    candidates = highlightCandidates,
+                    textPartner = keyText,
+                    separationReferences = listOf(background),
+                    excluded = setOf(keyAccent),
+                )
+
             return KeyboardColors(
                 background = background,
                 keyFill = keyFill,
                 keyText = keyText,
-                keyAccent =
-                    pickAccentColor(
-                        candidates = accentCandidates,
-                        textPartner = keyText,
-                        separationReferences = listOf(keyFill, background),
-                    ),
+                keyAccent = keyAccent,
                 candidateText = keyText,
-                candidateHighlight =
-                    pickAccentColor(
-                        candidates = highlightCandidates,
-                        textPartner = keyText,
-                        separationReferences = listOf(background),
-                    ),
+                candidateHighlight = candidateHighlight,
             )
         }
     }
