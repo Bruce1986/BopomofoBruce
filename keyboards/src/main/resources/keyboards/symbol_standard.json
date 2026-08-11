@@ -219,6 +219,14 @@
     ],
     [
       {
+        "label": "返回",
+        "action": {
+          "type": "custom",
+          "id": "switch_back"
+        },
+        "weight": 1.2
+      },
+      {
         "label": "注音",
         "action": {
           "type": "custom",

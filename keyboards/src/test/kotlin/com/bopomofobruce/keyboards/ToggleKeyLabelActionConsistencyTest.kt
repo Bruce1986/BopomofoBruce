@@ -45,6 +45,12 @@ class ToggleKeyLabelActionConsistencyTest {
         // English"), so this uses the KeyAction.Custom escape hatch. :ime must implement this
         // id -- see Keyboards.kt symbolStandard KDoc for the full Custom-id checklist.
         put("注音", KeyAction.Custom("switch_to_zhuyin"))
+        // symbol_standard control row (M1, round-13 tracer): "注音"'s destination is hardcoded
+        // to zhuyin, which only serves the zhuyin -> symbol_toggle -> here path -- it left
+        // password_qwerty / url_qwerty ("全形" -> symbol_toggle -> here) with no way back at
+        // all. "返回" is the source-agnostic escape hatch: :ime resolves it against whichever
+        // keyboard sent the user here. See Keyboards.kt symbolStandard KDoc.
+        put("返回", KeyAction.Custom("switch_back"))
         // zhuyin control row: already self-consistent with KeyAction's literal wording (going
         // *from* zhuyin, "符號" = leave to symbols, "英數" = leave to English/digits).
         put("符號", KeyAction.SymbolToggle)

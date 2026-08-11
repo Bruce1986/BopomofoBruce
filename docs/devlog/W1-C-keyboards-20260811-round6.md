@@ -86,7 +86,8 @@ Custom(id=switch_to_zhuyin) but found LanguageToggle ==> expected: <[]> but was:
 ## Gradle 收尾結果
 
 - `:keyboards:assembleDebug` — 綠
-- `:keyboards:testDebugUnitTest` — 綠，34 個 test case
+- `:keyboards:testDebugUnitTest` — 綠，34 個 test case（round 6 當時；後續 round 見
+  `docs/devlog/W1-C-keyboards-20260811-round13.md` 起的更正）
 - `:keyboards:ktfmtCheck` — 首次跑紅（`Keyboards.kt` 與新測試檔格式未過），跑
   `:keyboards:ktfmtFormat` 後重新完整跑一次 `:keyboards:assembleDebug :keyboards:testDebugUnitTest
   :keyboards:ktfmtCheck :keyboards:lint` 四項全綠
