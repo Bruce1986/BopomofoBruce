@@ -485,3 +485,20 @@
 - **本輪額外查核**：兩條 finding 逐條核對後，內容與程式碼現況一致，沒有發現 finding 本身有誤的地方。
   O1 的「全 repo grep 不到 `takePersistableUriPermission`」與 O2 的「`StyleSheetValidationTest` 7
   條全部只呼叫建構子、沒有一條走 `decodeFromString`」兩個具體斷言皆已重新查證屬實。
+
+## 2026-08-11 第十五輪 — O2 的測試自己也分不出兩種例外
+
+- **[medium]** O2 新增的 `StyleSheet decodeFromString throws IllegalArgumentException...` 只斷言
+  `assertThrows(IllegalArgumentException)`，但 **kotlinx-serialization 1.7.3 的
+  `SerializationException` 本身就繼承 `IllegalArgumentException`**（這件事在 W1-C 的 C6 那輪已被
+  反編譯 jar 證實過）。所以就算未來這條路徑改成把 require 包成 `SerializationException`——也就是
+  「呼叫端只 catch `SerializationException` 會漏接」這個問題根本不存在了——這條測試**仍然會綠**。
+  它區分不了自己要證明的兩種情況。
+
+  已修：取回 `assertThrows` 的回傳值，額外斷言 `thrown !is SerializationException`，失敗訊息寫明
+  「expected a bare IllegalArgumentException that `catch (e: SerializationException)` would NOT
+  catch」。**已證明會紅**：把測試 JSON 換成會丟真 `SerializationException` 的輸入（未知欄位）後
+  測試立刻 FAILED，還原後綠。
+
+  教訓與本包 B23／H2 同型：**斷言的型別範圍比它要證明的性質寬時，測試就會對「問題已消失」與
+  「問題仍在」給出相同的綠燈。** 這是本包第三次踩到同一類問題。

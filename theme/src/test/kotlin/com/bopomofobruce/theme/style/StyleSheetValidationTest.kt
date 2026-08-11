@@ -2,7 +2,9 @@ package com.bopomofobruce.theme.style
 
 import com.bopomofobruce.common.KeyboardColors
 import com.bopomofobruce.common.KeyboardDimens
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 
@@ -109,8 +111,20 @@ class StyleSheetValidationTest {
             """
                 .trimIndent()
 
-        assertThrows(IllegalArgumentException::class.java) {
-            Json.decodeFromString(StyleSheet.serializer(), jsonWithZeroKeyLabelSp)
-        }
+        val thrown =
+            assertThrows(IllegalArgumentException::class.java) {
+                Json.decodeFromString(StyleSheet.serializer(), jsonWithZeroKeyLabelSp)
+            }
+
+        // 光斷言 IllegalArgumentException 不夠：kotlinx-serialization 1.7.3 的
+        // SerializationException 本身就繼承 IllegalArgumentException，所以即使未來這條路徑改成
+        // 把 require 包成 SerializationException（＝呼叫端只 catch SerializationException 就接得
+        // 住，本測試想證明的問題也就不存在了），上面那條斷言仍會綠。必須額外排除掉子類，這條
+        // 測試才真的鎖得住「逃出來的是裸的 IAE、接 SerializationException 會漏接」這個性質。
+        assertFalse(
+            thrown is SerializationException,
+            "expected a bare IllegalArgumentException that `catch (e: SerializationException)` " +
+                "would NOT catch, but got ${thrown::class.qualifiedName}",
+        )
     }
 }
