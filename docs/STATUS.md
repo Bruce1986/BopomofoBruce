@@ -6,7 +6,7 @@
 > 啟動 prompt 模板：[DEVPLAN-SubagentFanout §6](DEVPLAN-SubagentFanout-20260620-0851.md#6-子代理啟動樣板)
 <!-- Doc-naming pushback (Gemini #3496050473): DEVPLAN 檔名含時間戳 (YYYYMMDD-HHMM) 是專案強制 doc-naming 慣例（CLAUDE.md「檔名必須加上日期時間」），不接受改為無時間戳檔名。link rot 是已知 trade-off；重命名時須同步更新本檔所有指向 DEVPLAN 的引用，以及 project-handbook.md / AGENTS.md / GEMINI.md / docs/adr/。 -->
 
-最後一次 lead 巡視：2026-08-11 01:04
+最後一次 lead 巡視：2026-08-11 13:36
 
 ---
 
@@ -29,9 +29,9 @@
 
 | ID | Wave | 範圍（獨占模組／檔案） | 狀態 | 認領者 | Worktree | 分支 | PR | 更新時間 |
 |----|------|----------------------|------|--------|----------|------|----|---------|
-| W1-A | W1 | `:decoder-native` libchewing → libbpmf.so | 🟠 In progress | sonnet-A | ../BopomofoBruce-w1a-decoder-native | feat/w1a-decoder-native | —（尚未開 PR，本機分支） | 2026-08-11 01:04 |
-| W1-B | W1 | `:theme` Material You + 自訂相片背景 | 🟠 In progress | sonnet-B | ../BopomofoBruce-w1b-theme | feat/w1b-theme | —（尚未開 PR，本機分支） | 2026-08-11 01:04 |
-| W1-C | W1 | `:keyboards` 注音 4×10、符號、數字、密碼 | 🟠 In progress | sonnet-C | ../BopomofoBruce-w1c-keyboards | feat/w1c-keyboards | —（尚未開 PR，本機分支） | 2026-08-11 01:04 |
+| W1-A | W1 | `:decoder-native` libchewing → libbpmf.so | 🟠 In progress | sonnet-A | ../BopomofoBruce-w1a-decoder-native | feat/w1a-decoder-native | —（fix-loop 已收斂，尚未開 PR） | 2026-08-11 13:36 |
+| W1-B | W1 | `:theme` Material You + 自訂相片背景 | 🟠 In progress | sonnet-B | ../BopomofoBruce-w1b-theme | feat/w1b-theme | —（fix-loop 已收斂，尚未開 PR） | 2026-08-11 13:36 |
+| W1-C | W1 | `:keyboards` 注音 4×10、符號、數字、密碼 | 🟠 In progress | sonnet-C | ../BopomofoBruce-w1c-keyboards | feat/w1c-keyboards | —（fix-loop 已收斂，尚未開 PR） | 2026-08-11 13:36 |
 | W2-A | W2 | `:decoder` JNI binding + 個人字典（Room） | 🔵 Backlog | — | — | — | — | — |
 | W2-B | W2 | `:ime` InputMethodService + Compose IME view | 🔵 Backlog | — | — | — | — | — |
 | W2-C | W2 | `:settings` 設定頁 + FirstRun | 🔵 Backlog | — | — | — | — | — |
@@ -49,9 +49,9 @@
 
 > 認領 / 開工時 append；merge 後刪。
 
-- W1-A  ../BopomofoBruce-w1a-decoder-native  feat/w1a-decoder-native  PR —  agent=sonnet-A  since=2026-08-10 15:03  heartbeat=2026-08-11 01:04（實作完成，gemini-grade-review fix-loop 第 7 輪）
-- W1-B  ../BopomofoBruce-w1b-theme  feat/w1b-theme  PR —  agent=sonnet-B  since=2026-08-10 15:03  heartbeat=2026-08-11 01:04（實作完成，fix-loop 第 12 輪）
-- W1-C  ../BopomofoBruce-w1c-keyboards  feat/w1c-keyboards  PR —  agent=sonnet-C  since=2026-08-10 15:03  heartbeat=2026-08-11 01:04（實作完成，fix-loop 第 11 輪）
+- W1-A  ../BopomofoBruce-w1a-decoder-native  feat/w1a-decoder-native  PR —  agent=sonnet-A  since=2026-08-10 15:03  heartbeat=2026-08-11 13:36（fix-loop 收斂：12 輪、連續兩輪零 finding；測試 JVM 9＋實機 4）
+- W1-B  ../BopomofoBruce-w1b-theme  feat/w1b-theme  PR —  agent=sonnet-B  since=2026-08-10 15:03  heartbeat=2026-08-11 13:36（fix-loop 收斂：19 輪、連續兩輪零 finding；測試 52）
+- W1-C  ../BopomofoBruce-w1c-keyboards  feat/w1c-keyboards  PR —  agent=sonnet-C  since=2026-08-10 15:03  heartbeat=2026-08-11 13:36（fix-loop 收斂：14 輪、連續兩輪零 finding；測試 37）
 
 > 註：本波三包的 STATUS 記帳由 lead 統一維護（三個子代理同時開工，避免同一檔案三方衝突）；子代理不改本檔。
 > `.claude/worktrees/` 下四個 W0 殘留 worktree 仍在，其中三個含未提交殘值，見 [REVIEW-ProjectStatus-20260807-0209.md §三](REVIEW-ProjectStatus-20260807-0209.md)，撿完殘值後清除。
