@@ -3,6 +3,7 @@ package com.bopomofobruce.decoder.nativ
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.bopomofobruce.decoder.nativ.testbridge.BpmfTestBridge
+import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -27,6 +28,41 @@ class BpmfNativeSmokeTest {
             assertNotEquals("bpmf_init() returned a null handle (0)", 0L, handle)
         } finally {
             BpmfTestBridge.nativeTestFree(handle)
+        }
+    }
+
+    @Test
+    fun bpmfInit_withMissingDictionaryData_returnsNullHandle() {
+        // Q1 (Opus tracer round 12): bpmf.h documents "Returns NULL on failure (e.g.
+        // dictionaries missing/corrupt)", but libchewing's own chewing_new3() never returns NULL
+        // for that case — it silently falls back to a built-in "mini" dictionary (verified
+        // against the vendored capi/src/io.rs / editor/mod.rs). Without bpmf_init()'s own
+        // self-check (added this round), a missing/corrupt data_path would hand back a "valid"
+        // handle that quietly returns near-empty candidates forever — exactly the silent-failure
+        // mode W2-A cannot tell apart from "no matching candidates for this input".
+        //
+        // Points bpmf_init() at a real, empty, readable directory (NOT the extracted dictionary
+        // path from getDataPath()) so word.dat/tsi.dat genuinely do not exist there.
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val emptyDir = File(context.cacheDir, "bpmf-missing-dict-test")
+        emptyDir.deleteRecursively()
+        check(emptyDir.mkdirs()) { "could not create empty test dir: $emptyDir" }
+
+        try {
+            val handle = BpmfTestBridge.nativeTestInit(emptyDir.absolutePath)
+            try {
+                assertEquals(
+                    "expected bpmf_init() to return NULL (0) when the dictionary files are " +
+                        "missing from data_path, got handle=$handle",
+                    0L,
+                    handle,
+                )
+            } finally {
+                // Safe even if handle is already 0 — bpmf_free() documents NULL as a no-op.
+                BpmfTestBridge.nativeTestFree(handle)
+            }
+        } finally {
+            emptyDir.deleteRecursively()
         }
     }
 
@@ -143,6 +179,66 @@ class BpmfNativeSmokeTest {
                 "candidates should be for gong1, not the previous syllable (nǐ); got " +
                     candidates.toList().toString(),
                 candidates.any { it == "你" || it == "妳" },
+            )
+        } finally {
+            BpmfTestBridge.nativeTestFree(handle)
+        }
+    }
+
+    @Test
+    fun bpmfInput_calledRepeatedlyOnSameHandle_recyclesBufferAcrossOwnershipBranches() {
+        // Q3 (Opus tracer round 12): no existing test ever called bpmf_input() more than once on
+        // the SAME handle, so the `free(handle->last_candidates)` recycle path at the top of
+        // bpmf_input() (bpmf_wrapper.c) had never actually executed — that is exactly the
+        // invariant bpmf.h spends ~40 lines documenting (heap-owned string valid "until the NEXT
+        // bpmf_input() call... or bpmf_free(), whichever comes first"). A future change that
+        // stashes the static-buffer branch into handle->last_candidates too, or gets the
+        // free-then-replace order wrong, produces a double-free / use-after-free — and every
+        // existing test would still stay green, because none of them re-enter bpmf_input() on a
+        // live handle.
+        //
+        // This drives three calls on one handle, deliberately alternating ownership branches:
+        //   1. "ㄋㄧˇㄏㄠˇ" -> real candidates (heap-owned last_candidates gets allocated)
+        //   2. "ㄏㄠˇx"     -> fail-closed, 0 candidates (static kEmptyCandidates branch; the
+        //                      heap buffer from call 1 must be freed on entry, not leaked)
+        //   3. "ㄋㄧˇㄍㄨㄥ" -> real candidates again (must allocate fresh heap memory, not reuse
+        //                      or double-free anything from call 1)
+        // Also exercises chewing_Reset(): call 3's candidates must be for gong1 only, proving call
+        // 2 (and call 1's leftover composition state) was actually cleared, not just the buffer.
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val dataPath = getDataPath(context)
+
+        val handle = BpmfTestBridge.nativeTestInit(dataPath)
+        assertNotEquals(0L, handle)
+        try {
+            val first = BpmfTestBridge.nativeTestInput(handle, "ㄋㄧˇㄏㄠˇ")
+            assertTrue(
+                "expected 好 among the candidates for call 1 (ㄋㄧˇㄏㄠˇ), got ${first.toList()}",
+                first.contains("好"),
+            )
+
+            val second = BpmfTestBridge.nativeTestInput(handle, "ㄏㄠˇx")
+            assertEquals(
+                "expected fail-closed (zero candidates) for call 2 (ㄏㄠˇx) on the SAME handle " +
+                    "that just held real candidates, got ${second.toList()}",
+                0,
+                second.size,
+            )
+
+            val third = BpmfTestBridge.nativeTestInput(handle, "ㄋㄧˇㄍㄨㄥ")
+            assertTrue(
+                "expected at least one candidate for call 3 (gong1), got ${third.toList()}",
+                third.isNotEmpty(),
+            )
+            assertTrue(
+                "expected 工 (gong1) among the candidates for call 3, got ${third.toList()}",
+                third.contains("工"),
+            )
+            assertFalse(
+                "call 3's candidates should be for gong1 only — finding a call-1/call-2 leftover " +
+                    "(好/郝) here would mean chewing_Reset() or the buffer recycle didn't actually " +
+                    "clear prior state; got ${third.toList()}",
+                third.any { it == "好" || it == "郝" },
             )
         } finally {
             BpmfTestBridge.nativeTestFree(handle)

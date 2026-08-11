@@ -30,10 +30,18 @@ owner 已就此裁示（見 devlog 2026-08-10 段）：**採用 v0.12.0（commit
   排進 task graph 的是 `:decoder-native:packageDebugAssets` 這類 artifact task，根本不會經過
   `:decoder-native` 自己的 `assembleDebug`/`assembleRelease`——只掛在後者上，會讓乾淨 checkout
   組出的 `:app` APK 打包一個空的 `assets/chewing/`（`getDataPath()` 解壓不出東西、
-  `bpmf_init()` 在真機回 NULL）。`ensureChewingDataDir`（純 `mkdir`、不連網）仍是
+  `bpmf_init()` 在真機回 NULL——**2026-08-11 更正**：這句話寫下當時未經查證即為假設，
+  已被 Opus 級追蹤者第十二輪指出：查證屬實的部分只到「`getDataPath()` 解壓不出東西」，
+  「`bpmf_init()` 在真機回 NULL」在當時的 `bpmf_wrapper.c` 底下並不成立——vendored
+  `capi/src/io.rs` 的 `chewing_new3()` 沒有任何回傳 NULL 的路徑，字典目錄缺字典時
+  `Editor::chewing()` 會靜默退回內建 mini 字典，`bpmf_init()` 舊版只在
+  `data_path == NULL` 或 `malloc` 失敗才回 NULL。這句話現在之所以成立，是因為
+  第十二輪同一批修正已在 `bpmf_init()` 內加了字典可用性自我檢測，詳見
+  `bpmf.h`／`bpmf_wrapper.c` 與 devlog 對應段落，不是這裡原本假設的理由）。
+  `ensureChewingDataDir`（純 `mkdir`、不連網）仍是
   `src/main/assets/chewing` 目錄本身唯一的 `outputs.dir` 擁有者，`package*Assets`/`Lint*`
   兩類 task 現在**同時**依附 `ensureChewingDataDir`（先 mkdir）與 `fetchChewingData`（真下載）。
-  這個决定的直接後果是 **`:lint` 又重新透支需要連網**（AGP 把
+  這個決定的直接後果是 **`:lint` 又重新透支需要連網**（AGP 把
   `lintAnalyzeDebugUnitTest`/`lintAnalyzeDebugAndroidTest`/`lintAnalyzeDebug`/
   `generateDebugLintReportModel` 都無條件連到 `package*Assets` 或直接讀 assets 目錄，這條
   耦合是 AGP 內建、這份 build script 無法切斷）——這是**刻意接受的取捨，不是疏忽**：APK 正確性

@@ -75,7 +75,25 @@ extern "C" {
  * responsibility (a Room-backed dictionary per DEVPLAN), not libchewing's.
  * `data_path` therefore only needs to be readable, not writable.
  *
- * Returns NULL on failure (e.g. dictionaries missing/corrupt).
+ * Returns NULL on failure: `data_path == NULL`, `word.dat`/`tsi.dat` not both
+ * present and readable directly under `data_path`, or malloc failure.
+ *
+ * IMPLEMENTATION NOTE (why this is true, not aspirational): libchewing's own
+ * chewing_new3() never returns NULL for missing/corrupt dictionaries — it
+ * silently falls back to a tiny built-in "mini" dictionary instead (verified
+ * against the vendored capi/src/io.rs and editor/mod.rs's Editor::chewing()).
+ * That fallback dictionary is NOT empty (verified on-device: it returns real
+ * candidates for common syllables), so a "does this syllable produce any
+ * candidates" self-check cannot detect it — bpmf_init() instead checks
+ * directly, before calling into libchewing at all, that `word.dat` and
+ * `tsi.dat` both exist and are readable under `data_path`. This catches the
+ * "missing" half of "dictionaries missing/corrupt" deterministically. It does
+ * NOT catch "present but corrupt" — a corrupt word.dat/tsi.dat that exists on
+ * disk still passes this check and still falls back to libchewing's silent
+ * mini dictionary; there is no public libchewing C API this wrapper can use
+ * to detect that case (no dictionary-metadata/introspection function is
+ * exported). This residual gap is recorded in the devlog as a known
+ * limitation, not silently left undocumented.
  */
 void* bpmf_init(const char* data_path);
 

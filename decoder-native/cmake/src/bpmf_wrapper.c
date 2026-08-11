@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 /* --- DaChen (standard) bopomofo -> ASCII keystroke table --------------- */
 /* clang-format off */
@@ -139,8 +140,68 @@ typedef struct {
 
 /* --- public API ---------------------------------------------------------- */
 
+/*
+ * Checks that `dir`/`filename` exists and is readable, without assuming any
+ * bound on `dir`'s length (the caller-supplied data_path is not under this
+ * file's control). Returns 0 (not readable, or OOM building the path — fails
+ * closed) or 1.
+ */
+static int file_is_readable(const char* dir, const char* filename) {
+    size_t dir_len = strlen(dir);
+    size_t name_len = strlen(filename);
+    /* dir + '/' + filename + '\0' */
+    char* path = (char*)malloc(dir_len + 1 + name_len + 1);
+    if (path == NULL) {
+        return 0;
+    }
+    memcpy(path, dir, dir_len);
+    path[dir_len] = '/';
+    memcpy(path + dir_len + 1, filename, name_len + 1);
+    int ok = (access(path, R_OK) == 0);
+    free(path);
+    return ok;
+}
+
 void* bpmf_init(const char* data_path) {
     if (data_path == NULL) {
+        return NULL;
+    }
+    /*
+     * Self-check (see bpmf.h "Returns NULL on failure (e.g. dictionaries
+     * missing/corrupt)"): chewing_new3() itself NEVER returns NULL for that
+     * case — verified against the vendored capi/src/io.rs, whose only return
+     * statement is Box::into_raw(context), and against editor/mod.rs's
+     * Editor::chewing(), which returns a plain Editor (not a Result) and, if
+     * AssetLoader::load() can't find/parse any system dictionary, silently
+     * falls back to a built-in "mini" dictionary rather than failing. Left
+     * unchecked, a missing/corrupt data_path would hand the caller a "valid"
+     * handle whose candidates come from that tiny fallback dictionary instead
+     * of the real word.dat/tsi.dat — exactly the W2-A failure mode this
+     * finding flagged (no way to tell "no candidates for this input" apart
+     * from "the dictionary never loaded").
+     *
+     * IMPORTANT / do not "simplify" this back to a candidate-count probe: an
+     * earlier version of this fix tried exactly that (feed a well-known
+     * syllable through chewing_cand_open()/_Enumerate() and require >=1
+     * candidate). It was WRONG and caught by this file's own on-device test
+     * (bpmfInit_withMissingDictionaryData_returnsNullHandle): libchewing's
+     * built-in "mini" fallback dictionary is not empty — verified on-device
+     * it returns real candidates for common syllables (e.g. 2 candidates
+     * [好, 郝] for hao3, 14 for gong1, vs. the real dictionary's 4 and more),
+     * so a "does hasNext() return true" check cannot tell "real dictionary
+     * loaded" apart from "silently fell back to mini". A count-threshold
+     * probe was considered and rejected too: the real/mini candidate-count
+     * gap is real but data-version-dependent (varies from +2 to +12 across
+     * several probe syllables measured on-device), so any fixed threshold
+     * would be fragile against future word.dat/tsi.dat updates. A direct,
+     * deterministic file-existence check on the two files `bpmf.h` already
+     * documents `data_path` as requiring (word.dat, tsi.dat) has none of
+     * these problems. This only detects "missing", not "present but
+     * corrupt" — see the known-gap note in the devlog; chewing_new3() falls
+     * back to the same mini dictionary for corrupt files, which this check
+     * does not distinguish from a real one either.
+     */
+    if (!file_is_readable(data_path, "word.dat") || !file_is_readable(data_path, "tsi.dat")) {
         return NULL;
     }
     /*

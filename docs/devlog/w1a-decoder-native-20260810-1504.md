@@ -285,6 +285,15 @@ ADR-0001 本體。詳細裁示內容見 lead 轉達訊息（本檔不重抄，�
   W2-A 若需要 libchewing 自己跨呼叫累積組句（例如多字詞的智慧選字），需要另外加
   API（例如導出 `chewing_buffer_String()`），超出 W1-A 範圍。見 `bpmf.h` 的
   `bpmf_commit()` KDoc。
+- **（2026-08-11 第十階段新增，Q2）APK size 增量實測未達 DEVPLAN 門檻，且
+  `:app` 目前打包出未剝除符號的 `.so`**：實測
+  `:app:assembleRelease` 產出的 APK，單 ABI（arm64-v8a）增量約 34.25 MiB、
+  兩 ABI 都包約 60.62 MiB，DEVPLAN「< 4 MB」門檻在任何情境下都沒有過；即使
+  假設性地修好 `:app:stripReleaseDebugSymbols` 找不到 strip 工具這個獨立
+  packaging 缺陷（`:app` 沒有宣告 `android.ndkVersion`，AGP 因此把
+  `libbpmf.so`/`libc++_shared.so`/等全部原封不動包進 APK），最樂觀的單 ABI
+  增量也要 5.26 MiB。詳細核算、strip 缺陷成因與四個可能的取捨方向見第十
+  階段 Q2 段落。**登記為需要 owner 裁決的項目，本輪未修正 `app/build.gradle.kts`**。
 
 ### Commit
 
@@ -740,6 +749,17 @@ armeabi-v7a release: bpmf_commit / bpmf_free / bpmf_init / bpmf_input（4 個，
   double-free 保護）隨測試一起消失，但這個事實不能就此無人知曉——改為寫進 `bpmf.h` 的
   `bpmf_free()` KDoc：明講不提供 double-free 保護、呼叫端必須自行保證只呼叫一次。
 
+  **（2026-08-11 第十階段後續修正，Opus 級追蹤者第十二輪指出）**：上面這段理由裡「字典缺失時
+  `bpmf_init()` 回 NULL」這句話，在當時的 `bpmf_wrapper.c` 底下其實是**未經查證的假設，並不
+  成立**——vendored `capi/src/io.rs` 的 `chewing_new3()` 沒有任何回傳 NULL 的路徑，字典缺失/
+  損毀時 `Editor::chewing()`（`editor/mod.rs`）只會 `error!()` 後靜默退回內建 mini 字典；當時
+  `bpmf_init()` 只在 `data_path == NULL` 或 `malloc` 失敗時才回 NULL。K3 用這句錯誤斷言論證
+  「這條測試唯一可能紅的情境已被另一條測試完全涵蓋」，但既然字典缺失走不到 NULL，K3 刪測試的
+  結論仍然站得住（`bpmfFree_isSafeToCallOnFreshHandleAndDoesNotCrash` 確實沒有任何 assert，
+  是嚴格子集，這點與字典缺失是否回 NULL 無關）——只是理由裡的這句舉例是假的，特此更正，不要
+  再引用它。第十階段已修正 `bpmf_init()`，替它加上字典可用性自我檢測，讓「字典缺失時回 NULL」
+  這句話從這時候起才是真的（見下方第十階段 Q1）。
+
 - **K4〔medium〕`bpmf_commit()` 的效果一定會被下一次 `bpmf_input()` 丟棄，header 沒寫**：
   查證屬實——`bpmf_wrapper.c` 的 `bpmf_input()` 每次開頭都無條件 `chewing_Reset(ctx)`，
   而 `chewing_Reset` 會清空 composition 與 commit buffer；這 4 個 API 沒有任何讀出
@@ -1037,3 +1057,265 @@ armeabi-v7a release: bpmf_commit / bpmf_free / bpmf_init / bpmf_input（4 個，
 - P2 沒有推翻既有設計，是既有「`testDebugUnitTest`/`testReleaseUnitTest` 掛
   一次」防線的補強，兩段 wiring 疊加後互不衝突（`dependsOn` 對同一個 task 多
   次宣告是冪等的）。
+
+## 第十階段（2026-08-11）：Opus 級追蹤者第十二輪 4 條 finding（Q1–Q4）
+
+分支 `feat/w1a-decoder-native`，起點 commit `8c539b6`（第九階段/P1-P2 修正後
+HEAD）。lead 已親自查證 Q1、Q4 屬實；本輪不動 `:common`、不動
+`docs/STATUS.md`、不動 vendored libchewing、不 push。
+
+### Q1〔high〕`bpmf_init()` 的失敗契約是錯的，且已擴散到三份文件
+
+查證屬實（lead 已查證，本輪再次核對）：vendored `capi/src/io.rs` 的
+`chewing_new3()` 唯一的回傳點是 `Box::into_raw(context)`，沒有任何
+`null_mut()` 路徑；`editor/mod.rs` 的 `Editor::chewing()` 回傳裸 `Editor`
+（不是 `Result`），字典找不到/解析失敗時只 `error!()` 記錄後靜默退回內建
+`mini.dat` 小字典。舊版 `bpmf_init()` 因此只在 `data_path == NULL` 或
+`malloc` 失敗時才回 NULL，`bpmf.h:78`「Returns NULL on failure (e.g.
+dictionaries missing/corrupt)」與 `bpmf_wrapper.c` 的 `if (ctx == NULL)`
+分支因此都是假的——後者永遠走不到。
+
+**改法（實作過程中一度走錯路，記錄下來避免重蹈）**：
+
+1. **第一版嘗試（finding 建議的做法）**：在 `bpmf_init()` 內對 `chewing_new3()`
+   之後的 context 餵一個已知音節（ㄏㄠˇ）跑 `cand_open`/`Enumerate`，拿不到
+   候選就視為失敗。**這個做法本身是錯的，被本輪新增的實機測試當場抓到**：
+   libchewing 退回的內建 `mini.dat` 小字典**不是空字典**——在真機上實測，
+   對著一個完全沒有 `word.dat`/`tsi.dat` 的空目錄呼叫 `bpmf_init()`，
+   `mini.dat` 對 hao3 仍回 `[好, 郝]`（2 個候選）、對 gong1 甚至回 14 個候選
+   （`[工, 公, 功, 供, 攻, 恭, 躬, 弓, 紅, 肱, 共, 宮, 蚣, 龔]`），"有沒有候選"
+   這個判準完全無法區分「真字典」與「退回 mini」。用候選數門檻（例如 ≥3）
+   也試算過：8 組探測音節量出的真/mini 候選數差距從 +2 到 +12 不等（見下方
+   紅測證據），門檻會隨字典版本更新而漂移，不可靠。
+2. **最終採用的做法**：直接、確定性地檢查 `data_path` 底下 `word.dat` 與
+   `tsi.dat` 是否存在且可讀（新增 `file_is_readable()`，用 `access(path,
+   R_OK)`），在呼叫 `chewing_new3()` 之前就短路回傳 NULL。這完全對應
+   `bpmf.h` 本來就寫的「data_path must be a readable... directory containing
+   the extracted chewing dictionary files (word.dat, tsi.dat)」，不依賴任何
+   對字典內容的假設，也不會隨字典版本改變而失準。**已知殘留缺口**：這只偵測
+   「檔案不存在」，偵測不到「檔案存在但內容損毀」——後者目前無法偵測，因為
+   libchewing 沒有公開任何字典中繼資料/內省 C API，這點已寫進 `bpmf.h` 與
+   本節，不是被隱藏的假設。
+
+**三處敘述都已修正**：
+
+- `decoder-native/cmake/include/bpmf.h`（`bpmf_init()` KDoc）：改寫失敗條件
+  為明確的三種情形（`data_path == NULL`／`word.dat`+`tsi.dat` 未同時存在且
+  可讀／malloc 失敗），並記錄上面「為什麼不能用候選探測」的完整理由，避免
+  未來有人「簡化」回候選探測版本。
+- `docs/adr/0006-libchewing-rust-build-pipeline.md:32-33`：原文斷言「乾淨
+  checkout 組出的 :app APK 打包一個空的 assets/chewing/（getDataPath() 解壓
+  不出東西、bpmf_init() 在真機回 NULL）」——「解壓不出東西」查證屬實，但
+  「bpmf_init() 在真機回 NULL」在當時的程式碼下並不成立，已加註更正說明：
+  這句話現在之所以是真的，是因為本輪替 `bpmf_init()` 加了字典可用性檢查，
+  不是原文假設的理由。
+- `docs/devlog`（本檔）K3 段（第七階段，約行 734）：K3 的論證引用了「字典
+  缺失時 `bpmf_init()` 回 NULL」這句當時未查證的假話，已在該段落後方加一條
+  後續修正條目說明：K3 刪測試的結論本身不受影響（那條測試確實沒有 assert，
+  是嚴格子集，這點跟字典是否回 NULL 無關），但引用的理由是假的，特此更正，
+  不要再引用它。
+
+**紅綠實測**：新增實機測試
+`bpmfInit_withMissingDictionaryData_returnsNullHandle`（指向一個真實存在、
+可讀、但刻意不含 `word.dat`/`tsi.dat` 的空目錄，不是 `getDataPath()` 解壓
+出來的路徑）。
+
+- 紅：把 `file_is_readable()` 檢查暫時註解掉（保留其餘程式碼不變），單獨
+  跑這條測試：
+
+  ```
+  $ PATH="/opt/homebrew/opt/rustup/bin:$PATH" ./gradlew :decoder-native:connectedDebugAndroidTest \
+      -Pandroid.testInstrumentationRunnerArguments.class=com.bopomofobruce.decoder.nativ.BpmfNativeSmokeTest#bpmfInit_withMissingDictionaryData_returnsNullHandle
+  ...
+  bpmfInit_withMissingDictionaryData_returnsNullHandle[ASUS_AI2302 - 15] FAILED
+      java.lang.AssertionError: expected bpmf_init() to return NULL (0) when the
+      dictionary files are missing from data_path, got handle=532243513808
+      expected:<0> but was:<532243513808>
+  BUILD FAILED
+  ```
+
+- 還原檢查，同一條指令：`BUILD SUCCESSFUL`，測試綠。
+- 全 6 條 `BpmfNativeSmokeTest`（含新增的這條與 Q3 那條）同時執行：
+  `:decoder-native:connectedDebugAndroidTest` → `BUILD SUCCESSFUL`，
+  `Starting 6 tests on ASUS_AI2302 - 15` / `Finished 6 tests`，0 failure。
+
+（探測「用候選數判斷失敗」為什麼不可靠的原始證據——8 組音節在空目錄 mini
+字典 vs. 真字典下的候選數差距，供以後有人想重新引入類似做法時參考，不建議
+重試）：
+
+```
+hao3: mini(2)=[好, 郝] real(4)=[好, 郝, 㚼, 㝀]
+nüe4: mini(3)=[虐, 瘧, 謔] real(5)=[虐, 瘧, 謔, 逽, 硸]
+neng2: mini(2)=[膿, 能] real(6)=[能, 薴, 儜, 膿, 嬣, 癑]
+fou3: mini(2)=[否, 不] real(8)=[否, 缶, 殕, 缹, 鴀, 不, 缻, 雬]
+cuo4: mini(8)=[錯, 措, 挫, 銼, 撮, 剉, 厝, 昔] real(20)=[錯, 措, 挫, 銼, 撮, 剉, 厝, 莝, 侳, 剒, 蓌, 昔, 蕞, 庴, 棤, 碏, 縒, 莡, 逪, 襊]
+xue2: mini(3)=[學, 穴, 尋] real(16)=[學, 穴, 鷽, 觷, 踅, 燢, 澩, 壆, 尋, 嶨, 斈, 斅, 雤, 乴, 学, 㶅]
+niu3: mini(3)=[扭, 鈕, 紐] real(10)=[紐, 扭, 鈕, 忸, 狃, 炄, 莥, 杻, 沑, 靵]
+feng4: mini(6)=[奉, 俸, 諷, 縫, 風, 鳳] real(16)=[奉, 鳳, 俸, 諷, 縫, 賵, 焨, 風, 凤, 凨, 凬, 煈, 綘, 鳯, 鴌, 凮]
+```
+
+`BpmfNativeSmokeTest` 更新後的測試名稱（原 `bpmfInit_withExtractedDictionaryData_succeeds`
+現在名副其實：在方案 (A)（候選探測）下它幾乎不可能變紅，但現在的檔案存在性
+檢查下，指向真正解壓出來的目錄時檢查一定會通過，指向假路徑時會被
+`bpmfInit_withMissingDictionaryData_returnsNullHandle` 抓到）：
+
+1. `bpmfInit_withExtractedDictionaryData_succeeds`
+2. `bpmfInit_withMissingDictionaryData_returnsNullHandle`（新增）
+3. `bpmfInput_forNiHao_returnsNonEmptyCandidates`
+4. `bpmfInput_forUnmappedCharacters_failsClosedWithNoCandidates`
+5. `bpmfInput_forFirstToneSyllable_commitsPendingSyllableNotPreviousOne`
+6. `bpmfInput_calledRepeatedlyOnSameHandle_recyclesBufferAcrossOwnershipBranches`（新增，見 Q3）
+
+### Q2〔medium〕APK size 驗收的核算漏掉字典 assets，結論偏樂觀
+
+查證屬實，而且**實測結果比 finding 本身估計的還要糟很多**，原因是本輪過程
+中意外發現了一個獨立的、更嚴重的 packaging 問題（見下方「意外發現」）。
+
+**指令**：`PATH="/opt/homebrew/opt/rustup/bin:$PATH" ./gradlew :app:assembleRelease`
+→ `BUILD SUCCESSFUL in 1m 5s`（沒有設定 release signingConfig，產出的是
+`app-release-unsigned.apk`，未簽章但可以量測；沒有因為簽章設定跑不起來）。
+
+```
+$ unzip -v app/build/outputs/apk/release/app-release-unsigned.apk | grep -E "libbpmf|assets/chewing"
+33820008  Stored 33820008   0%  lib/arm64-v8a/libbpmf.so
+27650608  Stored 27650608   0%  lib/armeabi-v7a/libbpmf.so
+ 4506745  Defl:N  2002144  56%  assets/chewing/tsi.dat
+  283949  Defl:N    84286  70%  assets/chewing/word.dat
+```
+
+`.so` 是 `Stored`（0% 壓縮，AGP 8 `useLegacyPackaging=false` 下 `.so` 在 APK
+內本來就不壓縮，這點與 finding 的假設一致）；assets 是 `Deflate` 壓縮。
+
+**意外發現（不在 Q2 原本的範圍內，但直接影響 Q2 的答案，一併記錄）**：這兩個
+`libbpmf.so`（33.8 MB / 27.6 MB）跟 `decoder-native` 自己模組 release 建置
+剝除後的大小（`decoder-native/build/intermediates/stripped_native_libs/release/.../libbpmf.so`
+= arm64-v8a 3,428,992 bytes／armeabi-v7a 2,451,096 bytes，與 devlog 第二階段
+記錄的 3.43 MB / 2.45 MB 一致）對不起來，差了一個數量級。追下去發現：
+
+- `:app:mergeReleaseNativeLibs` 收的是各上游 project 模組自己
+  `mergeReleaseNativeLibs` 的輸出（project-to-project 依賴，直接抓
+  `decoder-native/build/intermediates/cxx/RelWithDebInfo/.../obj/arm64-v8a/libbpmf.so`
+  這個**未剝除符號**的 CMake 產物），不是 `decoder-native` 發布的
+  `.aar`（`decoder-native-release.aar` 裡的 `jni/` 其實是正確的小檔案，
+  3,428,624 / 2,450,888 bytes，核對過）。也就是說 `:app` 走的是
+  project-dependency 的路徑，繞過了 `decoder-native` 自己模組的剝除結果。
+- `:app` 自己也有一個 `stripReleaseDebugSymbols` 任務想剝除這些 prebuilt
+  `.so`，但 `--info` 下實測它對每一個外部 `.so`（不只 `libbpmf.so`，
+  `libc++_shared.so`、`libandroidx.graphics.path.so`、
+  `libdatastore_shared_counter.so` 全部一樣）都印
+  `Unable to strip library '...' due to missing strip tool for ABI
+  'arm64-v8a'. Packaging it as is.`——`:app` 模組本身沒有
+  `externalNativeBuild`，也沒有宣告 `android.ndkVersion`（只有
+  `decoder-native/build.gradle.kts:9` 宣告了
+  `ndkVersion = "27.2.12479018"`），AGP 因此在 `:app` 這一層找不到剝符號
+  用的 strip 工具，於是把**完全未剝除符號**的 `.so` 原封不動包進最終 APK。
+- 這是一個獨立於 Q2 本身、獨立於本輪四條 finding 的 packaging 缺陷（暫記為
+  **Q2-follow-up**，超出本輪授權範圍——task 只要求「跑
+  `:app:assembleRelease` 量真實 APK 大小」，沒有授權改 `app/build.gradle.kts`
+  修 packaging，本輪**沒有**動這個檔案，留給 owner 裁決；可能的修法方向是
+  在 `:app/build.gradle.kts` 也宣告 `android.ndkVersion`，讓 AGP 在 `:app`
+  層也找得到剝符號工具，但這條路徑未經實測，只是推測）。
+
+**核算結果（單位 bytes，1 MiB = 1,048,576 bytes）**：
+
+| 情境 | arm64-v8a 單 ABI 增量 | 兩 ABI 皆包（目前 `:app` 實際建置方式，未設 abi splits） |
+| --- | --- | --- |
+| **目前實際測到的（含上述 strip 缺陷，未剝符號）** | 33,820,008 + 2,086,430 = 35,906,438 ≈ **34.25 MiB** | 33,820,008 + 27,650,608 + 2,086,430 = 63,557,046 ≈ **60.62 MiB** |
+| 假設 strip 缺陷被修好（用 `decoder-native` 自己已驗證的剝除後大小回推） | 3,428,992 + 2,086,430 = 5,515,422 ≈ **5.26 MiB** | 3,428,992 + 2,451,096 + 2,086,430 = 7,966,518 ≈ **7.60 MiB** |
+
+（`2,086,430` = `tsi.dat`＋`word.dat` 在 APK 內壓縮後的合計大小，兩種情境
+共用同一份 assets 數字。）
+
+**結論**：DEVPLAN「APK size 增量 < 4 MB」**在任何一種情境下都沒有過**——
+就算假設性地修好 strip 缺陷、只算最樂觀的單 ABI arm64-v8a 增量，也要
+5.26 MiB；目前 `:app` 實際建置出來的未剝除符號版本則是 34.25 MiB（單
+ABI）／60.62 MiB（兩 ABI 都包）。這條驗收條目從「待驗證」改標為
+**「預估／實測未達標，需 owner 裁決」**——可能的取捨方向：(a) 精簡字典（例如
+只保留 `word.dat`，捨棄 `tsi.dat` 智慧選字，但這會改變功能）、(b) 改用
+Android App Bundle 依 ABI 切分（單一使用者裝置只下載一個 ABI 的 `.so`，
+可以把「兩 ABI 都包」的問題消掉，但單 ABI 增量本身仍有 5.26 MiB，門檻仍然
+不過）、(c) 修正 `:app` 的 strip 缺陷（把兩 ABI 都包的情境從 60.62 MiB 降回
+7.60 MiB，但仍未達 4 MB 門檻）、(d) 調整 DEVPLAN 門檻本身。這是四選一（或
+組合）的產品/工程取捨，不是這輪 fix-loop 該自行決定的範圍。
+
+### Q3〔medium〕沒有任何測試在同一個 handle 上呼叫兩次 `bpmf_input()`
+
+查證屬實：`BpmfNativeSmokeTest` 既有 4 條測試（第九階段之前）各自
+init → 最多一次 input → free，`bpmf_input()` 開頭
+`free(handle->last_candidates); handle->last_candidates = NULL;` 這個回收
+路徑從未被同一個 handle 的第二次呼叫觸發過。
+
+**改法**：新增 `bpmfInput_calledRepeatedlyOnSameHandle_recyclesBufferAcrossOwnershipBranches`，
+在同一個 handle 上連續呼叫三次，刻意交錯不同所有權分支：
+
+1. `"ㄋㄧˇㄏㄠˇ"` → 有候選（heap-owned `last_candidates` 首次配置）
+2. `"ㄏㄠˇx"` → fail-closed，0 候選（static `kEmptyCandidates` 分支；呼叫
+   開頭必須正確 free 掉第 1 次配置的 heap buffer，不能洩漏）
+3. `"ㄋㄧˇㄍㄨㄥ"` → 再次有候選（必須重新配置新的 heap 記憶體，不能重用或
+   對第 1 次的記憶體做出雙重釋放）
+
+同時斷言第 3 次的候選只含「工」而不含「好」「郝」，驗證 `chewing_Reset()`
+真的清乾淨了前面兩次呼叫的 composition 狀態。
+
+**紅綠實測**：暫時把 `bpmf_input()` 開頭的
+`handle->last_candidates = NULL;`（`free()` 呼叫本身保留）拿掉，模擬「回收
+順序寫錯」這種真實會發生的 bug（mid-loop 的 fail-closed 早退分支本來就不
+碰 `handle->last_candidates`，所以第 2 次呼叫 free 掉一塊記憶體後沒有把
+指標歸零，第 3 次呼叫開頭再次 free 同一個已釋放指標 = 雙重釋放）：
+
+```
+$ PATH="/opt/homebrew/opt/rustup/bin:$PATH" ./gradlew :decoder-native:connectedDebugAndroidTest \
+    -Pandroid.testInstrumentationRunnerArguments.class=com.bopomofobruce.decoder.nativ.BpmfNativeSmokeTest#bpmfInput_calledRepeatedlyOnSameHandle_recyclesBufferAcrossOwnershipBranches
+...
+bpmfInput_calledRepeatedlyOnSameHandle_recyclesBufferAcrossOwnershipBranches[ASUS_AI2302 - 15] FAILED
+...
+Test run failed to complete. Instrumentation run failed due to Process crashed.
+BUILD FAILED
+```
+
+（雙重釋放直接讓真機上的測試 process crash，比一般斷言失敗更有力地證明這條
+測試真的在盯著這個不變量。）還原 `handle->last_candidates = NULL;`，同一條
+指令：`BUILD SUCCESSFUL`，測試綠；隨後 6 條全跑一次同樣全綠（見 Q1 段落）。
+
+### Q4〔medium〕ADR-0006 有一個簡體字
+
+`docs/adr/0006-libchewing-rust-build-pipeline.md:36`「這個**决**定的直接後果
+是」的「决」已改為「決」。核對過本輪 diff 只有這一處簡體字（`grep -n
+'这\|决\|证\|后\|开\|应\|时\|说\|们\|来'` 之類常見簡體字掃過整份 ADR 與本輪
+改到的其他檔案，只有這一處命中，其餘皆為正體或非簡體誤判）。
+
+### 收尾指令與實機結果（第十階段）
+
+- `./gradlew :decoder-native:assembleDebug :decoder-native:assembleRelease
+  :decoder-native:testDebugUnitTest :decoder-native:ktfmtCheck
+  :decoder-native:lint` 同一次呼叫 → `BUILD SUCCESSFUL`
+- `./gradlew :app:assembleRelease` → `BUILD SUCCESSFUL`（見 Q2；未簽章，但
+  成功產出可量測的 `app-release-unsigned.apk`）
+- 實機 `R6AIB700988748X`（ASUS_AI2302, API 15）
+  `:decoder-native:connectedDebugAndroidTest` → `BUILD SUCCESSFUL`，
+  `BpmfNativeSmokeTest` **6/6 綠**（4 條沿用自前幾輪 + 本輪新增 2 條，Q1 與
+  Q3 的紅綠證據見上）
+- `git diff --stat`：動了 `decoder-native/cmake/include/bpmf.h`（Q1）、
+  `decoder-native/cmake/src/bpmf_wrapper.c`（Q1）、
+  `decoder-native/src/androidTest/kotlin/com/bopomofobruce/decoder/nativ/BpmfNativeSmokeTest.kt`（Q1、Q3）、
+  `docs/adr/0006-libchewing-rust-build-pipeline.md`（Q1、Q4）、本檔（Q1、Q2）
+  五個檔案；沒有動 `:common`、`docs/STATUS.md`、vendored libchewing，沒有
+  push。
+
+### 對 finding 本身的補充意見
+
+- Q1、Q3、Q4 查證皆屬實，沒有發現判斷錯誤之處。
+- **Q1 finding 建議的具體修法（候選探測）本身有一個未被 finding 發現的
+  缺陷**：libchewing 的內建 `mini.dat` 退回字典不是空的，對常見音節仍能
+  回傳好幾個候選字（見上方「8 組音節候選數對照」表），所以「有沒有候選」
+  這個判準測不出「有沒有退回 mini」。這不是說 finding 判斷錯誤——finding
+  對「`bpmf_init()` 目前的失敗契約是假的」這個核心判斷完全正確，只是它
+  建議的**修法**本身在實測後發現不成立，已改用檔案存在性檢查（見 Q1 段落
+  完整說明），並用本輪新增的測試把這個「修法本身有 bug」的過程也抓了下來
+  （先紅 [候選探測誤判為成功] → 換掉判準 → 綠）。
+- Q2 的核算比 finding 本身估計的更悲觀，原因不是 finding 錯，而是本輪
+  過程中另外發現了一個 finding 範圍外的 packaging 缺陷（`:app` 沒有剝除
+  符號，見上方「意外發現」）——finding 原本只點出「assets 沒算進核算」，
+  這點完全正確；「連 .so 本身在 :app 手上都沒剝符號」是本輪追查 Q2 時的
+  額外發現，一併記錄避免遺漏，但沒有在授權範圍外自行修正 `app/build.gradle.kts`。
+- Q3 沒有可補充的異議。
