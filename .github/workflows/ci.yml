@@ -25,10 +25,15 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      # recursive：decoder-native/cmake/libchewing 本身是 gitlink submodule，它底下的
+      # data/（libchewing-data 字典來源）又是巢狀 submodule。checkout@v4 預設不拉 submodule，
+      # 不加 recursive 會讓 CMakeLists.txt 看到空目錄直接 FATAL_ERROR（見 ADR-0006 K6）——
+      # 這一步沒修對，後面補 Rust target 也還是紅在這裡。
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          submodules: recursive
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -42,6 +47,13 @@ jobs:
         uses: android-actions/setup-android@v4
         with:
           packages: 'platforms;android-35 build-tools;35.0.0'
+
+      # decoder-native 現在靠 Corrosion 把 vendored chewing_capi crate 交叉編成
+      # Android staticlib（見 ADR-0006）；沒有這兩個 target，corrosion_import_crate()
+      # 找不到對應 target 的 Rust std，assembleDebug/assembleRelease 會失敗。submodule
+      # 修好之後才會真正卡到這一關（順序見 ADR-0006 K6）。
+      - name: Install Rust Android targets
+        run: rustup target add aarch64-linux-android armv7-linux-androideabi
 
       # 用官方 Gradle action 處理 wrapper / ~/.gradle/caches / ~/.gradle/wrapper
       # 三層 cache。Fork PR 把 cache 設成 read-only 防止 cache poisoning。

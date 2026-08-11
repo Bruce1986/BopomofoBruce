@@ -79,10 +79,16 @@ owner 已就此裁示（見 devlog 2026-08-10 段）：**採用 v0.12.0（commit
 - 實測 `assembleDebug`／`assembleRelease` 都成功：debug `libbpmf.so` 未最終最佳化（arm64-v8a 11.4MB／armeabi-v7a 7.7MB，AGP 已剝除偵錯符號後的數字），release profile（workspace `Cargo.toml` 的 `[profile.release]` 已開 `lto = true, opt-level = 3, panic = "abort"`）大幅縮小：arm64-v8a 3.43MB／armeabi-v7a 2.45MB（剝除後）。
 
 **負面**
-- 多一層工具鏈依賴：本機需要 rustup 管理的 Rust toolchain + `aarch64-linux-android`／`armv7-linux-androideabi` target（見下方「本機 Homebrew rustc/cargo 衝突」），CI（GitHub Actions）目前**還沒有**裝這些，這是本 ADR 留下的已知缺口，不在 W1-A 範圍內解決。
+- 多一層工具鏈依賴：本機需要 rustup 管理的 Rust toolchain + `aarch64-linux-android`／`armv7-linux-androideabi` target（見下方「本機 Homebrew rustc/cargo 衝突」）。CI（GitHub Actions）第七階段已補上 submodule checkout 與 `rustup target add`（見下方「開放問題 / 風險」K6），但 NDK/CMake 版本來源是否需要在 CI 明列尚未驗證，仍是已知缺口。
 - `chewing_capi` 依賴（`env_logger`／`der`／`regex` 等一串 crates.io 套件）比純 C 版多一層供應鏈面（crates.io 套件完整性），不像純 C 版只依賴 libc。
 - 字典資料改用「下載 prebuilt release」而非「自己跑 chewing-cli 從 `.src` 建」，意味著我們現在信任 upstream release 流程的完整性，而不是自己重新產生一份可完全稽核的建置鏈；若未來要換字典內容（例如加自訂詞），需要另外處理（跑 chewing-cli 或直接編輯 .dat，兩者都超出 W1-A 範圍）。
 - **（2026-08-11 第五階段新增）`:lint` 需要連網**：`package*Assets`/`Lint*` 兩類 task 現在都直接依附 `fetchChewingData`，這是修正下游 `:app` 拿不到字典（見 devlog E1）的必然代價——AGP 把 lint 的 model builder 無條件連到 `package*Assets`，這份 build script 無法切斷這條耦合，只能整批接受或整批拒絕。已刻意選擇「整批接受」：APK 正確性優先於 lint 可離線執行。離線環境跑 `:decoder-native:lint` 會失敗；CI 或斷網環境需注意這點。
+- **（2026-08-11 第七階段新增，K1）本 ADR 把 ADR-0001 的動態連結前提改成了靜態連結，授權論證沒有跟著重新過關**：`decoder-native/cmake/CMakeLists.txt` 的
+  `corrosion_import_crate()` 把 vendored `chewing_capi`（`[lib] crate-type = ["rlib", "staticlib"]`）整份編成 staticlib，`target_link_libraries` 直接靜態連進 `libbpmf.so`——這正是 ADR-0001 Consequences 段明講「未來若想靜態連結需重新評估授權與逆向工程條款」的那個情境，但本 ADR 決定走 Corrosion staticlib 路線時完全沒提 LGPL、也沒重新評估。libchewing 是 **LGPL-2.1**，ADR-0001 的合規論證原文是「License LGPL-2.1：**動態連結**（JNI 載 `.so`）合規」——前提已經被本 ADR 換掉，論證卻沒有跟著換。目前 repo 內也沒有任何 `NOTICE`／授權履行文件。這代表：
+  - 若要維持靜態連結（Corrosion staticlib），需要以 LGPL §6(a) 履行——附我方 wrapper（`bpmf_wrapper.c`／`CMakeLists.txt`）原始碼＋足以讓使用者 relink 成別版 libchewing 的物件檔／連結資訊，或者直接公開整個 repo 滿足「原始碼可得」；
+  - 或者放棄 Corrosion 的 staticlib 產物，改回 `chewing_capi` 產出 `cdylib`（`.so`）、JNI 動態載入，回到 ADR-0001 原本已核可的合規路徑。
+  - 這兩者本輪皆**不動手**——本輪 owner 裁示只記案，不改連結方式（見 devlog 第七階段）。
+  - **明確登記為 W4-D（上架）的 blocker**：在正式上架 F-Droid／自行分發 APK 前，必須先完成上述兩者其一，否則靜態連結+無 LGPL 履行文件會讓上架審查（或事後被舉發）直接卡關。
 
 **開放問題 / 風險**
 - **本機 Homebrew rustc/cargo 與 rustup 衝突**：這台機器（M1 MBA，本次 W1-A 施工機）`brew install rustup` 後，`/opt/homebrew/bin/cargo`／`rustc` 仍然指向 Homebrew 自己的 `rust` formula（1.96.1，keg-only 但先佔用了 `bin` 的 symlink），rustup 管理的工具鏈（1.97.1，含 Android target）被安裝到 `/opt/homebrew/opt/rustup/bin/`，不在預設 `PATH` 順位前面。**解法**：不動全域 Homebrew link 狀態（`brew unlink rust` 影響其他 session/專案，超出這包授權），改為每次跑 native build 時把 `/opt/homebrew/opt/rustup/bin` 加到 `PATH` 前面：
@@ -90,7 +96,11 @@ owner 已就此裁示（見 devlog 2026-08-10 段）：**採用 v0.12.0（commit
   PATH="/opt/homebrew/opt/rustup/bin:$PATH" ./gradlew :decoder-native:assembleDebug
   ```
   這條命令本身沒有寫死進任何 checked-in 檔案（`CMakeLists.txt`／`build.gradle.kts` 都沒有硬編這台機器的路徑），純粹是本機操作註記；CI 或其他機器要用不同 PATH 排法時不受影響。Corrosion 的 `FindRust.cmake` 本身有 `rustup which cargo`/`rustup which rustc` 的偵測邏輯，`rustup` 這個指令本身在這台機器並未被 Homebrew `rust` formula 蓋掉（只有 `cargo`/`rustc` 被蓋），所以只要 `PATH` 順位對，Corrosion 就能正確找到 rustup 管理的工具鏈。
-- **CI 尚未跟進**：`.github/workflows/` 目前沒有安裝 Rust Android target 的步驟；下一次碰 CI 設定時要一併補上（`rustup target add aarch64-linux-android armv7-linux-androideabi`），否則 CI 上的 `assembleDebug`/`assembleRelease` 會失敗。這是本 ADR 明確留下的 follow-up，不在 W1-A 範圍內動手。
+- **CI 尚未跟進（2026-08-11 第七階段更正，K6：原清單不完整，照做仍不會綠）**：`.github/workflows/ci.yml` 要補的不只是 Rust target，且**順序很重要**——只補 target 會先卡在更早一步的 submodule 問題，錯誤訊息是 CMake `FATAL_ERROR`，容易被誤讀成「ADR 的診斷錯了」。完整清單（依卡關順序）：
+  1. `actions/checkout@v4` 目前**沒有** `with: submodules:`，`decoder-native/cmake/libchewing`（gitlink）在 runner 上會是空目錄；`decoder-native/cmake/libchewing/data`（libchewing 自己的巢狀字典 submodule）也是同樣問題。`CMakeLists.txt` 的 `if(NOT EXISTS .../Cargo.toml)` 會在空目錄上直接 `FATAL_ERROR`，整條 pipeline 連 Rust toolchain 都還沒摸到就先炸——這步不修，後面補了 Rust target 也還是紅在這裡。要用 `submodules: recursive`（不是 `true`），因為要連 `data` 這層巢狀 submodule 一起拉。
+  2. `rustup target add aarch64-linux-android armv7-linux-androideabi`：submodule 修好之後才會真正卡到的下一關，Corrosion 的 `corrosion_import_crate()` 找不到對應 target 的 Rust std 會失敗。
+  3. 確認 NDK/CMake 版本來源：`decoder-native/build.gradle.kts` 目前 pin `ndkVersion = "27.2.12479018"`；CI 用的 `android-actions/setup-android@v4` 目前只裝 `platforms;android-35 build-tools;35.0.0`，沒有明確裝這個 NDK 版本——要嘛在 `setup-android` 的 `packages` 加上對應 `ndk;27.2.12479018`，要嘛確認 AGP 會用 `sdkmanager` 自動補裝（目前未驗證，是本 ADR 留下的開放問題，不在 W1-A 範圍內解決）。
+  第七階段已把前兩步實際補進 `.github/workflows/ci.yml`（`checkout@v4` 加 `submodules: recursive`；新增一個 `rustup target add aarch64-linux-android armv7-linux-androideabi` step，排在 checkout 之後、Android SDK 之後）。第三步（NDK/CMake 版本來源是否需要在 `setup-android` 的 `packages` 明列 `ndk;27.2.12479018`，還是 AGP 會自動用 `sdkmanager` 補裝）**未驗證**——本輪沒有 CI runner 可實跑驗證，是本 ADR 明確留下的 follow-up。
 - **重評觸發條件延續 ADR-0001**：若 upstream 停更或詞典 5 年沒更新，重新評估（fork 自維 vs 換方案），與 ADR-0001 原文一致，不因本 ADR 而放寬或收緊。
 
 ## Alternatives considered（替代方案）

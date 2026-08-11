@@ -148,17 +148,4 @@ class BpmfNativeSmokeTest {
             BpmfTestBridge.nativeTestFree(handle)
         }
     }
-
-    @Test
-    fun bpmfFree_isSafeToCallOnFreshHandleAndDoesNotCrash() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val dataPath = getDataPath(context)
-
-        val handle = BpmfTestBridge.nativeTestInit(dataPath)
-        BpmfTestBridge.nativeTestFree(handle)
-        // No assertion beyond "did not crash the process" — bpmf_free() double-free protection
-        // is exercised by not calling it twice here; the leak-detection side of "無 leak" is
-        // verified externally (see devlog) since neither LeakCanary nor a native memory
-        // sanitizer is wired into this module's connectedAndroidTest yet.
-    }
 }

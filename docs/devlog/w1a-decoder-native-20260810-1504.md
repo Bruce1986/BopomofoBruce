@@ -6,7 +6,11 @@
 - 狀態：**驗收標準全數通過（實機 connectedAndroidTest 綠、assembleDebug 兩
   ABI 皆產出 .so、ktfmtCheck/lint 綠）。細節與已知缺口見下方「第二階段」。
   第五階段（2026-08-11）修正下游 `:app` 拿不到字典等 5 條 finding，其中 E1 把
-  `lint` 需要連網從「已解決」降級為「已知取捨」，見該節。**
+  `lint` 需要連網從「已解決」降級為「已知取捨」，見該節。
+  第七階段（2026-08-11）修正 K1–K7 共 7 條 finding：K1（LGPL-2.1 靜態連結授權缺口）
+  owner 裁示只記案、登記為 W4-D 上架 blocker；K2/K4/K7 為文件修正；K3 刪除一條
+  無鑑別力測試；K5 補上字典版本化快取（含新測試證明會紅）；K6 實際修 CI
+  submodule+Rust target。見該節。**
 
 ## 環境確認（動工前）
 
@@ -256,6 +260,20 @@ ADR-0001 本體。詳細裁示內容見 lead 轉達訊息（本檔不重抄，�
   `enabled_dicts` 還包含 `chewing.dat`/`chewing-deleted.dat`，這兩個檔案
   不在 upstream 的 prebuilt "Generic" 資料包裡，`bpmf_init()` 已明確只傳
   `"word.dat,tsi.dat"` 避免載入不存在的檔案失敗）。
+- **（2026-08-11 第七階段新增，K1）LGPL-2.1 靜態連結尚未有合規履行**：ADR-0006
+  把建置管線換成 Corrosion，把 `chewing_capi` 整份靜態編進 `libbpmf.so`，這與
+  ADR-0001 原本核可的「動態連結」前提不同，本輪只補上文件誠實記錄（見
+  ADR-0001/ADR-0006），**未**改連結方式、**未**補 LGPL §6(a) 履行文件（wrapper
+  原始碼＋可 relink 物件檔，或依賴整個 repo 公開）。**登記為 W4-D（上架）的
+  blocker**：上架前必須先解決（改回動態連結，或補齊 LGPL 履行）。
+- **（2026-08-11 第七階段新增，K4）`bpmf_commit()` 的效果目前在公開 API 上不可觀測**：
+  `bpmf_input()` 每次呼叫開頭都會 `chewing_Reset()`，把 composition 與 commit
+  buffer 一併清空，而這 4 個 API 沒有任何讀出 commit buffer 的出口——所以呼叫
+  `bpmf_commit()` 之後，唯一能看到「被 commit 了什麼」的方式是呼叫端自己在
+  Kotlin/JNI 側累積 `bpmf_input()` 已經回傳過的候選字串，不是靠這個 C API 讀回來。
+  W2-A 若需要 libchewing 自己跨呼叫累積組句（例如多字詞的智慧選字），需要另外加
+  API（例如導出 `chewing_buffer_String()`），超出 W1-A 範圍。見 `bpmf.h` 的
+  `bpmf_commit()` KDoc。
 
 ### Commit
 
@@ -676,3 +694,143 @@ armeabi-v7a release: bpmf_commit / bpmf_free / bpmf_init / bpmf_input（4 個，
   驗證：`assembleDebug`/`assembleRelease`/`testDebugUnitTest`/`ktfmtCheck`/`lint` 全綠；
   實機 `R6AIB700988748X` `connectedAndroidTest` 5/5 綠（含 E2 一聲迴歸測試與 fail-closed
   negative test，後者走的正是本次修改的這條分支）。
+
+## 第七階段（Opus 級追蹤者第八輪 7 條 finding 修正輪，2026-08-11）
+
+以下 7 條 finding（K1–K7）逐條記錄處理方式與證據；本輪不動 `:common`、不動
+`docs/STATUS.md`、不動 vendored libchewing、不 push。
+
+- **K1〔high → owner 裁示降為只記案〕LGPL-2.1 靜態連結**：ADR-0006 把建置管線換成
+  Corrosion `corrosion_import_crate()`，把 vendored `chewing_capi`（LGPL-2.1，
+  `crate-type = ["rlib", "staticlib"]`）整份靜態編進 `libbpmf.so`，但 ADR-0001 的合規
+  論證前提原文是「動態連結（JNI 載 `.so`）」，且 ADR-0001 自己明講「未來若想靜態連結需
+  重新評估授權與逆向工程條款」——ADR-0006 翻掉了這個前提卻沒接手評估，全文未提 LGPL，
+  repo 也沒有 `NOTICE`。**owner 裁示本輪只記案、不改連結方式**：
+  - ADR-0006 Consequences 補了一段，明講 (a) 前提已被本 ADR 換成靜態連結、(b) 因此
+    ADR-0001 的授權論證在靜態連結下不再成立、需要 LGPL §6(a) 履行或改回動態連結、
+    (c) 明確登記為 **W4-D（上架）的 blocker**。
+  - ADR-0001 底部的 supersede 註記補上「授權前提部分亦受影響，詳見 ADR-0006」。
+  - devlog「已知缺口」補一條（見上方，第二階段那節）。
+  - 沒有動 `decoder-native/cmake/CMakeLists.txt` 或任何連結方式相關程式碼。
+
+- **K2〔medium〕`ChewingDataPath.kt` KDoc 與 `bpmf.h` 權限要求相反**：`bpmf.h:56`
+  已在第三階段（A2）改成「`data_path` 只需可讀」，但 `ChewingDataPath.kt` 頂部 KDoc
+  仍寫「needs a writable filesystem directory」——已改成「needs a readable filesystem
+  directory」，並補一句：`cacheDir` 之所以要可寫，是為了 [extractChewingData] 自己的
+  解壓縮（寫 `.tmp` + rename），不是 `bpmf_init()` 的要求（後者只讀不寫）。純文件修正，
+  不影響任何簽章或行為。
+
+- **K3〔medium〕不可能失敗的實機測試**：`bpmfFree_isSafeToCallOnFreshHandleAndDoesNotCrash`
+  沒有任何 assert，字典缺失時 `bpmf_init()` 回 NULL、`nativeTestFree(0)` 直接 no-op 也照樣
+  綠；它唯一可能紅的情境（原生層 abort）已被 `bpmfInit_withExtractedDictionaryData_succeeds`
+  完全涵蓋（那條測試的 `finally` 區塊本來就會呼叫 `nativeTestFree`）。已**刪除**這條測試
+  （finding 給的兩個選項之一：它是第一條的嚴格子集）。原本「double-free protection is
+  exercised by not calling it twice here」這句未查證的說法（`bpmf_free()` 其實完全沒有
+  double-free 保護）隨測試一起消失，但這個事實不能就此無人知曉——改為寫進 `bpmf.h` 的
+  `bpmf_free()` KDoc：明講不提供 double-free 保護、呼叫端必須自行保證只呼叫一次。
+
+- **K4〔medium〕`bpmf_commit()` 的效果一定會被下一次 `bpmf_input()` 丟棄，header 沒寫**：
+  查證屬實——`bpmf_wrapper.c` 的 `bpmf_input()` 每次開頭都無條件 `chewing_Reset(ctx)`，
+  而 `chewing_Reset` 會清空 composition 與 commit buffer；這 4 個 API 沒有任何讀出
+  commit buffer 的出口，所以 `bpmf_commit()` 的效果在公開 API 上永遠不可觀測。已在
+  `bpmf.h` 的 `bpmf_commit()` KDoc 明講這個限制，並在devlog「已知缺口」補一條
+  （W2-A 若需要跨呼叫累積組句，需要另加 API，例如導出 `chewing_buffer_String()`，
+  超出 W1-A 範圍）。純文件修正，不動 `bpmf_wrapper.c` 的行為。
+
+- **K5〔medium〕字典資料改版後永遠不會更新**：查證屬實——`extractChewingData` 只看
+  「最終檔名是否存在」，cacheDir 在 app 升級後會保留，`fetch_chewing_data.sh` 的
+  `VERSION` 之後必然會 bump，使用者升級後 cacheDir 仍是舊字典且沒有任何訊號。
+  **改法**：把快取目錄名綁上資料版本——新增 `CHEWING_DATA_VERSION = "2026.3.22"`
+  常數（KDoc 明講必須與 `fetch_chewing_data.sh` 的 `VERSION` 手動同步，兩者是不同語言、
+  沒有機制強制一致，這是人工不變量）；`getDataPath()` 改成解壓進
+  `cacheDir/chewing-$CHEWING_DATA_VERSION`，並在解壓前呼叫新增的
+  `deleteStaleChewingCacheDirs()`（比對 `chewing-` 前綴、刪掉除了當前版本以外的所有
+  同前綴目錄，best-effort、刪不掉就留著，不丟例外）。`extractChewingData()` 本身
+  （單元測試涵蓋的核心邏輯）未改，改的是它的生產呼叫端 `getDataPath()`；同步把
+  `extractChewingData` KDoc 的「Self-healing」限定清楚：只對「同一個 targetDir、
+  同樣的 asset 內容、process 被砍重試」成立，不對「asset 內容換了」成立。
+
+  **測試證明會紅**：在 `ChewingDataPathTest.kt` 新增 3 個測試（`getDataPath` 依版本
+  分流、刪除舊版本殘留目錄、不誤刪不相干目錄）。把 `ChewingDataPath.kt` 換回
+  `git show HEAD:...` 取出的修正前版本（`CHEWING_CACHE_DIR_NAME = "chewing"`，
+  無版本、無清理邏輯）跑 `:decoder-native:testDebugUnitTest --tests
+  ChewingDataPathTest --rerun`：
+
+  ```
+  ChewingDataPathTest > getDataPath deletes a stale chewing-* cache dir left by a previous app version() FAILED
+      org.opentest4j.AssertionFailedError at ChewingDataPathTest.kt:178
+  ChewingDataPathTest > getDataPath scopes the extraction directory to the current dictionary data version() FAILED
+      org.opentest4j.AssertionFailedError at ChewingDataPathTest.kt:160
+  9 tests completed, 2 failed
+  BUILD FAILED
+  ```
+
+  換回修正後版本，同一條指令 `--rerun`：`9 tests completed, 0 failed`，`BUILD
+  SUCCESSFUL`。（測試名稱裡原本含 `*` 字元觸發 ktfmt 的 Windows 檔名警告，已改名
+  避開，不影響斷言內容。）
+
+- **K6〔medium〕ADR 的 CI follow-up 清單不完整，照做仍不會綠**：查證屬實——`ci.yml`
+  的 `actions/checkout@v4` 沒有 `submodules:`，`decoder-native/cmake/libchewing`
+  （gitlink）與它自己巢狀的 `data` submodule 在 runner 上都會是空目錄，
+  `CMakeLists.txt` 的 `if(NOT EXISTS .../Cargo.toml)` 會先 `FATAL_ERROR`，根本走不到
+  Rust toolchain——只補 `rustup target add` 不會讓 CI 變綠，還會讓人誤以為 ADR 診斷錯了
+  （因為錯誤訊息是 CMake FATAL_ERROR，不是 Rust 相關訊息）。已實際修 `ci.yml`：
+  1. `checkout@v4` 加 `submodules: recursive`（recursive 是因為要連 `data` 這層巢狀
+     submodule 一起拉，不是只拉第一層）。
+  2. 新增一個獨立 step `rustup target add aarch64-linux-android
+     armv7-linux-androideabi`，排在 checkout 與 Android SDK 之後、`assembleDebug`
+     之前。
+  3. NDK/CMake 版本來源（`decoder-native/build.gradle.kts` pin
+     `ndkVersion = "27.2.12479018"`，但 CI 的 `android-actions/setup-android@v4`
+     目前 `packages` 只列 `platforms;android-35 build-tools;35.0.0`，沒有明確裝這個
+     NDK 版本）**沒有 CI runner 可實跑驗證**，仍留為開放問題，寫進 ADR-0006。
+  已用 `python3 -c "import yaml; yaml.safe_load(...)"` 驗證 `ci.yml` 是合法 YAML；
+  沒有 GitHub Actions runner 可實際跑一次驗證 submodule+target 修正後真的會綠，這點
+  誠實記錄為未驗證。ADR-0006 的「開放問題 / 風險」與 Consequences 負面段都已同步
+  改寫，不再宣稱「還沒有」（已補上前兩步，第三步待驗證）。
+
+- **K7〔medium〕所有權契約說「一律 heap-allocated」，但 `kEmptyCandidates` 是
+  `.rodata`**：查證屬實——`bpmf.h` 寫「writes a single heap-allocated ... string」
+  「stays valid until the NEXT bpmf_input() call」，但零候選路徑（`opaque_handle`/
+  `zhuyin` 為 NULL、字元不在映射表、以及結尾 `strdup("")` OOM 三處）交出去的都是
+  `bpmf_wrapper.c` 的 `static const char kEmptyCandidates[] = ""`：不是 heap、寫入會
+  SIGSEGV，有效期是整個 process 而非「到下一次呼叫」。**選擇文件修正（而非讓零候選
+  也回傳 handle 擁有的 heap `""`）**：理由是 `opaque_handle == NULL` 這條路徑本來就沒有
+  handle 可以擁有任何字串——呼叫端傳 NULL handle 進來時，函式在觸碰 `handle` 之前就要
+  回傳，所以「handle-owned 空字串」這個方案在這條路徑上原理上就不成立，勢必還是要有一個
+  不屬於任何 handle 的 process-lifetime 空字串存在；與其只解決「count==0 且 handle 非
+  NULL」這一種子情況、留下 handle==NULL 這條路徑繼續用 static 字串（文件反而要拆更細的
+  三種情形），不如把兩種情形講清楚更簡單、也更誠實。已把 `bpmf.h` 的 ownership 段落
+  改寫成：回傳值一律唯讀（不得寫入、不得 free，兩種情形共同成立）；候選數 > 0 時是
+  handle 擁有的 heap 字串、有效期到下一次呼叫或 `bpmf_free()`；候選數 == 0 時可能是
+  process 生命週期的 `static const` 字串，不保證屬於該 handle，寫入是未定義行為
+  （多數平台會 SIGSEGV，但不可依賴這個現象本身）。沒有動 `bpmf_wrapper.c` 的行為。
+
+### 收尾指令與實機結果
+
+- `:decoder-native:assembleDebug` → `BUILD SUCCESSFUL`
+- `:decoder-native:assembleRelease` → `BUILD SUCCESSFUL`
+- `:decoder-native:testDebugUnitTest` → `BUILD SUCCESSFUL`（`ChewingDataPathTest`
+  9/9 綠，含新增的 3 個 K5 測試）
+- `:decoder-native:ktfmtCheck` → 第一輪抓到 `ChewingDataPath.kt` 格式不符，跑
+  `ktfmtFormat` 後 `BUILD SUCCESSFUL`
+- `:decoder-native:lint` → `BUILD SUCCESSFUL`（需連網，見 E1 取捨，本輪未變）
+- 上述四項＋`assembleRelease` 合併在同一次 `./gradlew` 呼叫也核對過一次全綠
+- 實機 `R6AIB700988748X`（ASUS_AI2302, API 15）`:decoder-native:connectedAndroidTest`
+  → `BUILD SUCCESSFUL`，`BpmfNativeSmokeTest` **4/4 綠**（K3 刪掉一條後從 5 條變 4
+  條：`bpmfInit_withExtractedDictionaryData_succeeds`、
+  `bpmfInput_forNiHao_returnsNonEmptyCandidates`、
+  `bpmfInput_forUnmappedCharacters_failsClosedWithNoCandidates`、
+  `bpmfInput_forFirstToneSyllable_commitsPendingSyllableNotPreviousOne`）。
+
+### 對 finding 本身的補充意見
+
+- 沒有發現 K1–K7 有判斷錯誤之處。
+- K1 是本輪唯一一條「查證屬實但不動程式碼」的 finding——owner 明確裁示只記案，這不代表
+  finding 的技術判斷有誤，只是修法（改回動態連結 vs. 補 LGPL 履行文件）需要 owner 對
+  上架時程與履行成本做取捨，不是這輪 fix-loop 該自行決定的範圍。
+- K6 提醒「順序很重要」這點在實作時確實驗證到：`ci.yml` 現有的
+  `android-actions/setup-android@v4` 只管 SDK/build-tools，不管 submodule；若沒注意
+  順序，容易誤以為「補了 target 就夠」，事實上 submodule 沒修對，target 修了也沒用。
+- K7 的兩個選項都合理，選文件修正主要是「handle==NULL 這條路徑本來就不可能有
+  handle-owned 字串」這個結構性理由，不是嫌 heap-owned 空字串方案技術上做不到。

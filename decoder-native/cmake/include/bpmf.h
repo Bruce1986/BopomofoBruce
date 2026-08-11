@@ -17,18 +17,38 @@
  * Ownership / memory contract:
  *   - bpmf_init() returns an opaque handle owned by the caller. Pass it to
  *     every subsequent call; release it exactly once with bpmf_free().
- *   - bpmf_input() writes a single heap-allocated, NUL-terminated UTF-8
- *     string into *candidates_out: candidate phrases joined by '\n', in
- *     libchewing's candidate order (best first). The returned pointer is
- *     owned by the handle and stays valid until the NEXT bpmf_input() call
- *     on the same handle, or until bpmf_free() — the caller must NOT free()
- *     it directly (mirrors how libchewing itself owns `chewing_cand_String`
- *     output; avoids a 5th "free string" function the DEVPLAN spec doesn't
- *     ask for). If there are zero candidates, *candidates_out is set to an
- *     empty string ("") and 0 is returned.
+ *   - bpmf_input() writes a NUL-terminated UTF-8 string into *candidates_out
+ *     (candidate phrases joined by '\n', in libchewing's candidate order,
+ *     best first). In EVERY case the caller must treat the returned pointer
+ *     as READ-ONLY — never write through it, never free() it directly
+ *     (mirrors how libchewing itself owns `chewing_cand_String` output;
+ *     avoids a 5th "free string" function the DEVPLAN spec doesn't ask
+ *     for). Its allocation and lifetime differ by how many candidates were
+ *     returned, and both matter to a caller planning any in-place
+ *     modification (e.g. splitting the '\n'-joined string into substrings
+ *     by writing NUL bytes over the separators):
+ *       - Count > 0: the pointer is a genuinely heap-allocated string owned
+ *         by the handle. It stays valid until the NEXT bpmf_input() call on
+ *         the same handle, or until bpmf_free() on that handle — whichever
+ *         comes first.
+ *       - Count == 0: *candidates_out is set to an empty string (""), but
+ *         that pointer is NOT guaranteed to be heap-allocated or
+ *         handle-owned — it may instead point at a `static const`,
+ *         process-lifetime string shared across ALL handles and ALL calls
+ *         (see bpmf_wrapper.c's kEmptyCandidates). Writing to it (even a
+ *         single NUL byte, e.g. an in-place '\n'-splitting routine that
+ *         doesn't special-case the empty string) is undefined behaviour —
+ *         on most platforms it will SIGSEGV because `.rodata` is
+ *         non-writable, but must not be relied upon; its "lifetime" is
+ *         effectively the whole process, not "until the next bpmf_input()
+ *         call", because it may not belong to this handle at all.
+ *     The one guarantee that holds identically in both cases: the caller
+ *     must never free() the returned pointer, in either case.
  *   - bpmf_commit() selects candidate `index` (0-based, matching the order
  *     bpmf_input returned) and commits it into libchewing's internal
- *     composition state, then closes the candidate window.
+ *     composition state, then closes the candidate window. See its own doc
+ *     comment below for a known limitation on observing the committed
+ *     result.
  */
 
 #ifndef BOPOMOFOBRUCE_BPMF_H
@@ -93,10 +113,38 @@ void* bpmf_init(const char* data_path);
  */
 size_t bpmf_input(void* handle, const char* zhuyin, char** candidates_out);
 
-/** Commits the candidate at `index` (0-based, from the last bpmf_input()). */
+/**
+ * Commits the candidate at `index` (0-based, from the last bpmf_input()).
+ *
+ * KNOWN LIMITATION (see devlog "已知缺口"): this call's effect is currently
+ * unobservable through this public API. bpmf_input() unconditionally calls
+ * chewing_Reset() at the top of every invocation, and chewing_Reset() clears
+ * both the composition buffer AND libchewing's internal commit buffer
+ * (editor.clear()) — so whatever bpmf_commit() just committed is discarded
+ * the moment the NEXT bpmf_input() call runs, and there is no function in
+ * this 4-function API (bpmf_init/bpmf_input/bpmf_commit/bpmf_free) that
+ * reads the commit buffer back out. In other words: calling bpmf_commit()
+ * closes the candidate window and advances libchewing's internal state, but
+ * nothing the caller can observe today reflects "this candidate was
+ * committed" — a caller that wants the committed text itself must
+ * accumulate it on the Kotlin/JNI side from the candidate string
+ * bpmf_input() already returned, not by reading it back through this C API.
+ * If W2-A needs libchewing itself to accumulate committed text across
+ * bpmf_input() calls (e.g. for multi-syllable phrase composition), that
+ * needs a new API (e.g. exposing chewing_buffer_String()) — out of scope
+ * for W1-A.
+ */
 void bpmf_commit(void* handle, size_t index);
 
-/** Releases a handle created by bpmf_init(). Safe to call with NULL. */
+/**
+ * Releases a handle created by bpmf_init(). Safe to call with NULL.
+ *
+ * Does NOT protect against double-free: calling this twice on the same
+ * non-NULL handle is undefined behaviour (use-after-free on the second
+ * call), same as calling free() twice on the same pointer. The caller must
+ * guarantee bpmf_free() is called exactly once per handle returned by a
+ * successful bpmf_init().
+ */
 void bpmf_free(void* handle);
 
 #ifdef __cplusplus
