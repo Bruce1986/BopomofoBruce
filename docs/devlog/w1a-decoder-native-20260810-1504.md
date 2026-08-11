@@ -10,7 +10,12 @@
   第七階段（2026-08-11）修正 K1–K7 共 7 條 finding：K1（LGPL-2.1 靜態連結授權缺口）
   owner 裁示只記案、登記為 W4-D 上架 blocker；K2/K4/K7 為文件修正；K3 刪除一條
   無鑑別力測試；K5 補上字典版本化快取（含新測試證明會紅）；K6 實際修 CI
-  submodule+Rust target。見該節。**
+  submodule+Rust target。見該節。
+  第八階段（2026-08-11）修正第九輪 2 條 finding：N1 改寫 `kEmptyCandidates` 註解
+  （第三次修正，改成不隨分支數量維護的表述）；N2 新增
+  `verifyChewingDataVersionSync` Gradle task 守門
+  `CHEWING_DATA_VERSION`/`fetch_chewing_data.sh` 的 `VERSION` 一致性（含紅綠實測、
+  `--dry-run` 確認不吃網路）。見該節。**
 
 ## 環境確認（動工前）
 
@@ -834,3 +839,80 @@ armeabi-v7a release: bpmf_commit / bpmf_free / bpmf_init / bpmf_input（4 個，
   順序，容易誤以為「補了 target 就夠」，事實上 submodule 沒修對，target 修了也沒用。
 - K7 的兩個選項都合理，選文件修正主要是「handle==NULL 這條路徑本來就不可能有
   handle-owned 字串」這個結構性理由，不是嫌 heap-owned 空字串方案技術上做不到。
+
+## 第八階段（第九輪審查 2 條 finding 修正輪，2026-08-11，commit `3a6de26` 之後）
+
+- **N1〔medium〕`kEmptyCandidates` 註解「EVERY path」仍不實**：查證屬實——
+  `bpmf_wrapper.c` 的 `kEmptyCandidates` 註解只涵蓋三條早退路徑（NULL handle/zhuyin
+  預檢、映射表外字元的 fail-closed 分支、結尾 `strdup("")` OOM），但漏掉第四條
+  count==0 的路徑：`bpmf_input()` 尾段走到 `chewing_cand_open(ctx)` 失敗（例如只打
+  聲母沒打韻母的半個音節）或成功但 `chewing_cand_hasNext` 一開始就 false（字典真的
+  查無候選）時，`count` 仍是 0，但 `*candidates_out`／`handle->last_candidates`
+  指向的是尾段 `strdup("")` 配出來的 **heap** 字串 `joined`，不是這個 static
+  `kEmptyCandidates`——這正好與該註解自己講的「NOT stored into
+  handle->last_candidates」互相矛盾。已改寫 `decoder-native/cmake/src/bpmf_wrapper.c`
+  第 69–96 行（原第 69–84 行）的註解，不再宣稱「count==0 必為 static」，改成明確拆成
+  兩種情形：(1) 早退路徑（三條）→ static `kEmptyCandidates`；(2) 候選收集流程正常跑完
+  但結果為零（`chewing_cand_open` 失敗或字典查無候選）→ heap 的 `strdup("")`。註解裡
+  也記下這是同一段話第三次被抓到不準確（先前是「兩種情況」→「EVERY path」），這次改
+  成不需要隨分支數量維護的表述方式（按事件類別分兩類，而非窮舉分支）。**沒有動
+  `bpmf_wrapper.c` 的行為**，純文件修正。
+
+- **N2〔medium〕`CHEWING_DATA_VERSION` 與 `fetch_chewing_data.sh` 的 `VERSION` 零守
+  門**：查證屬實——K5 的 KDoc 誠實承認「There is no automated check tying these two
+  together」，但兩邊各寫一個版本字串、build 時完全不比對，一旦其中一邊漂移，CI 仍全
+  綠（`ChewingDataPathTest` 三條 K5 測試都是 mock `AssetManager`，讀不到真正的腳本檔
+  案，抓不到跨檔案漂移）。已在 `decoder-native/build.gradle.kts` 新增
+  `verifyChewingDataVersionSync` task：用 regex 分別從 `ChewingDataPath.kt` 抓
+  `CHEWING_DATA_VERSION`、從 `scripts/fetch_chewing_data.sh` 抓 `VERSION=`，不一致
+  就 `throw GradleException`。這個 task 不需要網路（純讀本地兩個檔案），刻意只掛在
+  `testDebugUnitTest`/`testReleaseUnitTest`（不是 `preBuild`/`assemble*`），避免違反
+  ADR-0006/devlog A4「單元測試必須可離線跑」的規則，同時保留掛在
+  `assemble*`/`connected*`/`install*` 上的 `fetchChewingData`（真正下載）維持不動。
+  **已實跑證明會紅再證明會綠**：把 `ChewingDataPath.kt` 的 `CHEWING_DATA_VERSION` 暫改
+  成 `"2026.3.23"`，`./gradlew :decoder-native:verifyChewingDataVersionSync --rerun`
+  回報
+
+  ```
+  > Task :decoder-native:verifyChewingDataVersionSync FAILED
+  ...
+  > CHEWING_DATA_VERSION (ChewingDataPath.kt) = "2026.3.23" but VERSION
+    (fetch_chewing_data.sh) = "2026.3.22" — these must be bumped together (see the
+    KDoc on CHEWING_DATA_VERSION in ChewingDataPath.kt). Update whichever one is
+    stale.
+
+  FAILURE: Build failed with an exception.
+  ```
+
+  還原後同一條指令 `BUILD SUCCESSFUL`。另外用
+  `./gradlew :decoder-native:testDebugUnitTest --dry-run` 確認任務圖裡有
+  `:decoder-native:verifyChewingDataVersionSync SKIPPED`、但**沒有**
+  `:decoder-native:fetchChewingData`——`testDebugUnitTest` 依舊不吃網路依賴。
+
+### 收尾指令與實機結果（第八階段）
+
+- `:decoder-native:testDebugUnitTest --dry-run` → 含
+  `verifyChewingDataVersionSync`、不含 `fetchChewingData`（已貼在上方 N2）
+- `:decoder-native:verifyChewingDataVersionSync --rerun`（人為改壞版本號）→
+  `FAILED`，訊息如上；還原後 → `BUILD SUCCESSFUL`
+- `:decoder-native:testDebugUnitTest :decoder-native:ktfmtCheck :decoder-native:lint`
+  三者同一次 `./gradlew` 呼叫 → `BUILD SUCCESSFUL`
+- `:decoder-native:assembleDebug :decoder-native:assembleRelease` 同一次
+  `./gradlew` 呼叫 → `BUILD SUCCESSFUL`
+- 實機 `R6AIB700988748X`（ASUS_AI2302, API 15）`:decoder-native:connectedAndroidTest`
+  → `BUILD SUCCESSFUL`，4/4 測試綠（同第七階段那 4 條，本輪未動這些測試）
+- `git diff --stat`：只動了 `decoder-native/build.gradle.kts`（N2）與
+  `decoder-native/cmake/src/bpmf_wrapper.c`（N1）兩個檔案
+
+### 對 finding 本身的補充意見
+
+- N1、N2 皆查證屬實，沒有發現判斷錯誤之處。
+- N1 特別值得記一筆：這是同一段註解第三次被抓不準確，說明「窮舉目前涵蓋哪些分支」這
+  種措辭本身就是脆弱的維護負擔——這次改成按「早退 vs. 正常流程跑完但零結果」兩個穩定
+  的事件類別分類，而不是列點式窮舉分支，理論上不會再隨新增分支而過期（除非未來出現
+  第三類事件，那本來就該重新審視）。
+- N2 的守門刻意選在 `testDebugUnitTest`/`testReleaseUnitTest` 而非 `check` 或
+  `preBuild`，是因為 `preBuild` 對每個 variant 的任務圖都會跑（包含這兩個純 JVM 單元
+  測試任務本身），把守門掛在 `preBuild` 反而是同一件事繞了一圈；直接掛在兩個測試
+  task 上更直白，且已用 `--dry-run` 證明不會意外把 `fetchChewingData` 的網路依賴帶進
+  來。

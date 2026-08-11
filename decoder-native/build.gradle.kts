@@ -170,3 +170,61 @@ tasks
             it.name.startsWith("install")
     }
     .configureEach { dependsOn(fetchChewingData) }
+
+// K5's CHEWING_DATA_VERSION (Kotlin constant in ChewingDataPath.kt) and this script's own
+// VERSION (scripts/fetch_chewing_data.sh) are a hand-maintained invariant by design — see the
+// KDoc on CHEWING_DATA_VERSION, which is honest that "there is no automated check tying these
+// two together". This task IS that check: a pure regex-extract-and-compare over the two source
+// files already on disk, no network involved, so bumping one without the other now fails the
+// build instead of silently shipping a cache-dir name that never matches its own asset content.
+val verifyChewingDataVersionSync by tasks.registering {
+    description =
+        "Fails the build if CHEWING_DATA_VERSION (ChewingDataPath.kt) and VERSION " +
+            "(fetch_chewing_data.sh) have drifted apart."
+    val kotlinFile =
+        layout.projectDirectory.file(
+            "src/main/kotlin/com/bopomofobruce/decoder/nativ/ChewingDataPath.kt"
+        )
+    val shellFile = layout.projectDirectory.file("scripts/fetch_chewing_data.sh")
+    inputs.file(kotlinFile)
+    inputs.file(shellFile)
+
+    doLast {
+        val kotlinText = kotlinFile.asFile.readText()
+        val shellText = shellFile.asFile.readText()
+
+        val kotlinMatch =
+            Regex("""private const val CHEWING_DATA_VERSION = "([^"]+)"""").find(kotlinText)
+                ?: throw GradleException(
+                    "verifyChewingDataVersionSync: could not find CHEWING_DATA_VERSION in " +
+                        "${kotlinFile.asFile}"
+                )
+        val shellMatch =
+            Regex("""^VERSION="([^"]+)"""", RegexOption.MULTILINE).find(shellText)
+                ?: throw GradleException(
+                    "verifyChewingDataVersionSync: could not find VERSION= in ${shellFile.asFile}"
+                )
+
+        val kotlinVersion = kotlinMatch.groupValues[1]
+        val shellVersion = shellMatch.groupValues[1]
+
+        if (kotlinVersion != shellVersion) {
+            throw GradleException(
+                "CHEWING_DATA_VERSION (ChewingDataPath.kt) = \"$kotlinVersion\" but VERSION " +
+                    "(fetch_chewing_data.sh) = \"$shellVersion\" — these must be bumped " +
+                    "together (see the KDoc on CHEWING_DATA_VERSION in ChewingDataPath.kt). " +
+                    "Update whichever one is stale."
+            )
+        }
+    }
+}
+
+// Wired onto testDebugUnitTest/testReleaseUnitTest specifically (NOT preBuild/assemble*):
+// verifyChewingDataVersionSync needs no network (pure text regex over two files already on
+// disk), so attaching it here does not violate the "unit tests run offline from a clean
+// checkout" rule documented above fetchChewingData (ADR-0006 / devlog A4) — it still runs on
+// every unit-test invocation, which is frequent enough to catch drift promptly, without pulling
+// fetchChewingData's network dependency onto testDebugUnitTest's task graph.
+tasks
+    .matching { it.name == "testDebugUnitTest" || it.name == "testReleaseUnitTest" }
+    .configureEach { dependsOn(verifyChewingDataVersionSync) }
