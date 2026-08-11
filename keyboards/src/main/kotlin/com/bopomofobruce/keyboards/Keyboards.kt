@@ -47,7 +47,13 @@ object Keyboards {
 
     /**
      * 純數字（計算機式 3 欄）。`.` 鍵的 longPress 掛 `-`（F2），供 `TYPE_NUMBER_FLAG_SIGNED`
-     * 欄位（溫度、價差、偏移量）輸入負數；本頁沒有切頁鍵，是唯一終端頁。
+     * 欄位（溫度、價差、偏移量）輸入負數；本頁沒有切頁鍵（終端頁）。本模組的終端頁為 [numericStandard]、[phoneDialpad]、[datetimeStandard]
+     * 這三份（L1，round-11 審查——之前 `numericStandard` 與 `phoneDialpad` 的 KDoc 各自寫「是唯一終端頁」，兩個「唯一」互相矛盾，
+     * 且漏了同樣不含切頁鍵的 `datetimeStandard`）。`:ime` 可直接從資料本身判定終端頁，不必依賴這份 KDoc：一份鍵盤是終端頁，若且唯若它的 rows 內所有
+     * [com.bopomofobruce.common.KeyData.action]（含 `longPress`）都不是
+     * [com.bopomofobruce.common.KeyAction.SymbolToggle] 或
+     * [com.bopomofobruce.common.KeyAction.LanguageToggle]。[ToggleFreeKeyboardsTest]
+     * 釘住「這三份且僅這三份」這個性質。
      */
     val numericStandard: KeyboardDef by lazy {
         KeyboardLoader.loadFromResource("keyboards/numeric_standard.json")
@@ -79,7 +85,8 @@ object Keyboards {
 
     /**
      * 電話撥號鍵盤。`+` 鍵的 longPress 掛 `-`、`#` 鍵的 longPress 掛 `,`（撥號暫停）（F3），供台灣常見
-     * 「02-2712-3456」「0912-345-678」電話號碼分隔符輸入；本頁沒有切頁鍵，是唯一終端頁。
+     * 「02-2712-3456」「0912-345-678」電話號碼分隔符輸入；本頁沒有切頁鍵（終端頁）。終端頁清單與判定 方式見 [numericStandard]
+     * KDoc（L1，round-11 審查）。
      */
     val phoneDialpad: KeyboardDef by lazy {
         KeyboardLoader.loadFromResource("keyboards/phone_dialpad.json")
@@ -95,7 +102,10 @@ object Keyboards {
         KeyboardLoader.loadFromResource("keyboards/url_qwerty.json")
     }
 
-    /** 日期／時間輸入：數字 + 常用分隔符（`/` `:` `-`）。 */
+    /**
+     * 日期／時間輸入：數字 + 常用分隔符（`/` `:` `-`）。本頁沒有切頁鍵（終端頁）。終端頁清單與判定方式見 [numericStandard] KDoc（L1，round-11
+     * 審查——本頁先前完全沒被記載為終端頁）。
+     */
     val datetimeStandard: KeyboardDef by lazy {
         KeyboardLoader.loadFromResource("keyboards/datetime_standard.json")
     }

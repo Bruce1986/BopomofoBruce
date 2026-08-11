@@ -113,8 +113,32 @@ commit）之後沒有再被修改過，直到本輪。
 
 ## F1 label 改動範圍核實
 
-`grep -rn "symbol_toggle"` 確認 `symbol_toggle` action 只出現在 5 個檔案：
-`zhuyin_4x10_portrait.json`（label「符號」）、`zhuyin_4x10_landscape.json`（label「符號」）、
-`symbol_standard.json`（該頁本身自己頁內無此鍵，實際上是另外三份的目的地）、`url_qwerty.json`、
-`password_qwerty.json`（後兩者原本 label「123」，本輪改為「符號」）——改動後全模組同一個 action
-的標籤一致。
+**round-11 tracer 審查（L2）更正**：本節原文自稱「已用 grep 核實」，但內容有兩處錯誤——(1)
+`symbol_standard.json` 當時被列為「頁內無此鍵」，但實際上 round 5 當下 `symbol_standard.json`
+控制列的「ABC」鍵掛的正是 `symbol_toggle`（J1，round-11 之後才改成 `language_toggle`），所以當時
+的正確檔案數是 5 個、不是「4 份 + 1 個目的地」；(2) 「改動後全模組同一個 action 的標籤一致」這句
+結論從未成立過——`url_qwerty.json`／`password_qwerty.json` 標成「符號」，`zhuyin_4x10_*.json`
+標成「符號」沒錯，但這只是巧合；`symbol_toggle` 的標籤此後又被改為「全形」（見 `Keyboards.kt`
+`passwordQwerty` 的 F1 落差說明），標籤從來不是靠這個 action 本身固定的。**這是「把未查證推測寫進永久紀錄」
+在本專案的第三次**（前兩次見 `W1-C-keyboards-20260810-1644.md` C10 段落與其 F4 補正）——原因同樣
+是寫下當下觀察到的字面事實，卻用了一句更強的、沒有實際驗證過的結論句去總結它。
+
+以下改以 J1 修正後的現況（HEAD `b952131`）重新 grep 核對：
+
+`grep -rn '"type": "symbol_toggle"'` 確認 `symbol_toggle` action 目前出現在 4 個檔案，各自的 label：
+- `password_qwerty.json` — label「全形」
+- `url_qwerty.json` — label「全形」
+- `zhuyin_4x10_portrait.json` — label「符號」
+- `zhuyin_4x10_landscape.json` — label「符號」
+
+`symbol_standard.json` 已不含 `symbol_toggle`（J1 之後改掛 `language_toggle`，label「ABC」）。
+
+`grep -rn '"type": "language_toggle"'` 確認 `language_toggle` action 出現在 3 個檔案：
+`symbol_standard.json`（label「ABC」）、`zhuyin_4x10_portrait.json`（label「英數」）、
+`zhuyin_4x10_landscape.json`（label「英數」）。
+
+結論改寫：**同一個 action 依所在頁面帶不同標籤是常態，不是需要收斂成一致的目標**——
+`symbol_toggle` 在密碼／URL 頁標「全形」、在注音頁標「符號」；`language_toggle` 在符號頁標
+「ABC」、在注音頁標「英數」。標籤要傳達的是「按下去去哪、對使用者有什麼意義」，語意由 `:ime`
+依當前鍵盤決定，不是 action 本身的固定屬性。`ToggleKeyLabelActionConsistencyTest`（J1）已經逐一
+釘住這些 (label, action) 配對，比這裡的散文更能防止標籤漂移。
