@@ -70,8 +70,12 @@ internal fun contrastRatio(a: UInt, b: UInt): Double {
  *
  * @param candidates 依優先序排列的候選色（ARGB [UInt]），不可為空。
  * @param textPartner 候選色要承載的文字顏色（`keyText` 或 `candidateText`）。
- * @param separationReferences 候選色需要與之區分開來的底色（`keyAccent` 傳 `listOf(keyFill,
- *   background)`；`candidateHighlight` 依契約只需要對 `background` 有分離度，傳 `listOf(background)` 即可），不可為空。
+ * @param separationReferences 候選色需要與之區分開來的底色，不可為空。現行呼叫端（見
+ *   `MaterialYouTheme.dynamicColorsFor()`）：`keyAccent` 傳 `listOf(keyFill, background)`；
+ *   **`candidateHighlight` 傳 `listOf(background, keyAccent)`——把已選定的 `keyAccent` 一併列為參照色，
+ *   正是本函式避免兩個用途撞色的方式**（`keyAccent` 也在候選清單內，它對自己的對比度恆為 1.0，因此會被 壓到最低分而讓出位置；見上方 I1 段落）。**不要**只傳
+ *   `listOf(background)`——那是 H1 修正前的舊寫法， 在 M3 baseline 的 tone 分布下兩次呼叫會雙雙選中 `inversePrimary`，light 對
+ *   background 僅 1.66:1、 dark 2.66:1，皆不及本模組自訂的 WCAG 1.4.11 門檻。
  * @param textThreshold WCAG AA 一般文字門檻，預設 4.5。
  * @param excluded 要排除的顏色集合（例如另一個用途已經選中的顏色，避免撞色）。若排除後候選清單變空， 見上方
  *   KDoc「退化語意」——會忽略這個排除限制。預設空集合，等同不排除任何顏色。

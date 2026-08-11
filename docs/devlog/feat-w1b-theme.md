@@ -502,3 +502,19 @@
 
   教訓與本包 B23／H2 同型：**斷言的型別範圍比它要證明的性質寬時，測試就會對「問題已消失」與
   「問題仍在」給出相同的綠燈。** 這是本包第三次踩到同一類問題。
+
+## 2026-08-11 第十七輪 — 撞色那條線第三次以文件形式殘留
+
+- **[medium]** `pickAccentColor` 的 `@param separationReferences` 還停在 H1 修正前的舊慣例：
+  「`candidateHighlight` 依契約只需要對 `background` 有分離度，傳 `listOf(background)` 即可」。
+  但那正是 H1 撞色缺陷的成因——I1 的最終解法就是改傳 `listOf(background, keyAccent)`，讓
+  `keyAccent` 在候選清單中對自己的對比度恆為 1.0 而被壓到最低分。`@param` 是 IDE 補全與 API
+  文件最先看到的一段，照它寫就會原封不動重現 H1（M3 baseline tone 下兩次呼叫雙雙選中
+  `inversePrimary`，light 對 background 1.66:1、dark 2.66:1）。而這個誤用**沒有任何守門**：
+  測試驗的是函式本身，`dynamicColorsFor()` 傳什麼參數無法在 JVM 驗證。
+
+  已修：`@param` 改成與現行呼叫端一致，並明寫「**不要**只傳 `listOf(background)`」與理由。
+
+  這是同一條線第三次以文件形式殘留（第九輪 G3 段落也寫過「candidateHighlight 只看 [background]
+  （依契約語意）」）。教訓：**行為改了之後，要一併 grep 所有描述該行為的文字**——尤其是
+  `@param`／`@return` 這種會被 IDE 直接推到呼叫端眼前的位置，它們比散文段落更容易被照著做。
