@@ -17,13 +17,29 @@
  * binding and its own connectedAndroidTest coverage.
  *
  * Exposure: cmake/CMakeLists.txt only adds this translation unit to the
- * `bpmf` target for Debug builds (CMAKE_BUILD_TYPE == "Debug"), so these
- * four Java_..._BpmfTestBridge_nativeTest* symbols are absent from release
- * .so output — verified with `nm -D` (see devlog A5). `nativeTestFree`
- * treats its jlong argument as a raw pointer and calls free() on it, so
- * keeping it out of release builds matters: with it present a release APK
- * would expose an arbitrary-address free() primitive to anything that can
- * dlsym() the .so.
+ * `bpmf` target when -DBPMF_BUILD_TEST_BRIDGE=ON is set (debug variant
+ * only — see build.gradle.kts), so these four
+ * Java_..._BpmfTestBridge_nativeTest* symbols are absent from release .so
+ * output — verified with `nm -D` (see devlog A5/A10).
+ *
+ * `nativeTestFree` treats its jlong argument as a raw pointer and calls
+ * free() on it, so keeping it out of release builds matters — but NOT for
+ * the reason a prior version of this comment gave ("avoid exposing an
+ * arbitrary-address free() primitive to anything that can dlsym() the
+ * .so"). That framing was wrong on its own terms: before
+ * cmake/CMakeLists.txt gained a --version-script (see R1 in the 20260811
+ * devlog entry), the release .so already exported chewing_free(void*) —
+ * the vendored libchewing C API's own arbitrary-pointer free() — plus
+ * chewing_delete/chewing_Terminate/chewing_set_logger and ~130 other
+ * chewing_* functions regardless of this gate; the gate was never actually
+ * the thing standing between a dlsym()-capable attacker and a free()
+ * primitive on a release build. The version script now hides all of those
+ * (release .so exports only bpmf_commit/bpmf_free/bpmf_init/bpmf_input),
+ * so this gate keeping nativeTestFree() out of release IS what keeps
+ * release libbpmf.so's dynsym table down to exactly bpmf.h's 4 functions —
+ * that value (attack surface stays minimal and matches the documented
+ * public API, not "prevents the only free() primitive") is why it's worth
+ * keeping.
  */
 
 #include "bpmf.h"

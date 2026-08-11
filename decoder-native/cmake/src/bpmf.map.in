@@ -1,0 +1,29 @@
+# GNU ld / lld version script for libbpmf.so — generated at configure time
+# by cmake/CMakeLists.txt via configure_file(@ONLY) from this template.
+#
+# Purpose: bpmf.h's own contract ("nothing else from libchewing is
+# re-exported") and ADR-0006's "not the full ~60 API" claim were, before
+# this file existed, aspirational rather than enforced — corrosion_import_crate
+# links chewing_capi's staticlib into libbpmf.so with no visibility control
+# at all, so every GLOBAL-visibility symbol in that archive (the ~130
+# chewing_* C API plus ~3000+ Rust-mangled symbols from chewing_capi's own
+# dependency tree — regex, aho-corasick, gimli, miniz_oxide, jiff, std, …)
+# ends up in libbpmf.so's dynamic symbol table verbatim. See R1 in the
+# 20260811 devlog entry for the on-device symbol count that proved this.
+#
+# This version script is the actual enforcement: only the names listed
+# under `global:` end up in the .dynsym table with default visibility;
+# everything else — including every re-exported chewing_* symbol and every
+# Rust std/dependency symbol — is demoted to local (hidden) linkage in the
+# final .so, regardless of what visibility it had in the object files or
+# static archives that were linked in.
+BPMF_LOCAL {
+  global:
+    bpmf_init;
+    bpmf_input;
+    bpmf_commit;
+    bpmf_free;
+@BPMF_TESTBRIDGE_SYMBOLS_BLOCK@
+  local:
+    *;
+};

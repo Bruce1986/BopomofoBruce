@@ -87,3 +87,80 @@ if(ANDROID)
     # both end up wanting liblog on Android.
     target_link_libraries(bpmf PRIVATE log)
 endif()
+
+# --- Symbol visibility: only export bpmf.h's own 4 functions -------------
+# corrosion_import_crate() links chewing_capi's staticlib (and, transitively,
+# its entire Rust dependency tree — regex, aho-corasick, gimli, jiff, std,
+# …) into libbpmf.so with no visibility control of its own: every
+# GLOBAL-visibility symbol in that archive lands in the final .so's dynamic
+# symbol table verbatim, alongside our own bpmf_* API. Without this section
+# libbpmf.so re-exports the entire libchewing C API (~130 chewing_*
+# functions) plus thousands of Rust-mangled symbols — contradicting bpmf.h's
+# own "nothing else from libchewing is re-exported" contract. See R1 in the
+# 20260811 devlog entry for the measured before/after symbol counts.
+#
+# We follow the exact recipe upstream libchewing's own CMakeLists.txt uses
+# for its libchewing.so target (capi/src/symbols-elf.map via
+# LINKER:-version-script) rather than inventing a different mechanism.
+#
+# BPMF_TESTBRIDGE_SYMBOLS_BLOCK: when the test bridge is compiled in, its
+# four Java_..._BpmfTestBridge_nativeTest* JNI entry points must stay
+# dynamically visible — the JVM resolves JNI-exported native methods via
+# dlsym() by their mangled Java_* name at runtime, so hiding them would
+# break connectedAndroidTest with UnsatisfiedLinkError. They are listed
+# explicitly (not via a wildcard) so the version script itself documents
+# exactly which four symbols the test-only surface adds.
+if(BPMF_BUILD_TEST_BRIDGE)
+    set(BPMF_TESTBRIDGE_SYMBOLS_BLOCK "    Java_com_bopomofobruce_decoder_nativ_testbridge_BpmfTestBridge_nativeTestInit;
+    Java_com_bopomofobruce_decoder_nativ_testbridge_BpmfTestBridge_nativeTestInput;
+    Java_com_bopomofobruce_decoder_nativ_testbridge_BpmfTestBridge_nativeTestCommit;
+    Java_com_bopomofobruce_decoder_nativ_testbridge_BpmfTestBridge_nativeTestFree;")
+else()
+    set(BPMF_TESTBRIDGE_SYMBOLS_BLOCK "")
+endif()
+
+set(BPMF_VERSION_SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/bpmf.map")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/bpmf.map.in"
+    "${BPMF_VERSION_SCRIPT}"
+    @ONLY
+)
+
+if(CMAKE_C_COMPILER_ID MATCHES "^(GNU|Clang)$")
+    # NOT -fvisibility=hidden: Android's <jni.h> JNIEXPORT macro already
+    # expands to an explicit `__attribute__((visibility("default")))` (so
+    # the JNI entry points in bpmf_test_jni.c would survive -fvisibility=
+    # hidden regardless), but bpmf_wrapper.c's own bpmf_init/input/commit/
+    # free carry no such attribute — under -fvisibility=hidden the compiler
+    # marks their ELF symbols STV_HIDDEN, which --version-script's `global:`
+    # list cannot undo (a version script can only demote a default-visibility
+    # symbol to local, not promote a hidden one back to default). Verified
+    # by trying it: with -fvisibility=hidden added here, `nm -D
+    # --defined-only` on the release .so dropped to 0 symbols total — it hid
+    # bpmf_init/input/commit/free too, not just the Rust/libchewing symbols
+    # this section exists to hide. The version script's own `local: *;`
+    # catch-all already hides everything not explicitly listed under
+    # `global:`, so -fvisibility=hidden would be redundant even if it
+    # worked.
+    target_compile_options(bpmf PRIVATE
+        -ffunction-sections
+        -fdata-sections
+    )
+    target_link_options(bpmf PRIVATE
+        "LINKER:--version-script,${BPMF_VERSION_SCRIPT}"
+        # Hides symbols originating from statically-linked archives (i.e.
+        # chewing_capi's .a and its dependency .rlibs) from the dynamic
+        # symbol table too — belt-and-suspenders alongside the version
+        # script, and independent of it: --exclude-libs applies regardless
+        # of the source-level visibility the archive's objects were built
+        # with (we don't control chewing_capi's own rustc flags).
+        "LINKER:--exclude-libs,ALL"
+        # Lets the linker drop Rust dependency code that bpmf_wrapper.c
+        # never calls into, now that the version script also stops that
+        # code being pinned in the dynamic table as a side effect.
+        "LINKER:--gc-sections"
+    )
+    set_target_properties(bpmf PROPERTIES
+        LINK_DEPENDS "${BPMF_VERSION_SCRIPT}"
+    )
+endif()

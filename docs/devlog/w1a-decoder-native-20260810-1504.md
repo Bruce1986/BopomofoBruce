@@ -262,8 +262,18 @@ ADR-0001 本體。詳細裁示內容見 lead 轉達訊息（本檔不重抄，�
 
 ### 已知缺口（誠實列出，非驗收標準內但值得記錄）
 
-- CI（`.github/workflows/`）還沒裝 Rust Android target，目前只在本機驗證
-  過；下次碰 CI 設定要補上（見 ADR-0006）。
+- **（2026-08-11 第十四輪 Opus 追蹤者 R2 更正）**~~CI（`.github/workflows/`）還沒裝
+  Rust Android target，目前只在本機驗證過；下次碰 CI 設定要補上（見
+  ADR-0006）~~——**已過期**：第七階段 K6 已把 `submodules: recursive`（`.github/
+  workflows/ci.yml:36`）與 `rustup target add aarch64-linux-android
+  armv7-linux-androideabi`（`ci.yml:56`）實際寫進 `ci.yml`（見下方第三階段 K6 記錄）。
+  真正尚未做的殘留只剩：`Set up Android SDK` 這步（`ci.yml:46-49`）只用
+  `android-actions/setup-android@v4` 裝了 `platforms;android-35`/
+  `build-tools;35.0.0`，沒有明列 `ndk;27.2.12479018`（`decoder-native/
+  build.gradle.kts` 的 `ndkVersion`）——目前能過是靠 AGP 依 `ndkVersion` 自動下載
+  對應 NDK，未在 CI 顯式宣告版本；若之後 `ndkVersion` 改版但忘了同步，CI 仍會抓到
+  正確版本（AGP 自動下載），不會像本條原始敘述那樣直接卡關，屬於「隱性耦合可以更
+  明確」而非阻斷性缺口，值得補上但不是 blocker。
 - `bpmf_input()` 目前只回傳游標所在音節的重選候選，不是整句智慧選字結果；
   W2-A 設計 `ZhuyinDecoder` 時需要知道這個語意（見上）。
 - 「無 leak」只有程式碼審查層級保證，沒有 ASan/LeakCanary 工具驗證。
@@ -1319,3 +1329,128 @@ BUILD FAILED
   這點完全正確；「連 .so 本身在 :app 手上都沒剝符號」是本輪追查 Q2 時的
   額外發現，一併記錄避免遺漏，但沒有在授權範圍外自行修正 `app/build.gradle.kts`。
 - Q3 沒有可補充的異議。
+
+---
+
+## 第十五階段（第十四輪 Opus 追蹤者 R1/R2 修正輪，2026-08-11）
+
+lead 已親自查證 R1（實測 release stripped arm64-v8a 匯出 3527 個動態符號屬實），本輪逐條修。
+
+### R1〔medium〕`libbpmf.so` 匯出整份 libchewing C API 與 Rust 符號 — 已修正
+
+**根因**：`decoder-native/cmake/CMakeLists.txt` 的 `corrosion_import_crate()` 把
+`chewing_capi` staticlib（連同其 Rust 依賴樹）連進 `libbpmf.so`，沒有任何符號可見度
+控制（無 version script、無 `-fvisibility=hidden`、無 `--exclude-libs`）。
+
+**修法**：仿照 vendored upstream `capi/src/symbols-elf.map`（`decoder-native/cmake/
+libchewing/CMakeLists.txt:202` 對 `libchewing.so` 自己的做法），新增
+`decoder-native/cmake/src/bpmf.map.in`（GNU ld/lld version script 範本，用 CMake
+`configure_file(@ONLY)` 依 `BPMF_BUILD_TEST_BRIDGE` 產生實際內容），並在
+`decoder-native/cmake/CMakeLists.txt` 加上：
+- `LINKER:--version-script,<生成的 bpmf.map>` — 只放行 `bpmf_init`/`bpmf_input`/
+  `bpmf_commit`/`bpmf_free`（`BPMF_BUILD_TEST_BRIDGE=ON` 時額外放行四個
+  `Java_..._BpmfTestBridge_nativeTest*`），其餘一律 `local: *;`。
+- `LINKER:--exclude-libs,ALL` — 額外把靜態封存檔（`chewing_capi` 的 `.a`/`.rlib`）來源
+  的符號也排除在動態表外，與 version script 互為 belt-and-suspenders，且不受該封存檔
+  本身編譯時的可見度設定影響。
+- `-ffunction-sections -fdata-sections` + `LINKER:--gc-sections` — 讓連結器把
+  `bpmf_wrapper.c` 沒用到的 Rust 依賴死碼真正砍掉，而不只是隱藏符號。
+
+**踩到的一個真實 bug（過程記錄，非虛構）**：第一版修法額外加了
+`-fvisibility=hidden`（C 編譯旗標），實測後發現這會把 `bpmf_wrapper.c` 自己的
+`bpmf_init`/`bpmf_input`/`bpmf_commit`/`bpmf_free`（沒有任何顯式 visibility
+attribute）也標成 `STV_HIDDEN`，而 version script 的 `global:` 清單**無法**把一個
+編譯期已經 hidden 的符號救回動態表——`nm -D --defined-only` 對 release .so 核對出
+**0 個**符號（不只 `chewing_*` 被隱藏，`bpmf_*` 四個公開 API 也一起消失了）。Android
+`<jni.h>` 的 `JNIEXPORT` 巨集本身展開成顯式 `__attribute__((visibility("default")))`，
+所以 debug 產物當時只剩 `nativeTest*` 四個、`bpmf_*` 同樣消失。已移除
+`-fvisibility=hidden`（保留 `-ffunction-sections`/`-fdata-sections`），version
+script 自己的 `local: *;` 已經足以隱藏一切未明列的符號，不需要靠編譯期旗標重複。
+
+**驗收證據（`llvm-nm -D --defined-only`，NDK 27.2.12479018 toolchain，兩個 ABI 皆
+`--rerun-tasks` 全新編譯，非增量快取）**：
+
+修正前（baseline，暫存 stash 回舊版 CMakeLists.txt 重編驗證）：
+
+```
+release arm64-v8a : 總符號 3527、chewing_*=134、bpmf_*=4、.so 3,428,992 bytes
+release armeabi-v7a: 總符號 3509、chewing_*=134、bpmf_*=4、.so 2,451,096 bytes
+debug   arm64-v8a : 總符號 18942、chewing_*=129、bpmf_*=4、.so 11,355,720 bytes
+debug   armeabi-v7a: 總符號 18622、chewing_*=129、bpmf_*=4、.so  7,655,724 bytes
+```
+
+修正後：
+
+```
+release arm64-v8a : 總符號 4（bpmf_commit/bpmf_free/bpmf_init/bpmf_input，chewing_*=0）
+                    .so 1,592,400 bytes（省 1,836,592 bytes，約 53.6%）
+release armeabi-v7a: 總符號 4（同上），chewing_*=0
+                    .so 1,106,552 bytes（省 1,344,544 bytes，約 54.9%）
+debug   arm64-v8a : 總符號 8（上述 4 個 bpmf_* ＋ 4 個 nativeTest*），chewing_*=0
+                    .so 4,604,952 bytes（省 6,750,768 bytes，約 59.4%）
+debug   armeabi-v7a: 總符號 8（同上），chewing_*=0
+                    .so 2,449,952 bytes（省 5,205,772 bytes，約 68.0%）
+```
+
+debug 兩 ABI 上四個 `Java_..._BpmfTestBridge_nativeTest*` 皆仍在（`nativeTestInit`/
+`nativeTestInput`/`nativeTestCommit`/`nativeTestFree`），確認 test bridge 沒有被
+version script 誤殺。
+
+`--gc-sections` 對 APK size 缺口（Q2，仍待 owner 裁決 `app/build.gradle.kts`）有實質
+貢獻：release .so 縮小約 54%，但這只是 `:decoder-native` 自己的 `.so`，不改變 Q2
+記錄的「`:app` 沒宣告 `ndkVersion`、`stripReleaseDebugSymbols` 找不到 strip 工具」這個
+獨立 packaging 缺陷——兩者要一起修才會反映在最終 APK 上。
+
+**三處文件已更新為與實測產物相符的敘述**：`decoder-native/cmake/include/bpmf.h`
+（header comment，補上「用 `nm -D` 可驗證」與測得的符號數）、
+`docs/adr/0006-libchewing-rust-build-pipeline.md`（在原本「而不是把全部 ~60 個
+libchewing C API 都轉出去」那句後面補更正段落，標注日期）、本檔（此節）。
+
+**test bridge 閘門理由已改為查證屬實的版本**：`bpmf_test_jni.c` 與
+`BpmfTestBridge.kt` 原本的說法（「防止把 dlsym 得到的 arbitrary-address `free()`
+暴露給 release」）不成立——release 在加 version script 之前本來就已經匯出
+`chewing_free(void*)`（vendored `capi/include/chewing.h:311`，語意就是對任意指標
+`free()`）、`chewing_delete`、`chewing_Terminate`、`chewing_set_logger`，這個閘門
+從未真正擋住過任何東西。已改寫兩處註解：閘門本身仍值得保留（有了 version script 之後，
+它是讓 release `.so` 的動態表精準等於 `bpmf.h` 4 個函式、不多長出第二個
+free-like 進入點的原因），但不再宣稱它防的是「唯一的 free() primitive」。
+
+### R2〔medium〕devlog「已知缺口」第一條已過期 — 已修正
+
+第七階段 K6 已把 `submodules: recursive`（`.github/workflows/ci.yml:36`）與
+`rustup target add aarch64-linux-android armv7-linux-androideabi`
+（`ci.yml:56`）實際寫進 CI；原「已知缺口」清單第一條（「CI 還沒裝 Rust Android
+target」）已用刪除線＋更正段落標注過期（見上方「已知缺口」小節）。掃過同一清單其餘
+條目（`bpmf_input()` 只回傳游標音節重選候選、無 leak 只有審查層級保證、字典檔案
+組合、K1 LGPL、K4 commit 不可觀測、Q2 APK size）——皆仍成立，沒有第二條被實作掉卻
+沒回填標記的情況。
+
+真正殘留、值得另外登記的殘留項：CI 的 `Set up Android SDK` 步驟
+（`ci.yml:46-49`）沒有明列 `ndk;27.2.12479018`（對照
+`decoder-native/build.gradle.kts` 的 `ndkVersion`），目前是靠 AGP 依
+`ndkVersion` 自動下載對應 NDK 才過關，不是 CI 顯式宣告版本——不是阻斷性缺口
+（AGP 自動下載機制本身可靠），但值得之後補上讓 CI 設定自我說明。
+
+### 收尾指令與實機結果（第十五階段）
+
+- `./gradlew :decoder-native:assembleDebug :decoder-native:assembleRelease
+  :decoder-native:testDebugUnitTest :decoder-native:ktfmtCheck
+  :decoder-native:lint` → `BUILD SUCCESSFUL`
+- 實機 `R6AIB700988748X`（ASUS_AI2302, API 15）
+  `:decoder-native:connectedDebugAndroidTest` → `BUILD SUCCESSFUL`，6/6 綠
+- `git diff --stat`：新增 `decoder-native/cmake/src/bpmf.map.in`；動了
+  `decoder-native/cmake/CMakeLists.txt`（R1）、`decoder-native/cmake/include/bpmf.h`
+  （R1 文件更正）、`decoder-native/cmake/src/bpmf_test_jni.c`（R1 閘門理由更正）、
+  `decoder-native/src/androidTest/kotlin/com/bopomofobruce/decoder/nativ/testbridge/BpmfTestBridge.kt`
+  （R1 閘門理由更正）、`docs/adr/0006-libchewing-rust-build-pipeline.md`（R1 文件更正）、
+  本檔（R1、R2）；沒有動 `:common`、`docs/STATUS.md`、vendored libchewing、
+  `app/build.gradle.kts`，沒有 push。
+
+### 對 finding 本身的補充意見
+
+- R1、R2 兩條 lead 查證／推導皆屬實，沒有發現判斷錯誤之處。
+- R1 finding 提出的首選修法（version script）在本輪直接可行，不需要退回誠實記錄
+  「做不到」的備案。
+- 過程中另外發現一個 finding 未預期到的真實 bug（`-fvisibility=hidden` 會讓
+  `bpmf_*` 也連帶消失，見上方「踩到的一個真實 bug」段落）——不是 finding 本身的
+  錯誤，是修法實作過程中的插曲，一併誠實記錄。

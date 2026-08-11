@@ -3,7 +3,16 @@
  *
  * This is the ONLY public surface `decoder-native` exposes (DEVPLAN W1-A).
  * `:decoder` (W2-A) is expected to JNI-bind exactly these four functions;
- * nothing else from libchewing is re-exported.
+ * nothing else from libchewing is re-exported — enforced (not just intended)
+ * by a `--version-script` linker map (cmake/src/bpmf.map.in, applied in
+ * cmake/CMakeLists.txt): `nm -D --defined-only` on the release `.so`
+ * verifies exactly `bpmf_commit`/`bpmf_free`/`bpmf_init`/`bpmf_input` and
+ * nothing else — no `chewing_*` symbol, no Rust-mangled dependency symbol —
+ * on both shipping ABIs. See the 20260811 devlog entry (R1) for the
+ * measured before/after symbol counts; before that fix, `corrosion_import_
+ * crate`'s staticlib link had no visibility control and this .so re-exported
+ * libchewing's entire ~130-function C API plus ~3400 Rust-mangled symbols
+ * from its dependency tree.
  *
  * Thread-safety contract:
  *   - This handle is NOT thread-safe. Every call on a given handle (from

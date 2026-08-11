@@ -23,6 +23,19 @@ owner 已就此裁示（見 devlog 2026-08-10 段）：**採用 v0.12.0（commit
 
 - `decoder-native/cmake/CMakeLists.txt`（AGP `externalNativeBuild.cmake.path` 指到這裡）用 `FetchContent` 拉 Corrosion，`corrosion_import_crate()` 把 vendored 的 `chewing_capi` crate（`decoder-native/cmake/libchewing/capi`，`[lib] crate-type = ["rlib", "staticlib"]`）依 AGP 傳入的 `CMAKE_ANDROID_ARCH_ABI` 交叉編譯成對應 ABI 的 Rust staticlib。Corrosion 原生支援從 `CMAKE_ANDROID_ARCH_ABI` 推導 Rust target triple（`aarch64-linux-android` / `armv7-linux-androideabi`），不需要額外的 cargo-ndk 或手寫 `.cargo/config.toml` target 對照。
 - 我們自己寫的一個薄 C wrapper（`decoder-native/cmake/src/bpmf_wrapper.c`，含 DaChen 鍵盤對照表 — 對照表直接照抄 vendored `src/editor/zhuyin_layout/standard.rs`，不是憑記憶重建）`#include` 上游的 `capi/include/chewing.h`，呼叫 `chewing_new3`/`chewing_handle_Default`/`chewing_cand_*`/`chewing_commit_String`/`chewing_delete` 等公開 C API，`target_link_libraries` 連結剛剛的 `chewing_capi` staticlib，一起編成單一 `libbpmf.so`。這條路線完全比照 upstream 自己的 `CMakeLists.txt`（`add_library(libchewing capi/src/chewing.c)` 接 `chewing_capi`），只是我們的 C 檔案換成 `bpmf_wrapper.c` 輸出 DEVPLAN 指定的 4 個簡化 API，而不是把全部 ~60 個 libchewing C API 都轉出去。
+  **（2026-08-11 第十四輪 Opus 追蹤者 R1 更正，見 devlog）**：以上「而不是把全部 ~60 個
+  libchewing C API 都轉出去」在本次更正之前只是**編譯層級**的事實（`bpmf_wrapper.c` 本身只呼叫
+  4 個函式），並不是**連結產物層級**的事實。`corrosion_import_crate()` 把整個 `chewing_capi`
+  staticlib（連同其依賴樹：regex/aho-corasick/gimli/miniz_oxide/jiff/std 等）連進
+  `libbpmf.so`，在加上 `--version-script` 之前完全沒有符號可見度控制，實測 release
+  arm64-v8a stripped 產物 `nm -D --defined-only` 匯出 **3527 個**動態符號，其中 **134 個**
+  `chewing_*`（不是 4 個，也不是零），其餘約 3400 個是 Rust mangled 符號。已在
+  `cmake/CMakeLists.txt` 加上比照 upstream `capi/src/symbols-elf.map` 的
+  `cmake/src/bpmf.map.in` version script（`-Wl,--version-script` + `-Wl,--exclude-libs,ALL` +
+  `-Wl,--gc-sections`），修正後 release 兩個 ABI 皆只匯出 `bpmf_commit`/`bpmf_free`/
+  `bpmf_init`/`bpmf_input` 這 4 個符號，`chewing_*` 降為 0。副作用：`--gc-sections` 能清掉未被
+  `bpmf_wrapper.c` 觸及的 Rust 死碼，release arm64-v8a stripped `.so` 從 3,428,992 bytes 降到
+  1,592,400 bytes（約省 54%），對已登記的 APK size 缺口有實質貢獻。
 - 字典資料（`word.dat`/`tsi.dat`）**不**在 CMake/cargo 建置流程裡現編（那需要另外跑 `chewing-cli`，等於再多一個 host-side Rust 建置目標）。改用 `decoder-native/scripts/fetch_chewing_data.sh` 下載 upstream 發布的 prebuilt "Generic" 資料包（`chewing/libchewing-data` release `v2026.3.22`），sha256 校驗後解壓進 `decoder-native/src/main/assets/chewing/`。已驗證這個 `v2026.3.22` release 的 commit（`c44e81aef24b06f1509f19e1be54c99812d0c43f`）與我們 vendor 的 `data` submodule commit **完全一致**，不是版本混搭。二進位資料不進 git（見 `.gitignore`），靠腳本可重現下載。
   **（2026-08-11 第五階段更正，見 devlog E1）**：Gradle 把這個 script 真正掛在 `package*Assets`
   上——**不是**只掛在 decoder-native 自己的 `assembleDebug`/`assembleRelease`/`connected*`/
