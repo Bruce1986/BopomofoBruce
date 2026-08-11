@@ -68,36 +68,22 @@ static const size_t kBopomofoKeyCount = sizeof(kBopomofoKeys) / sizeof(kBopomofo
 
 /*
  * bpmf.h promises *candidates_out == "" (not NULL) whenever bpmf_input()
- * returns 0 — but that does NOT mean count == 0 always points here. Two
- * different things can produce a 0 return, and this comment must not blur
- * them again (it has already been corrected twice: first from "two cases",
- * then from a false "EVERY path" claim):
+ * returns 0. What is NOT promised is which "" this is — this static buffer,
+ * or a heap-allocated strdup("")/realloc() chain owned by the handle. Do not
+ * try to enumerate here which code paths produce which (this comment has
+ * already drifted out of sync with the code four times); read bpmf_input()
+ * itself for that. The one fact that matters, and that stays true no matter
+ * how the branches inside bpmf_input() change, is this:
  *
- *   1. Early-return paths that bail out BEFORE the real candidate-collection
- *      logic ever runs: the NULL handle/zhuyin pre-checks, the fail-closed
- *      branch for characters outside the DaChen mapping table, and
- *      strdup("") failing under OOM further down. These, and only these,
- *      point *candidates_out at this static, process-lifetime empty string.
- *      Any new early-return path must follow the same rule rather than
- *      strdup("") its own copy (a strdup there can itself fail and hand the
- *      caller a NULL, breaking the very promise the branch exists to
- *      honour).
- *   2. The normal candidate-collection path running to completion with zero
- *      results — chewing_cand_open() failing (e.g. an incomplete syllable:
- *      only an initial/medial typed, no final) or succeeding but
- *      chewing_cand_hasNext() being false from the start (a genuine
- *      dictionary miss). Here count is 0 too, but *candidates_out /
- *      handle->last_candidates is the heap-allocated strdup("") from
- *      `joined`, NOT this static string.
+ *   *candidates_out points at this static buffer if and only if it was NOT
+ *   also stored into handle->last_candidates. Check that assignment, not
+ *   the return value or any inferred "reason", to know which one you have.
  *
- * Distinguishing the two matters for ownership: static-string paths are NOT
- * stored into handle->last_candidates (so bpmf_free()/the next bpmf_input()
- * never free()s this static buffer — only genuinely heap-allocated strings
- * are ever assigned there), whereas case 2's heap string IS stored there and
- * will be free()'d normally. Either way the caller must not free what it
- * receives (same ownership contract as the heap-backed candidates strings —
- * see bpmf.h); the difference is purely about who owns the free(), which is
- * this file's job, not the caller's concern.
+ * Ownership consequence, same for both: the caller must never write to or
+ * free() what it receives (see bpmf.h). Only the difference is who is
+ * responsible for eventually free()ing it — bpmf_free()/the next
+ * bpmf_input() call free() handle->last_candidates when it is heap-backed,
+ * and never touch this static buffer.
  */
 static const char kEmptyCandidates[] = "";
 

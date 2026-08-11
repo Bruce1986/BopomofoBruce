@@ -15,7 +15,13 @@
   （第三次修正，改成不隨分支數量維護的表述）；N2 新增
   `verifyChewingDataVersionSync` Gradle task 守門
   `CHEWING_DATA_VERSION`/`fetch_chewing_data.sh` 的 `VERSION` 一致性（含紅綠實測、
-  `--dry-run` 確認不吃網路）。見該節。**
+  `--dry-run` 確認不吃網路）。見該節。
+  第九階段（2026-08-11）修正第十輪 2 條 finding：P1 再次改寫 `kEmptyCandidates`
+  註解（第四次修正——這次停止窮舉成因，改成只陳述「有沒有存進
+  `handle->last_candidates`」這條不變量）；P2 把 `verifyChewingDataVersionSync`
+  額外掛到 `package*Assets`/`assembleDebug`/`assembleRelease`/`connected*`/
+  `install*`，補上「只組裝不跑測試」的路徑（含紅綠實測、`--dry-run` 確認不吃
+  網路）。見該節。**
 
 ## 環境確認（動工前）
 
@@ -916,3 +922,118 @@ armeabi-v7a release: bpmf_commit / bpmf_free / bpmf_init / bpmf_input（4 個，
   測試任務本身），把守門掛在 `preBuild` 反而是同一件事繞了一圈；直接掛在兩個測試
   task 上更直白，且已用 `--dry-run` 證明不會意外把 `fetchChewingData` 的網路依賴帶進
   來。
+
+## 第九階段（2026-08-11）：第十輪審查 2 條 finding
+
+分支 `feat/w1a-decoder-native`，起點 commit `0132594`（第九輪修正後 HEAD）。
+
+### P1 — `kEmptyCandidates` 註解第四次窮舉不完整
+
+- 位置：`decoder-native/cmake/src/bpmf_wrapper.c`，`kEmptyCandidates` 上方的
+  註解區塊（約第 71–101 行）。
+- 審查抓到：現行「兩種情況」的窮舉漏掉第三條——`chewing_cand_open()` 成功、
+  `chewing_cand_hasNext()` 一開始是 true（字典確實有候選字），但迴圈第一次
+  疊代就在 `chewing_cand_String()` 回 NULL 或 `realloc()` 失敗時 `break`：此時
+  `count` 仍是 0、`joined` 仍是最初的 heap `strdup("")`，但這既不是
+  `cand_open` 失敗、也不是「genuine dictionary miss」，而是配置/讀取失敗被吞
+  成 0，舊註解的「running to completion with zero results」描述也不準——它
+  沒有 run to completion。
+- 這是同一段註解**第四次**被抓到不準確（先「兩種情況」→ 假的「EVERY path」
+  → 「兩類」→ 這次）。這次不再嘗試窮舉成因，改寫成只陳述呼叫端與維護者真正
+  需要知道的不變量：`*candidates_out` 是不是指向這個 static buffer，唯一判準
+  是它有沒有被存進 `handle->last_candidates`，而不是靠推測「為什麼」count 會
+  是 0。所有權結論（呼叫端不得寫入/free）兩種情形完全相同。新註解明確寫了
+  一句：「不要在這裡窮舉，去讀 `bpmf_input()` 本身」，把會漂移的細節丟給程式
+  碼負責，註解只負責維護不變量。
+
+### P2 — 版本同步守門掛錯位置
+
+- 位置：`decoder-native/build.gradle.kts`，`verifyChewingDataVersionSync`
+  task 定義後方的 wiring 區塊（約第 222–252 行）。
+- 審查抓到：舊 wiring 只掛在 `testDebugUnitTest`/`testReleaseUnitTest`，任何
+  「只組裝不跑測試」的路徑（本機手動 `assembleRelease` 準備簽章上架、或
+  `:app` 把本模組當一般 AAR 依賴拉入時實際排程的 `package*Assets`，而非本模組
+  自己的 `assembleDebug`/`assembleRelease`——見 `fetchChewingData` 上方既有的
+  `--dry-run` 證據註解）都不會被擋。CI 目前擋得住是巧合（同一個 job 依序跑
+  `assembleDebug` 再跑 `testDebugUnitTest`，測試紅會讓整個 job 紅），CI 從未
+  跑過 `assembleRelease`/`testReleaseUnitTest`。
+- 改法：仿照 `fetchChewingData` 既有的兩段 wiring（`tasks.matching { name
+  contains "Assets" }` 與 `assembleDebug`/`assembleRelease`/`connected*`/
+  `install*`），把 `verifyChewingDataVersionSync` 也掛上去，讓它跟
+  `fetchChewingData` 走同一條「產出產物就會觸發」的路徑。這個 task 本身不吃
+  網路（純 regex 讀兩個既有檔案），所以掛上去不會讓 `assembleDebug` 等 task
+  意外多一條網路依賴。
+
+#### 紅綠實測（P2）
+
+1. `--dry-run` 確認沒有意外帶入網路依賴：
+
+   ```
+   $ PATH="/opt/homebrew/opt/rustup/bin:$PATH" ./gradlew :decoder-native:testDebugUnitTest --dry-run
+   ...
+   :decoder-native:verifyChewingDataVersionSync SKIPPED
+   :decoder-native:testDebugUnitTest SKIPPED
+   BUILD SUCCESSFUL in 8s
+   ```
+
+   任務圖裡沒有 `fetchChewingData`，`testDebugUnitTest` 仍不吃網路。
+
+2. 紅：把 `ChewingDataPath.kt` 的 `CHEWING_DATA_VERSION` 暫改成
+   `"9999.9.9"`，只跑 `assembleDebug`（不跑任何測試）：
+
+   ```
+   $ PATH="/opt/homebrew/opt/rustup/bin:$PATH" ./gradlew :decoder-native:assembleDebug
+   ...
+   > Task :decoder-native:verifyChewingDataVersionSync FAILED
+
+   FAILURE: Build failed with an exception.
+
+   * What went wrong:
+   Execution failed for task ':decoder-native:verifyChewingDataVersionSync'.
+   > CHEWING_DATA_VERSION (ChewingDataPath.kt) = "9999.9.9" but VERSION
+     (fetch_chewing_data.sh) = "2026.3.22" — these must be bumped together
+     (see the KDoc on CHEWING_DATA_VERSION in ChewingDataPath.kt). Update
+     whichever one is stale.
+
+   BUILD FAILED in 13s
+   ```
+
+3. 還原 `CHEWING_DATA_VERSION` 回 `"2026.3.22"`，同一條指令：
+
+   ```
+   $ PATH="/opt/homebrew/opt/rustup/bin:$PATH" ./gradlew :decoder-native:assembleDebug
+   ...
+   > Task :decoder-native:assembleDebug
+   BUILD SUCCESSFUL in 5s
+   ```
+
+證明了守門真的掛到了「只組裝不跑測試」的路徑上，且改壞會讓 `assembleDebug`
+本身失敗（不再需要靠測試任務連坐）。
+
+### 收尾指令與實機結果（第九階段）
+
+- `./gradlew :decoder-native:assembleRelease :decoder-native:testDebugUnitTest
+  :decoder-native:ktfmtCheck :decoder-native:lint` 同一次呼叫 →
+  `BUILD SUCCESSFUL`
+- `./gradlew :decoder-native:assembleDebug` 單獨重跑一次確認 → `BUILD
+  SUCCESSFUL`（見上方紅綠實測步驟 3）
+- 實機 `R6AIB700988748X`（ASUS_AI2302, API 15）
+  `:decoder-native:connectedAndroidTest` → `BUILD SUCCESSFUL`，4/4 測試綠
+  （同第七/八階段那 4 條，本輪未動這些測試）
+- `git diff --stat`：只動了 `decoder-native/build.gradle.kts`（P2）與
+  `decoder-native/cmake/src/bpmf_wrapper.c`（P1）兩個檔案
+
+### 對 finding 本身的補充意見
+
+- P1、P2 皆查證屬實，沒有發現判斷錯誤之處。
+- P1 的教訓值得明寫一條規則：**這段 `kEmptyCandidates` 註解已經被連續四輪審
+  查抓到「窮舉不完整/不準確」**，說明「列點窮舉目前有哪些分支會走到這裡」這
+  種寫法在一份還在演進的 C 檔案裡本質上就是脆弱的——只要 `bpmf_input()` 內部
+  多一條 early-return 或改一下迴圈結構，窮舉就可能過期，而過期的窮舉比沒有
+  窮舉更危險（會誤導維護者）。這次改成「陳述不變量＋指向程式碼本身」的寫
+  法，理論上不會再因為分支數量變化而過期；如果之後真的出現需要在註解裡說明
+  的新語意（例如所有權規則本身改變，而不只是新增一條 early-return 分支），
+  那才需要重新審視這段註解，而不是繼續往清單裡加項目。
+- P2 沒有推翻既有設計，是既有「`testDebugUnitTest`/`testReleaseUnitTest` 掛
+  一次」防線的補強，兩段 wiring 疊加後互不衝突（`dependsOn` 對同一個 task 多
+  次宣告是冪等的）。

@@ -228,3 +228,31 @@ val verifyChewingDataVersionSync by tasks.registering {
 tasks
     .matching { it.name == "testDebugUnitTest" || it.name == "testReleaseUnitTest" }
     .configureEach { dependsOn(verifyChewingDataVersionSync) }
+
+// Round-10 finding: the testDebugUnitTest/testReleaseUnitTest wiring above only catches drift
+// on paths that run unit tests. Any assemble-only path — a manual `./gradlew assembleRelease`
+// before signing/upload, `assembleDebug` alone, or a downstream `:app` build that pulls this
+// module in as a regular AAR dependency (which schedules `:decoder-native:packageDebugAssets` /
+// `packageReleaseAssets`, never this module's own assembleDebug/assembleRelease — see the
+// package*Assets note above fetchChewingData) — never ran verifyChewingDataVersionSync. CI has
+// so far been protected only by coincidence: it happens to run testDebugUnitTest right after
+// assembleDebug in the same job, so a failing check turns the whole job red either way. CI has
+// never run assembleRelease/testReleaseUnitTest at all, so a release build/upload path was
+// silently unguarded. Wire the same check onto the actual artifact-producing tasks, mirroring
+// exactly how fetchChewingData itself is wired in above (package*Assets for the downstream-AAR
+// path, assembleDebug/assembleRelease for the direct in-module path). This adds no network
+// dependency to those tasks — verifyChewingDataVersionSync is a pure regex-over-two-files check
+// (see its own comment above) — confirmed by `:decoder-native:testDebugUnitTest --dry-run`
+// still not scheduling fetchChewingData (see devlog for the actual --dry-run output).
+tasks.matching { it.name.contains("Assets") }.configureEach {
+    dependsOn(verifyChewingDataVersionSync)
+}
+
+tasks
+    .matching {
+        it.name == "assembleDebug" ||
+            it.name == "assembleRelease" ||
+            it.name.startsWith("connected") ||
+            it.name.startsWith("install")
+    }
+    .configureEach { dependsOn(verifyChewingDataVersionSync) }
