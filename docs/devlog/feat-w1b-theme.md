@@ -33,7 +33,7 @@
   round-trip、內建主題對比度守門、MaterialYouTheme 退化分支與值語意、動態取色
   選色函式 `pickAccentColor`）。**條數不在此處寫死**（第十二輪審查，I3：曾經在「交付」/「驗收結果」/
   各輪紀錄三處各寫一個數字、每輪都要手動同步卻每輪都漏），實際條數與最新一輪的紅綠驗證結果見本檔
-  最新一輪紀錄（目前最新：下方「2026-08-11 第十二輪」）。
+  最新一輪紀錄（目前最新：下方「2026-08-11 第十四輪」）。
 
 ## 驗收結果
 
@@ -42,7 +42,7 @@
 | 三主題各有 `@Preview` | ✅ 過（`LightThemePreview` / `DarkThemePreview` / `MaterialYouThemeFallbackPreview` + `MaterialYouThemeDynamicPreview`，共 4 個；B14 後 Material You 拆成兩條路徑各一個）。證據等級：函式存在且編譯通過，未實際在 Android Studio 內 render 過。 |
 | 主題序列化/反序列化 round-trip test | ✅ 過（`StyleSheetSerializationTest`、`PhotoBackgroundTest`，含巢狀 `UIntHexSerializer`） |
 | `./gradlew :theme:assembleDebug` | ✅ 過 |
-| `./gradlew :theme:testDebugUnitTest` | ✅ 全綠（條數見各輪紀錄，第十二輪審查 I3 後不在此處寫死絕對條數，避免每輪手動同步漏更新——見下方最新一輪「2026-08-11 第十二輪」） |
+| `./gradlew :theme:testDebugUnitTest` | ✅ 全綠（條數見各輪紀錄，第十二輪審查 I3 後不在此處寫死絕對條數，避免每輪手動同步漏更新——見下方最新一輪「2026-08-11 第十四輪」） |
 | `./gradlew :theme:ktfmtCheck` | ✅ 過（`BUILD SUCCESSFUL`；期間跑過 `:theme:ktfmtFormat` 修過格式後才綠——含 2026-08-10 B12/B14/B15 修正後、最後一次 commit 之後重跑的結果） |
 | `./gradlew :theme:lint` | ✅ 過（`BUILD SUCCESSFUL`，`lint-results-debug.txt`：`No issues found.`——2026-08-10 B12/B14/B15 修正後、最後一次 commit 之後重跑的結果） |
 | PhotoBackground 實機渲染 < 200 ms | ❌ **沒有量測**——沒有連上 Pixel 6 / 任何實機做這項；本 session 只跑到 JVM unit test 與 AGP 編譯層級，誠實回報未驗證，不編數字。 |
@@ -421,3 +421,67 @@
   `DynamicAccentSelection.kt`／`AccentColorSelectionTest.kt`），跑 `:theme:ktfmtFormat` 後重新
   完整跑一次四項，全部 `BUILD SUCCESSFUL`（`lint-results-debug.txt`：`No issues found.`）。
 - **本輪額外查核**：三條 finding 逐條核對後，內容與程式碼現況一致，沒有發現 finding 本身有誤的地方。
+
+## 2026-08-11 第十四輪（Opus tracer）— 兩處呼叫端契約補文件
+
+- **O1（medium）：`PhotoBackground.uri` 沒說明「必須先取得可持久化授權」這個呼叫端契約。**
+  `uri` 原本的 KDoc 只解釋「為什麼存 `String` 而非 `android.net.Uri`」（序列化考量），沒提到 Android
+  的 `content://` 授權預設不是持久的：`MediaStore.ACTION_PICK_IMAGES`（Photo Picker）發出的 URI
+  **不支援** `takePersistableUriPermission`，授權隨 task／process 結束即失效；只有走 SAF
+  `ACTION_OPEN_DOCUMENT` 並呼叫 `contentResolver.takePersistableUriPermission(uri,
+  FLAG_GRANT_READ_URI_PERMISSION)` 才會跨重開機存活。照原 KDoc 實作 W2-C 的選圖流程，會得到一個
+  當下測試完全正常、重開機後相片背景整個消失的功能，唯一訊號是 `PhotoBackgroundLayer` 的一行
+  `Log.w`（把它寫成「來源 App 移除授權」這種外部偶發因素，沒提到呼叫端本來就要履行的前置契約）。
+
+  **純文件修正**：`theme/src/main/kotlin/com/bopomofobruce/theme/photo/PhotoBackground.kt`，
+  `uri` 欄位 KDoc（class KDoc 內第一個條列項）補上呼叫端契約：要用 SAF `ACTION_OPEN_DOCUMENT` +
+  `takePersistableUriPermission` 取得可持久化授權後才能存進 `uri`；Photo Picker 的 URI 存下來會在
+  重開機後失效。**未改行為**，`PhotoBackgroundLayer.kt` 與其他程式碼皆未動。給 W2-C 接手者的提醒：
+  選圖流程要走 SAF `ACTION_OPEN_DOCUMENT`，不能用 Photo Picker，選完要呼叫
+  `takePersistableUriPermission`，這件事目前全 repo grep 不到任何一處提及，是 W2-C 實作前必須補上的
+  前置動作。
+
+- **O2（medium）：反序列化時丟的是 `IllegalArgumentException`，呼叫端最自然的 catch 會漏接。**
+  `StyleSheet`（以及巢狀的 `KeyboardShapes` / `KeyboardTypography` / `PhotoBackground` /
+  `:common` 的 `KeyboardDimens`）的 `init` require 在反序列化路徑上照樣執行，丟的是
+  `IllegalArgumentException`——kotlinx 不會把它包成 `SerializationException`。呼叫端若寫
+  `try { Json.decodeFromString<StyleSheet>(text) } catch (e: SerializationException) { 用預設
+  主題 }`，遇到結構合法但欄位超出範圍的主題 JSON（例如 `"keyLabelSp": 0`）就會漏接，`IllegalArgumentException`
+  未被捕捉地從 IME 主題載入路徑竄出去。這與 `:common` 的 `UIntHexSerializer` 刻意把
+  `NumberFormatException` 轉成 `SerializationException`（註解寫明理由是讓 kotlinx 能附帶 JSON
+  位置上下文）在同一份 wire format 上自相矛盾。`StyleSheetValidationTest` 原本 7 條全部只呼叫建構子，
+  沒有一條走 `decodeFromString`，這個實際使用情境下的例外型別完全沒有守門。
+
+  **已補 KDoc 契約**：`theme/src/main/kotlin/com/bopomofobruce/theme/style/StyleSheet.kt`，class
+  KDoc 補一段——本 schema（含巢狀型別）的 `require` 在反序列化時一樣會執行並丟
+  `IllegalArgumentException`，解析不受信任的主題 JSON 除了 `SerializationException` 也必須接
+  `IllegalArgumentException`（或兩者共同的上層 `RuntimeException`）。
+
+  **已補測試**：`theme/src/test/kotlin/com/bopomofobruce/theme/style/StyleSheetValidationTest.kt`
+  新增 `StyleSheet decodeFromString throws IllegalArgumentException for out-of-range nested
+  field`——用一段結構合法、但巢狀 `typography.keyLabelSp` 為 `0.0`（超出 `KeyboardTypography` 的
+  `> 0f` 範圍）的原始 JSON 字串走 `Json.decodeFromString(StyleSheet.serializer(), ...)`，斷言逃出來
+  的是 `IllegalArgumentException`。
+
+  **已證明會紅**：把 `KeyboardTypography.kt` 的 `keyLabelSp` require 暫時改成一行註解拿掉，重跑
+  `StyleSheetValidationTest`——2 條 FAILED：新加的
+  `StyleSheet decodeFromString throws IllegalArgumentException for out-of-range nested
+  field()`（`org.opentest4j.AssertionFailedError`，因為拿掉 require 後 `decodeFromString` 不再丟
+  例外）與既有的 `KeyboardTypography rejects zero or negative font sizes()` 一併紅掉（同一個
+  require 也守著這條舊測試，紅得符合預期）。還原 require 後重新完整跑 `:theme:testDebugUnitTest`，8
+  條全綠（`git diff` 確認 `KeyboardTypography.kt` 已完整還原、無殘留）。
+
+  **未採用「改丟 `SerializationException`」的替代方案**：那會改變直接建構子呼叫端（例如
+  `StyleSheetValidationTest` 現有 7 條、`BuiltInThemes.kt` 等）目前依賴 `IllegalArgumentException`
+  的既有語意，屬於較大的行為決策，本輪不動。記在此處給 owner：若未來要統一例外型別，`StyleSheet` 及其
+  巢狀型別的 `init` 可考慮改成先驗證、`decodeFromString` 路徑改包一層轉型，但這需要重新檢視所有既有
+  呼叫端與測試對 `IllegalArgumentException` 的依賴，不是本輪範圍。
+
+- **本輪驗收**：`StyleSheetValidationTest` 從 7 條增至 8 條，`:theme` 模組總測試數從 51 增至 52。
+  `./gradlew :theme:assembleDebug :theme:testDebugUnitTest :theme:ktfmtCheck :theme:lint`
+  第一次跑，`ktfmtCheckMain` 因新加的 KDoc 換行未套用 ktfmt 而 FAILED（`PhotoBackground.kt` /
+  `StyleSheet.kt`），跑 `:theme:ktfmtFormat` 後重新完整跑一次四項，全部 `BUILD SUCCESSFUL`
+  （`lint-results-debug.txt`：`No issues found.`）。
+- **本輪額外查核**：兩條 finding 逐條核對後，內容與程式碼現況一致，沒有發現 finding 本身有誤的地方。
+  O1 的「全 repo grep 不到 `takePersistableUriPermission`」與 O2 的「`StyleSheetValidationTest` 7
+  條全部只呼叫建構子、沒有一條走 `decodeFromString`」兩個具體斷言皆已重新查證屬實。

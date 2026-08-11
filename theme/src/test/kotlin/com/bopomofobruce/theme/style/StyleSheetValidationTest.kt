@@ -2,6 +2,7 @@ package com.bopomofobruce.theme.style
 
 import com.bopomofobruce.common.KeyboardColors
 import com.bopomofobruce.common.KeyboardDimens
+import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 
@@ -76,5 +77,40 @@ class StyleSheetValidationTest {
     fun `KeyboardTypography rejects out-of-range font weight`() {
         assertThrows(IllegalArgumentException::class.java) { KeyboardTypography(fontWeight = 0) }
         assertThrows(IllegalArgumentException::class.java) { KeyboardTypography(fontWeight = 1001) }
+    }
+
+    // O2（第十四輪 tracer）：反序列化路徑上 require 丟的仍是 IllegalArgumentException，不是
+    // SerializationException——呼叫端若只接 SerializationException 會漏接。這條測試直接走
+    // decodeFromString，證明「結構合法但欄位超出範圍」的主題 JSON 逃出來的例外型別。
+    @Test
+    fun `StyleSheet decodeFromString throws IllegalArgumentException for out-of-range nested field`() {
+        val jsonWithZeroKeyLabelSp =
+            """
+            {
+                "id": "bad-typography",
+                "colors": {
+                    "background": "#1E1E1E",
+                    "keyFill": "#2E2E2E",
+                    "keyText": "#EAEAEA",
+                    "keyAccent": "#4A90E2",
+                    "candidateText": "#EAEAEA",
+                    "candidateHighlight": "#4A90E2"
+                },
+                "dimens": {
+                    "keyHeightDp": 48.0,
+                    "rowGapDp": 4.0,
+                    "keyGapDp": 4.0,
+                    "candidateRowHeightDp": 40.0
+                },
+                "typography": {
+                    "keyLabelSp": 0.0
+                }
+            }
+            """
+                .trimIndent()
+
+        assertThrows(IllegalArgumentException::class.java) {
+            Json.decodeFromString(StyleSheet.serializer(), jsonWithZeroKeyLabelSp)
+        }
     }
 }

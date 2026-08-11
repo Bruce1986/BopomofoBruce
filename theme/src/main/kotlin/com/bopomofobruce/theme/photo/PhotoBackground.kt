@@ -9,7 +9,13 @@ import kotlinx.serialization.UseSerializers
 /**
  * 使用者自訂的相片背景設定。
  * - [uri]：使用者從相簿選的圖片 `content://` URI，存 [String] 而非 `android.net.Uri`，讓 `:theme` 的資料模型維持可在無 Android
- *   runtime 情境下序列化/反序列化（跟 [com.bopomofobruce.common.KeyData] 等 contracts-v1 型別同一慣例）。
+ *   runtime 情境下序列化/反序列化（跟 [com.bopomofobruce.common.KeyData] 等 contracts-v1 型別同一慣例）。 **呼叫端契約（[uri]
+ *   這個 `@Serializable` 型別的存在目的就是被寫進 DataStore 長期保存，但 `content://` 授權預設不是持久的）**： 呼叫端在把使用者選的圖片存進
+ *   [uri] 之前，必須先透過 SAF `ACTION_OPEN_DOCUMENT` 取得該 URI，並呼叫
+ *   `contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)`
+ *   取得可持久化授權， 授權才會跨重開機存活。`MediaStore.ACTION_PICK_IMAGES`（Android Photo Picker）發出的 URI **不支援**
+ *   `takePersistableUriPermission`——授權隨 task／process 結束即失效，把這種 URI 存進 [uri] 會在下次重開機後讓相片背景
+ *   悄悄消失（唯一訊號是 [PhotoBackgroundLayer] 的一行 `Log.w`，見該檔 KDoc）。
  * - [blurRadiusDp]：高斯模糊半徑，`0f` 代表不模糊，上限 [MAX_BLUR_RADIUS_DP]（避免呼叫端傳入
  *   離譜大的值——模糊層邊界外擴、在部分渲染路徑上可能造成明顯效能與畫面裁切問題）。
  * - [opacity]：疊加不透明度，`0f`（完全透明）..`1f`（完全不透明）。
