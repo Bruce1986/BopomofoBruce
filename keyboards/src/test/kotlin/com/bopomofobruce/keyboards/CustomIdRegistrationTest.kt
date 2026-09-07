@@ -67,18 +67,25 @@ class CustomIdRegistrationTest {
         assertTrue(inBoth.isEmpty(), "同一個 Custom id 不能同時登記在兩邊：$inBoth")
     }
 
+    /**
+     * 反向：擋住「常數改了、JSON 沒改」（IDE rename symbol 的典型單邊改動）。少了這條，把 `SWITCH_TO_ZHUYIN_CUSTOM_ID`
+     * 改成錯字會全套全綠，而 `:ime` 依常數 dispatch，那顆鍵在 執行期直接變 no-op。
+     *
+     * **這條要求「登記」與「使用」同時落地**——不能先把 id 登記進清單、等之後才補上用它的 鍵盤。那是刻意的（登記了卻沒人用，從資料上看與「分岔」「刪了沒清」無法區分），但也代表
+     * 分階段開發 W2-B 時會踩到；踩到時請連同鍵盤一起加，或先把該 id 留在清單外。
+     */
     @Test
     fun `every registered Custom id is actually used by some keyboard`() {
-        // 反向：擋住「常數改了、JSON 沒改」（IDE rename symbol 的典型單邊改動）。
-        // 少了這條，把 SWITCH_TO_ZHUYIN_CUSTOM_ID 改成錯字會 42 條全綠，而 :ime 依常數
-        // dispatch，那顆鍵在執行期直接變 no-op。
         val inUse = customIdsInUse().keys
         val registered = Keyboards.PAGE_SWITCH_CUSTOM_IDS + Keyboards.NON_PAGE_SWITCH_CUSTOM_IDS
         val orphaned = registered - inUse
         assertEquals(
             emptySet<String>(),
             orphaned,
-            "這些 Custom id 登記了卻沒有任何鍵盤在用——常數與 JSON 字面值可能已經分岔" + "（或是這顆鍵被刪了卻沒清登記）。目前實際使用中的是 $inUse。",
+            "這些 Custom id 登記了卻沒有任何鍵盤在用。三種可能：①常數與 JSON 字面值已經分岔" +
+                "（改了一邊沒改另一邊）；②這顆鍵被刪了卻沒清登記；③為還沒加進 Keyboards.all " +
+                "的鍵盤預先登記——本條刻意要求登記與使用同時落地，請連同鍵盤一起加，或先把該 " +
+                "id 留在清單外。目前實際使用中的是 $inUse。",
         )
     }
 }

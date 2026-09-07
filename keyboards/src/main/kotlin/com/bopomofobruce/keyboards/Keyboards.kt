@@ -36,13 +36,17 @@ object Keyboards {
      * 抽成常數，是為了讓**導航圖與分類清單共用同一個來源**：[ReturnPathCoverageTest] 原本自己
      * 另外寫死了一次字面字串，於是「這顆鍵登記在哪一邊」與「這顆鍵算不算返回路徑」各說各話。
      *
-     * **不是所有地方都該改用常數。**三個 id 目前的使用點有五處，刻意分成兩類：
-     * - 用常數：[PAGE_SWITCH_CUSTOM_IDS] / [NON_PAGE_SWITCH_CUSTOM_IDS]、[ReturnPathCoverageTest]
+     * **不是所有地方都該改用常數**，兩類刻意分開（不列舉具體數量——會隨每次改動漂移）：
+     * - **用常數**：[PAGE_SWITCH_CUSTOM_IDS] / [NON_PAGE_SWITCH_CUSTOM_IDS]、
+     *   [ReturnPathCoverageTest]、[ToggleFreeKeyboardsTest]、`CustomIdRegistrationTest`
      *   ——它們要表達的是「跟資料層講的是同一顆鍵」。
      * - **刻意保留字面字串**：`symbol_standard.json` / `url_qwerty.json`（資料本身）、
      *   [ToggleKeyLabelActionConsistencyTest] 的標籤表、`OtherKeyboardsContentTest` 對
      *   `url_insert_dot_com` 的比對——它們是**獨立錨點**。全部改用常數的話，「常數改了、JSON 沒改」
      *   就會兩邊一起變而沒人發現；留著字面字串，`CustomIdRegistrationTest` 的第二條 （登記了的 id 必須真的有鍵盤在用）才有東西可以對照。
+     *
+     * **獨立錨點是有代價的**：一次**合法**的重新命名（常數與 JSON 一起改）會讓 [ToggleKeyLabelActionConsistencyTest]
+     * 紅一次，因為它的標籤表寫死的還是舊字面字串。 那不是缺陷，是這個設計刻意要的那一次人工同步——失敗訊息會直接告訴你要補哪一筆。
      */
     const val GENERIC_BACK_CUSTOM_ID: String = "switch_back"
 

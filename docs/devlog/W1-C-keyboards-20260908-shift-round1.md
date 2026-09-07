@@ -251,7 +251,7 @@ IDE 的 rename symbol 就會造成這種單邊改動：Kotlin 那側全改了、
 
 ## tracer 已驗證、沒有問題的部分
 
-- 本班五條新測試**全部可被突變殺掉**，原有 37 條抽驗 5 條亦然（唯一例外是
+- 本班新測試（round 1 四條、round 2 一條、round 3 兩條，共**七條**）**全部可被突變殺掉**，原有 37 條抽驗 5 條亦然（唯一例外是
   `every key…has a positive finite weight`，它由 `KeyData.init` 保證、結構上不可能失敗，
   且測試自己的註解已誠實說明）。
 - **合成 `StaticKeyboardDef` 與 JSON 載入路徑沒有行為分歧**：10 種形狀（空 rows、空 row、
@@ -264,3 +264,35 @@ IDE 的 rename symbol 就會造成這種單邊改動：Kotlin 那側全改了、
   **零消費者**，這是純前瞻性的注意事項。（桌面 JVM 數字，非 ART 實機。）
 - `ZhuyinLayoutContentTest` 的「37 個注音符號齊全」那條自己把 `ㄦ` 補進集合，所以對 `ㄦ` 不可能
   失敗——但註解誠實說明了，且刪掉 `ㄜ` 的 longPress 會被另外兩條抓到，無需處理。
+
+---
+
+# 第 4 輪（最後一輪：對抗式複審 round 3）
+
+**round 3 的核心主張全部通過獨立重算與突變重現**，沒有 critical/high：`none`/`any` 雙層短路的
+Kotlin 語意、index 30／28／32、8 份 JSON 共 39,828 bytes 都逐一核對相符；tracer 另外把未登記的
+`Custom` 掛在**短路點之後**的 Enter 鍵 `longPress` 上，`CustomIdRegistrationTest` 正確抓到。
+也確認 `ToggleFreeKeyboardsTest` 的「clean partition」與 `CustomIdRegistrationTest` 第一條
+**不是重複**——把 id 登記錯邊（仍登記、仍有人用）時只有前者會紅，兩者測的是互補性質。
+
+本輪修四條文件層問題：
+
+1. **round 3 更正的「使用點列舉」自己又漏了一個檔案。**我把「三處」改成「五處」，卻沒把
+   `ToggleFreeKeyboardsTest` 算進去——它在三個測試方法裡對這三個常數共 5 次直接引用。
+   改法不是再數一次，而是**不寫死數量**（同一份 KDoc 早就對「37 條測試」做過同樣的處理，
+   這次卻在隔壁段落又寫了一個會漂移的數字）。
+2. **「獨立錨點」的代價沒揭露。**KDoc 只寫了它的好處。實測：一次**合法**的協調式改名
+   （常數與 JSON 一起改）會讓 `ToggleKeyLabelActionConsistencyTest` 紅一次，因為它的標籤表
+   寫死的還是舊字面值。那不是缺陷，是這個設計刻意要的那一次人工同步——但要寫出來。
+3. **`CustomIdRegistrationTest` 第二條會對「W2-B 預先登記」誤紅，錯誤訊息卻只給兩個成因。**
+   實測把一個假想的 `switch_to_generic_abc_w2b` 加進清單（模擬先登記、JSON 之後補），
+   該條立即紅而訊息叫人去查「分岔」或「遺留鍵」——兩個都不是真正的成因。已補上第三種成因，
+   並在 KDoc 說明「本條刻意要求登記與使用同時落地」這個限制。
+4. **devlog 的「本班五條新測試」與實際對不上**：逐 commit 數過是 4＋1＋2＝**七條**。
+   已更正。（五條是 round 3 tracer 當下的數字，round 3 自己又加了兩條之後就過期了。）
+
+## tracer 標記為「無出處」的兩則（記錄下來，不是問題）
+
+devlog round 3 段落引用的「冷啟動 3.57 ms」與「10 種形狀 round-trip 一致」，在 repo 裡找不到
+對應的可重跑腳本——它們是 tracer 在自己的 probe worktree 裡量的，probe 已清掉。與本 repo
+既有的「另開 probe worktree」作法一致，但**這兩個數字無法從 repo 重現**，引用時請注意。
