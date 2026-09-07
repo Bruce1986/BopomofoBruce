@@ -178,3 +178,89 @@ enhanced signature，非嚴格模式下不是 error），`ktfmtCheck` 又只管�
   顯示 4 條一起紅時，**只有這一條**提到 `LanguageToggle` 與 `destinationsOf()`，其餘三條都只說
   「目錄變了」。更精準的寫法需要資料層有「這份鍵盤是不是 LanguageToggle 目的地」的標記，
   而 `KeyboardDef` 沒有這種欄位——成本明顯超過這個 trip-wire 的簡單有效，維持現狀。
+
+---
+
+# 第 3 輪（Opus tracer 全案最終掃描）
+
+## 🔴 critical：本班 round 2 補的那道守門，在真實鍵盤上從來不會觸發
+
+round 2 補了「未登記的 `Custom` id 要大聲失敗」的直接測試，並在 KDoc 兩處宣稱
+`ToggleFreeKeyboardsTest` 的 `throw` 就是這條守門。**兩句都是假的。**
+
+`isToggleFree` 是 `rows.flatten().none { … actions.any { … } }`——`none` 與 `any` **兩層都會短路**。
+只要那份鍵盤上較早的某顆鍵已經是切頁鍵，走訪就停了，後面的鍵根本不會被送進
+`isPageSwitchAction`，那個 `throw` 自然永遠到不了。攤平後的實際順序：
+
+| 鍵盤 | 第一顆切頁鍵的 index | 總鍵數 | 後果 |
+|---|---|---|---|
+| `symbol_standard` | 30（`返回`） | 36 | index 30 之後全部不檢查 |
+| `url_qwerty` | 28（`全形`） | 34 | `url_insert_dot_com` 在 index 32，**從來沒被檢查過** |
+
+**端到端重現**（本輪實跑）：在 `symbol_standard` 加一顆 `半形` →
+`Custom("switch_to_halfwidth")`，插在既有控制鍵之後（最自然的位置）——第一次跑
+`ToggleKeyLabelActionConsistencyTest` 會紅；接著**照它的失敗訊息**把 `半形` 加進標籤表，
+於是 **42 條全綠**，而那顆真正的切頁鍵被靜默當成「不是切頁鍵」。也就是說：開發者完全照著
+測試的指引走，就會走進 M2 存在要防的那個誤判。
+
+round 2 的測試之所以蓋不到，是因為它的合成鍵盤把未登記的 `Custom` 放成**唯一**的切頁鍵
+——正是短路唯一咬不到的那種排列。**它可以被突變殺掉（round 2 驗過），卻證明不了真實目錄
+的任何事。**這與整個工作包一路在追的失效形狀完全相同（規則本身沒錯、被現有配列的長相遮住），
+只是這次出現在「修那個失效」的修正裡面。
+
+## 🟠 high：常數與 JSON 是兩個獨立來源，其中兩個改錯字完全靜默
+
+round 1 抽出的三個 `const val` 與 JSON 裡的字面字串沒有任何測試對照過。兩個方向實測：
+
+| 突變 | 結果 |
+|---|---|
+| `GENERIC_BACK_CUSTOM_ID` 改錯字（JSON 不動） | 紅（但只是**碰巧**——`返回` 剛好是短路發生前的第一顆） |
+| `SWITCH_TO_ZHUYIN_CUSTOM_ID` 改錯字（JSON 不動） | **42 條全綠** |
+| `URL_INSERT_DOT_COM_CUSTOM_ID` 改錯字（JSON 不動） | **42 條全綠** |
+
+IDE 的 rename symbol 就會造成這種單邊改動：Kotlin 那側全改了、JSON 字串沒動，而 `:ime` 是依
+常數 dispatch 的——那顆鍵在執行期直接變 no-op，測試全綠。
+
+## 修法：一條不短路的專屬測試，同時關掉上面兩個洞
+
+新增 `CustomIdRegistrationTest`，**逐一走訪、不短路、不依賴任何鍵位順序**，兩個方向各一條：
+
+1. `Keyboards.all` 裡用到的每個 `Custom` id 都必須登記在兩份清單其中一邊，且只在一邊。
+2. **反向**：登記了的每個 id 都必須真的有鍵盤在用（這條才擋得住常數／JSON 分岔）。
+
+突變驗證：
+
+| 突變 | 修正前 | 修正後 |
+|---|---|---|
+| 加未登記的切頁鍵＋補標籤表 | 42 全綠 | 紅 1（第 1 條） |
+| `SWITCH_TO_ZHUYIN_CUSTOM_ID` 改錯字 | 42 全綠 | 紅 2（兩條都紅） |
+
+並修掉 KDoc 兩處被證偽的宣稱，改成講明「那個 `throw` 現在只是備援，不是守門」。
+
+## 其他
+
+- **刻意不把測試裡的字面字串改成常數**（tracer 提到有四處）：那些字面值正是**獨立錨點**
+  ——全部改用常數的話，「常數改了、JSON 沒改」會兩邊一起變而沒人發現，第 2 條測試就沒有
+  東西可以對照了。已把這個取捨寫進 `GENERIC_BACK_CUSTOM_ID` 的 KDoc，並更正它原本寫錯的
+  使用點列舉（宣稱三處，實際五處）。
+- 正式 KDoc 裡寫死的「37 條測試」會隨每輪漂移，已改成不寫死條數（數字留在 devlog）。
+- `round5.md` 兩處「唯一終端頁」是 L1 已推翻的舊事實，該檔別處有更正註記的慣例卻漏了這兩處，
+  已補上——先讀到 round5 的人本來會拿到過期的結論。
+- `.kotlin/`（Kotlin compiler session 檔）未被 `.gitignore` 涵蓋，本班約 20 次 gradle 就多出 5 個
+  檔案，`git add -A` 有機會把它們 commit 進去。已加一行。
+
+## tracer 已驗證、沒有問題的部分
+
+- 本班五條新測試**全部可被突變殺掉**，原有 37 條抽驗 5 條亦然（唯一例外是
+  `every key…has a positive finite weight`，它由 `KeyData.init` 保證、結構上不可能失敗，
+  且測試自己的註解已誠實說明）。
+- **合成 `StaticKeyboardDef` 與 JSON 載入路徑沒有行為分歧**：10 種形狀（空 rows、空 row、
+  空白 id、單獨的 high surrogate、重複 label、`Float.MAX_VALUE` / 次正規 weight 等）全部
+  round-trip 一致、都不丟例外。`KeyboardLoader` 的嚴格性只在於 `ignoreUnknownKeys=false`，
+  而「未知欄位」在 Kotlin 建構子這側根本無法表達。
+- **`Keyboards.all` 一次載入 8 份的成本**：8 份 JSON 共 39,828 bytes，冷啟動全載
+  **3.57 ms**（第一份 0.82 ms 含 serializer 初始化，其餘 7 份約 0.39 ms/份），一個 process 一次。
+  且每份鍵盤各自 `by lazy`，`:ime` 可以只碰需要的那一個；目前 `Keyboards` 在 `:keyboards` 之外
+  **零消費者**，這是純前瞻性的注意事項。（桌面 JVM 數字，非 ART 實機。）
+- `ZhuyinLayoutContentTest` 的「37 個注音符號齊全」那條自己把 `ㄦ` 補進集合，所以對 `ㄦ` 不可能
+  失敗——但註解誠實說明了，且刪掉 `ㄜ` 的 longPress 會被另外兩條抓到，無需處理。

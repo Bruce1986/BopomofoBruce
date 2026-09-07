@@ -39,7 +39,7 @@
 改動檔案：
 - `keyboards/src/main/resources/keyboards/numeric_standard.json`（`.` 鍵新增 `longPress`）
 - `keyboards/src/main/kotlin/com/bopomofobruce/keyboards/Keyboards.kt`：`numericStandard` KDoc
-  補充負號 longPress 與「本頁無切頁鍵、是唯一終端頁」的說明。
+  補充負號 longPress 與「本頁無切頁鍵、是唯一終端頁」的說明。（**round-11 tracer 審查（L1）更正**：終端頁其實有三份——`numeric_standard`、`phone_dialpad`、`datetime_standard`，「唯一」是錯的；見 round13 devlog 與 `Keyboards.numericStandard` 的 KDoc。）
 - `keyboards/src/test/kotlin/com/bopomofobruce/keyboards/OtherKeyboardsContentTest.kt`：新增
   `numeric keyboard can type a minus sign for signed values`，斷言 `-` 短按或長按可達。
 
@@ -63,7 +63,7 @@ OtherKeyboardsContentTest > numeric keyboard can type a minus sign for signed va
 改動檔案：
 - `keyboards/src/main/resources/keyboards/phone_dialpad.json`（`+` 鍵、`#` 鍵各新增 `longPress`）
 - `keyboards/src/main/kotlin/com/bopomofobruce/keyboards/Keyboards.kt`：`phoneDialpad` KDoc
-  補充分隔符 longPress 與「本頁無切頁鍵、是唯一終端頁」的說明。
+  補充分隔符 longPress 與「本頁無切頁鍵、是唯一終端頁」的說明。（**round-11 tracer 審查（L1）更正**：終端頁其實有三份——`numeric_standard`、`phone_dialpad`、`datetime_standard`，「唯一」是錯的；見 round13 devlog 與 `Keyboards.numericStandard` 的 KDoc。）
 - `keyboards/src/test/kotlin/com/bopomofobruce/keyboards/OtherKeyboardsContentTest.kt`：新增
   `phone dialpad can type out common phone number separators`，斷言 `-` 與 `,` 短按或長按可達。
 

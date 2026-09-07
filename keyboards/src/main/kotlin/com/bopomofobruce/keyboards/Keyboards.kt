@@ -33,8 +33,16 @@ object Keyboards {
     /**
      * 「回到剛剛送我來這裡的那份鍵盤」的 [com.bopomofobruce.common.KeyAction.Custom] id。
      *
-     * 抽成常數而不是各處寫死字面字串：這個 id 同時被 `symbol_standard.json`、 [PAGE_SWITCH_CUSTOM_IDS] 與
-     * [ReturnPathCoverageTest] 三處使用，而後者原本自己 另外寫死了一次，於是「這顆鍵登記在哪一邊」與「這顆鍵算不算返回路徑」是兩個 各說各話的來源。
+     * 抽成常數，是為了讓**導航圖與分類清單共用同一個來源**：[ReturnPathCoverageTest] 原本自己
+     * 另外寫死了一次字面字串，於是「這顆鍵登記在哪一邊」與「這顆鍵算不算返回路徑」各說各話。
+     *
+     * **不是所有地方都該改用常數。**三個 id 目前的使用點有五處，刻意分成兩類：
+     * - 用常數：[PAGE_SWITCH_CUSTOM_IDS] / [NON_PAGE_SWITCH_CUSTOM_IDS]、[ReturnPathCoverageTest]
+     *   ——它們要表達的是「跟資料層講的是同一顆鍵」。
+     * - **刻意保留字面字串**：`symbol_standard.json` / `url_qwerty.json`（資料本身）、
+     *   [ToggleKeyLabelActionConsistencyTest] 的標籤表、`OtherKeyboardsContentTest` 對
+     *   `url_insert_dot_com` 的比對——它們是**獨立錨點**。全部改用常數的話，「常數改了、JSON 沒改」
+     *   就會兩邊一起變而沒人發現；留著字面字串，`CustomIdRegistrationTest` 的第二條 （登記了的 id 必須真的有鍵盤在用）才有東西可以對照。
      */
     const val GENERIC_BACK_CUSTOM_ID: String = "switch_back"
 
@@ -54,15 +62,24 @@ object Keyboards {
      * 也可能是切頁鍵（`"switch_to_zhuyin"` 就是），這條規則沒有跟著更新——今天湊巧不出錯是因為 `symbolStandard` 另外還掛了
      * `language_toggle`，一旦出現「只用 `Custom` 切頁」的鍵盤就會被誤判成 終端頁。
      *
-     * 這兩份清單合起來必須涵蓋 [Keyboards.all] 目前用到的每一個 `Custom` id—— [ToggleFreeKeyboardsTest] 對「出現一個兩邊都沒登記的
-     * id」直接判定失敗，不會靜默放行成「不是切頁鍵」。
+     * 這兩份清單合起來必須涵蓋 [Keyboards.all] 目前用到的每一個 `Custom` id——由 `CustomIdRegistrationTest`
+     * 逐一走訪、不短路地釘住這條性質（**兩個方向**：用到的 id 必須 有登記，登記了的 id 也必須真的有鍵盤在用）。
+     *
+     * ⚠️ **不要以為 `ToggleFreeKeyboardsTest` 的 throw 就是這條守門**：它一度是這麼寫的，但 `isToggleFree` 是
+     * `rows.flatten().none { … any { … } }`，`none` 與 `any` **兩層都會短路**
+     * ——只要那份鍵盤上較早的某顆鍵已經是切頁鍵，後面的鍵根本不會被送進 `isPageSwitchAction`。 實測（2026-09-08 round-3
+     * tracer）攤平後：`symbol_standard` 的第一顆切頁鍵在 index 30 （共 36 鍵）、`url_qwerty` 在 index 28（共 34 鍵，所以
+     * `url_insert_dot_com` 位在 index 32、 **從來沒被檢查過**）。端到端重現：加一顆 `半形` →
+     * `Custom("switch_to_halfwidth")` 排在既有 控制鍵之後，再照 [ToggleKeyLabelActionConsistencyTest]
+     * 的失敗訊息把標籤補進表——**42 條 全綠**，那顆真正的切頁鍵被靜默當成「不是切頁鍵」。那個 throw 現在只是備援，不是守門。
      *
      * **但「兩邊都沒登記」只是兩種錯法之一**：另一種是「登記了、但登記錯邊」。這一種一度 完全沒有守門——實測（2026-09-08，突變測試）把
-     * [GENERIC_BACK_CUSTOM_ID] 從本清單移到 [NON_PAGE_SWITCH_CUSTOM_IDS]，37 條測試**全數通過**。原因是兩邊都剛好看不到它：
-     * [ToggleFreeKeyboardsTest] 釘的是「哪幾份鍵盤是終端頁」，而 `symbolStandard` 另外還掛著 `switch_to_zhuyin` 與
-     * `language_toggle`，少算一顆不影響它的終端頁判定； [ReturnPathCoverageTest] 則根本不看這兩份清單，自己另外寫死了一次字面字串。 那正是本
-     * KDoc 上一段描述的同一種失效（規則本身不完備、靠鍵盤組合湊巧遮住）， 只是換到了分類這一層。現已補上兩道守門：分類本身有專屬測試， [ToggleFreeKeyboardsTest]
-     * 另有一份「唯一的切頁鍵就是 `Custom`」的合成鍵盤， 讓規則不再依賴 [Keyboards.all] 目前剛好長什麼樣子。
+     * [GENERIC_BACK_CUSTOM_ID] 從本清單移到 [NON_PAGE_SWITCH_CUSTOM_IDS]，**當時全套測試零反應**（具體條數逐輪會變，記在
+     * devlog，不寫死在這裡）。原因是兩邊都剛好看不到它： [ToggleFreeKeyboardsTest] 釘的是「哪幾份鍵盤是終端頁」，而 `symbolStandard`
+     * 另外還掛著 `switch_to_zhuyin` 與 `language_toggle`，少算一顆不影響它的終端頁判定； [ReturnPathCoverageTest]
+     * 則根本不看這兩份清單，自己另外寫死了一次字面字串。 那正是本 KDoc 上一段描述的同一種失效（規則本身不完備、靠鍵盤組合湊巧遮住），
+     * 只是換到了分類這一層。現已補上兩道守門：分類本身有專屬測試， [ToggleFreeKeyboardsTest] 另有一份「唯一的切頁鍵就是 `Custom`」的合成鍵盤，
+     * 讓規則不再依賴 [Keyboards.all] 目前剛好長什麼樣子。
      */
     val PAGE_SWITCH_CUSTOM_IDS: Set<String> =
         setOf(SWITCH_TO_ZHUYIN_CUSTOM_ID, GENERIC_BACK_CUSTOM_ID)
@@ -134,8 +151,9 @@ object Keyboards {
      * [PAGE_SWITCH_CUSTOM_IDS] 裡的 [com.bopomofobruce.common.KeyAction.Custom]**（M2，round-13 tracer
      * 審查——原本這句話漏了 `Custom` 也可能是切頁鍵，`symbolStandard` 的 `"switch_to_zhuyin"`/`"switch_back"`
      * 都是；當時湊巧沒出錯是因為 `symbolStandard` 另外掛了 `language_toggle`，一旦出現「只用 `Custom` 切頁」的鍵盤就會被這條不完備規則
-     * 誤判成終端頁）。[ToggleFreeKeyboardsTest] 釘住「這三份且僅這三份」這個性質，且對任何未登記進 [PAGE_SWITCH_CUSTOM_IDS] /
-     * [NON_PAGE_SWITCH_CUSTOM_IDS] 的 `Custom` id 直接判定失敗，不會靜默放行。
+     * 誤判成終端頁）。[ToggleFreeKeyboardsTest] 釘住「這三份且僅這三份」這個性質。**「每個 `Custom` id 都有登記」則是由
+     * `CustomIdRegistrationTest` 守的，不是 [ToggleFreeKeyboardsTest]**——後者的 throw 會被 `none`/`any`
+     * 的短路跳過（見 [PAGE_SWITCH_CUSTOM_IDS] KDoc 的實測），只能算備援。
      */
     val numericStandard: KeyboardDef by lazy {
         KeyboardLoader.loadFromResource("keyboards/numeric_standard.json")
