@@ -13,8 +13,37 @@ import com.bopomofobruce.common.KeyboardDef
  *
  * Explicitly **not** here: emoji / kaomoji keyboards (W2-D) and any UI rendering (`:ime`'s job) —
  * see the W1-C work-package scope in `docs/DEVPLAN-SubagentFanout-20260620-0851.md`.
+ *
+ * ## `:ime` 必須做到的一件事：把 `longPress.label` 畫出來
+ *
+ * 本模組有幾個功能**只存在於長按**，而且沒有任何替代入口：
+ * - [passwordQwerty] / [urlQwerty] 的數字 0–9 與 16 個半形符號（短按那一層只有 26 個小寫字母）
+ * - [numericStandard] 的負號 `-`（掛在 `.` 上；`TYPE_NUMBER_FLAG_SIGNED` 的欄位靠它）
+ * - [zhuyin4x10Portrait] / [zhuyin4x10Landscape] 的 `ㄦ`（掛在 `ㄜ` 上）
+ *
+ * 這些鍵盤的內容測試（例如「password 鍵盤打得出每一個數字」）驗的是**資料層可不可達**， 不是**使用者知不知道**。若 `:ime`
+ * 只把長按做成「會動」而不畫出提示，第一次使用的人在 密碼欄位看到的就只有一排小寫字母，沒有任何線索顯示按住 `q` 會得到 `1`——測試全綠， 功能等於不存在。這正是本工作包前 14
+ * 輪反覆抓到的「驗收標準過了但功能不能用」。
+ *
+ * 所以這是一條**契約，不是建議**：`:ime` 的按鍵 renderer 對每一顆帶 [com.bopomofobruce.common.KeyData.longPress] 的鍵，都必須把
+ * [com.bopomofobruce.common.LongPressData.label] 常駐顯示（慣例是右上角小字）。 資料層不需要為此改
+ * schema——`LongPressData.label` 就是為了被畫出來才存在的。
  */
 object Keyboards {
+    /**
+     * 「回到剛剛送我來這裡的那份鍵盤」的 [com.bopomofobruce.common.KeyAction.Custom] id。
+     *
+     * 抽成常數而不是各處寫死字面字串：這個 id 同時被 `symbol_standard.json`、 [PAGE_SWITCH_CUSTOM_IDS] 與
+     * [ReturnPathCoverageTest] 三處使用，而後者原本自己 另外寫死了一次，於是「這顆鍵登記在哪一邊」與「這顆鍵算不算返回路徑」是兩個 各說各話的來源。
+     */
+    const val GENERIC_BACK_CUSTOM_ID: String = "switch_back"
+
+    /** 「切回注音鍵盤」的 `Custom` id（固定目的地，見 [symbolStandard] KDoc）。 */
+    const val SWITCH_TO_ZHUYIN_CUSTOM_ID: String = "switch_to_zhuyin"
+
+    /** 「插入 `.com`」的 `Custom` id——插入文字，不是切頁鍵（見 [urlQwerty] KDoc）。 */
+    const val URL_INSERT_DOT_COM_CUSTOM_ID: String = "url_insert_dot_com"
+
     /**
      * [com.bopomofobruce.common.KeyAction.Custom] id 集合，依「是否代表切頁（帶使用者跳去另一份
      * 鍵盤，而不是插入文字或其他行為）」分類（M2，round-13 tracer 審查）。
@@ -27,13 +56,30 @@ object Keyboards {
      *
      * 這兩份清單合起來必須涵蓋 [Keyboards.all] 目前用到的每一個 `Custom` id—— [ToggleFreeKeyboardsTest] 對「出現一個兩邊都沒登記的
      * id」直接判定失敗，不會靜默放行成「不是切頁鍵」。
+     *
+     * **但「兩邊都沒登記」只是兩種錯法之一**：另一種是「登記了、但登記錯邊」。這一種一度 完全沒有守門——實測（2026-09-08，突變測試）把
+     * [GENERIC_BACK_CUSTOM_ID] 從本清單移到 [NON_PAGE_SWITCH_CUSTOM_IDS]，37 條測試**全數通過**。原因是兩邊都剛好看不到它：
+     * [ToggleFreeKeyboardsTest] 釘的是「哪幾份鍵盤是終端頁」，而 `symbolStandard` 另外還掛著 `switch_to_zhuyin` 與
+     * `language_toggle`，少算一顆不影響它的終端頁判定； [ReturnPathCoverageTest] 則根本不看這兩份清單，自己另外寫死了一次字面字串。 那正是本
+     * KDoc 上一段描述的同一種失效（規則本身不完備、靠鍵盤組合湊巧遮住）， 只是換到了分類這一層。現已補上兩道守門：分類本身有專屬測試， [ToggleFreeKeyboardsTest]
+     * 另有一份「唯一的切頁鍵就是 `Custom`」的合成鍵盤， 讓規則不再依賴 [Keyboards.all] 目前剛好長什麼樣子。
      */
-    val PAGE_SWITCH_CUSTOM_IDS: Set<String> = setOf("switch_to_zhuyin", "switch_back")
+    val PAGE_SWITCH_CUSTOM_IDS: Set<String> =
+        setOf(SWITCH_TO_ZHUYIN_CUSTOM_ID, GENERIC_BACK_CUSTOM_ID)
 
     /** 不代表切頁、單純插入文字/其他行為的 `Custom` id（同上，供終端頁判定排除）。 */
-    val NON_PAGE_SWITCH_CUSTOM_IDS: Set<String> = setOf("url_insert_dot_com")
+    val NON_PAGE_SWITCH_CUSTOM_IDS: Set<String> = setOf(URL_INSERT_DOT_COM_CUSTOM_ID)
 
-    /** 注音 4×10，直向。大千式配列，見 [KeyboardLoader] 所讀 JSON 內的來源附註。 */
+    /**
+     * 注音 4×10，直向。大千式配列，見 [KeyboardLoader] 所讀 JSON 內的來源附註。
+     *
+     * **已知落差（W2-B 之前）：直向時打不出任何數字，而且完全沒有替代路徑。**本配列沒有 數字鍵（40 格塞不下），唯一走得到的逃生口 [symbolStandard] 的 30
+     * 個字元裡也**沒有** 數字（全形或半形都沒有），所以「我今年30歲」這種句子在直向下打不完；[LanguageToggle] 的目的地（通用英數鍵盤）要等 W2-B。橫向
+     * [zhuyin4x10Landscape] 因為多一列數字快捷鍵 反而打得出來——**轉個方向就多一個功能**，而使用者沒有理由想到要轉方向。
+     *
+     * 這個缺口跨兩個檔案（本配列缺、符號頁也缺），單看任何一份 JSON 都不會發現，所以寫在 這裡。若 W2-B 有延誤，最小的止血是在 [symbolStandard] 補上全形
+     * `０`–`９`——它已經是 直向唯一到得了的地方。
+     */
     val zhuyin4x10Portrait: KeyboardDef by lazy {
         KeyboardLoader.loadFromResource("keyboards/zhuyin_4x10_portrait.json")
     }

@@ -1,8 +1,11 @@
 package com.bopomofobruce.keyboards
 
 import com.bopomofobruce.common.KeyAction
+import com.bopomofobruce.common.KeyData
 import com.bopomofobruce.common.KeyboardDef
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
@@ -67,5 +70,67 @@ class ToggleFreeKeyboardsTest {
             actualToggleFreeIds,
             "toggle-free (terminal) keyboards changed -- update Keyboards.kt KDoc to match",
         )
+    }
+
+    @Test
+    fun `the two Custom id sets are a clean partition of the ids actually used`() {
+        // 兩份清單的分類**本身**要有守門。原本只有「兩邊都沒登記」會失敗（見
+        // isPageSwitchAction 的 throw），但「登記了、卻登記錯邊」完全沒人看：實測
+        // （2026-09-08）把 GENERIC_BACK_CUSTOM_ID 從 PAGE_SWITCH 移到 NON_PAGE_SWITCH，
+        // 37 條測試全數通過——因為 symbolStandard 另外還掛著 switch_to_zhuyin 與
+        // language_toggle，少算一顆不改變它的終端頁判定。
+        val overlap =
+            Keyboards.PAGE_SWITCH_CUSTOM_IDS intersect Keyboards.NON_PAGE_SWITCH_CUSTOM_IDS
+        assertEquals(emptySet<String>(), overlap, "同一個 Custom id 不能同時登記在兩邊")
+
+        // 這三顆的分類是資料層與導航圖共同依賴的事實，不能靠「目前剛好沒出事」維持。
+        assertTrue(
+            Keyboards.GENERIC_BACK_CUSTOM_ID in Keyboards.PAGE_SWITCH_CUSTOM_IDS,
+            "『返回』是切頁鍵：它會把使用者帶回來源鍵盤。登記成非切頁鍵會讓 " + "ReturnPathCoverageTest 與資料層對『這顆鍵會不會換頁』說法相反。",
+        )
+        assertTrue(
+            Keyboards.SWITCH_TO_ZHUYIN_CUSTOM_ID in Keyboards.PAGE_SWITCH_CUSTOM_IDS,
+            "『注音』是切頁鍵",
+        )
+        assertTrue(
+            Keyboards.URL_INSERT_DOT_COM_CUSTOM_ID in Keyboards.NON_PAGE_SWITCH_CUSTOM_IDS,
+            "『.com』插入文字，不是切頁鍵",
+        )
+    }
+
+    @Test
+    fun `a keyboard whose only page-switch key is a Custom id is not counted as terminal`() {
+        // 用合成鍵盤釘住**規則**，不依賴 Keyboards.all 目前剛好長什麼樣子。M2 修的正是
+        // 「規則不完備、但被現有鍵盤組合湊巧遮住」——symbolStandard 另外掛了 language_toggle，
+        // 所以就算完全不看 Custom 也不會出錯。等到真的出現「唯一的切頁鍵是 Custom」的鍵盤
+        // （switch_back 就是設計成給任何鍵盤重用的通用逃生口）才會爆，那時已經太遲。
+        val onlyCustomSwitch =
+            StaticKeyboardDef(
+                id = "synthetic-custom-only",
+                rows =
+                    listOf(
+                        listOf(
+                            KeyData("a", KeyAction.Character('a')),
+                            KeyData("返回", KeyAction.Custom(Keyboards.GENERIC_BACK_CUSTOM_ID)),
+                        )
+                    ),
+            )
+        assertFalse(isToggleFree(onlyCustomSwitch), "唯一的切頁鍵是 Custom 時，這份鍵盤仍然不是終端頁")
+
+        val genuinelyTerminal =
+            StaticKeyboardDef(
+                id = "synthetic-terminal",
+                rows =
+                    listOf(
+                        listOf(
+                            KeyData("a", KeyAction.Character('a')),
+                            KeyData(
+                                ".com",
+                                KeyAction.Custom(Keyboards.URL_INSERT_DOT_COM_CUSTOM_ID),
+                            ),
+                        )
+                    ),
+            )
+        assertTrue(isToggleFree(genuinelyTerminal), "只掛非切頁的 Custom（插入文字）時，這份鍵盤確實是終端頁")
     }
 }
