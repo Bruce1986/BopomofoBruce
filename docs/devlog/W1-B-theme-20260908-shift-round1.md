@@ -14,8 +14,18 @@
 
 **突變實測**：把正式 `relativeLuminance` 的 gamma 由 `2.4` 改成 `2.2`（WCAG 公式的核心常數）
 → `AccentColorSelectionTest` 紅 1 條（它真的呼叫 `pickAccentColor` → 正式 `contrastRatio`），
-而 `BuiltInThemesContrastTest` **12 條全數維持綠燈**。把 `contrastRatio` 的 `+0.05` 偏移拿掉，
-結果相同。
+而 `BuiltInThemesContrastTest` **12 條全數維持綠燈**。
+
+> ⚠️ **更正（round 2）**：本節原文還寫了「把 `contrastRatio` 的 `+0.05` 偏移拿掉，結果相同」，
+> 並把它與 gamma 突變並列為等效證據。**那是錯的，而且我沒有自己驗算就寫進了永久紀錄。**
+> 移除 `+0.05` 偏移在數學上**只會讓比值變大**：`L1 ≥ L2 ≥ 0` 時
+> `L1/L2 ≥ (L1+0.05)/(L2+0.05)` 恆成立（分子分母同加正常數會把比值拉向 1）。而
+> `BuiltInThemesContrastTest` 的 12 條全是 `ratio >= 門檻` 的下限檢查，所以這個突變**不論修正
+> 前後都不可能讓它們變紅**——它從一開始就不是能區分修正前後的突變。實測確認：修正後這個
+> 突變下 `BuiltInThemesContrastTest` 0 紅、只有 `AccentColorSelectionTest` 1 紅（後者測的是
+> 候選**排序**，非線性重新縮放會改變名次，那是另一種鑑別機制）。
+> **能區分修正前後的只有 gamma 突變**，而它已經獨立、充分地證明了本節的論點。
+> ⚠️ commit `6807b28` 的 message 裡也有同一句錯誤敘述，已推出、改不掉，以本段為準。
 
 也就是說：這 12 條是本 PR 用來守兩個內建主題全部對比門檻的主力，卻壓根沒在測產品程式碼。
 `DynamicAccentSelection.kt` 的 KDoc 自己早就寫著這份重複的存在、目的是「**避免第三份手抄
@@ -94,3 +104,59 @@ reviewer 推翻了我原本的假設（「2.9 是為了讓現值通過而調鬆�
    但之後擴充案例時可以把這個突變單獨當成一條回歸測試。
 4. `dynamicColorsFor()` 的 fallback 分支只挑文字對比度最高者，不看 `separationReferences`
    ——已是 devlog G3 登記在案的 W2 契約 follow-up，此處僅重述位置，不重開。
+
+---
+
+# 第 2 輪（對抗式複審 round 1 自己的修正）
+
+round 1 的兩處修正在突變下都如預期轉紅（gamma 突變 → `BuiltInThemesContrastTest` 4 紅、
+`keyLabelSp` 預設值突變 → 只有 `StyleDefaultsTest` 1 紅），核心論證站得住。本輪處理四條：
+
+## A. 更正 round 1 寫進永久紀錄的一個錯誤突變宣稱
+
+見上一節的更正框。要點：**「移除 `+0.05` 偏移」這個突變對任何純下限檢查（`ratio >= 門檻`）
+都是無效突變**，因為移除偏移只會讓比值變大。我在 round 1 把它與 gamma 突變並列成等效證據，
+而且沒有自己驗算就寫了進去——這是本班第三次在「補守門」的當下寫出未驗證的宣稱
+（前兩次都在 bruce_bot#304）。這次的教訓更明確：**突變無效不代表被測程式碼沒問題，
+只代表這個突變挑錯了**——判斷一個突變有沒有鑑別力，要先問「它會往哪個方向動被測的量」。
+
+## B. 補上「唯一那份公式自己錯了」的偵測能力
+
+round 1 修掉了「兩份公式各自漂移」，但換來新風險：全模組只剩一份 `relativeLuminance` /
+`contrastRatio`，它自己錯了的話所有使用者會**一起錯**。而 `theme/src/test/` 底下原本
+**沒有任何一條**測試是拿外部已知答案驗這份公式的——全是「這份公式算的值 vs 這份公式算的
+另一個值」或「算出來的值 vs 門檻常數」。
+
+新增 `ContrastFormulaKnownValuesTest`，三組刻意涵蓋不同錯誤型態（鑑別力皆以獨立實作交叉驗算）：
+
+| 已知值 | 抓得到 | 抓不到 |
+|---|---|---|
+| 黑白 = 21:1（WCAG 數學上界） | `+0.05` 偏移被動過（會變成 `Infinity`） | gamma 錯誤（0 與 1 的任何次方仍是 0 與 1） |
+| `#767676` 對白 ≈ 4.5422（WebAIM 常引用的「剛好達 AA」灰） | gamma 錯誤（2.2 會算成 4.0559，跨過 4.5） | — |
+| 同色自比 = 1.0 | lighter/darker 取反、除法寫反 | — |
+
+另加對稱性與「alpha 不影響亮度」兩條。**這些期望值不可以改成從本專案公式反推的數字**，
+否則會退化成自我印證——已寫進 `DynamicAccentSelection.kt` 的 KDoc。
+
+## C. `DynamicAccentSelection.kt` 的 KDoc 講的是已經不存在的東西
+
+原文寫「與 `BuiltInThemesContrastTest` 私有實作的公式相同」——round 1 已經把那份私有複製品
+**刪掉**了，現在兩者是**同一份**，不是「相同的另一份」。留著會讓下一個讀者以為還有兩份平行
+實作要維護同步，正是 round 1 想根除的認知模型。已改寫，並把 B 節那條「別把已知值改成反推值」
+的約束寫進去。
+
+## D. 把 `StyleDefaultsTest` 的防護邊界寫清楚
+
+突變實證：單改預設值 → 轉紅；**預設值與測試期望值一起改（兩檔同動）→ 55 條全綠**。凡是簽入
+快照都有這個固有邊界。它的價值是把「改預設值」從零觸點變成一個觸點——PR diff 裡會出現成對
+變更讓 reviewer 有機會問「為什麼」。**擋協同修改靠人看 diff，不是靠這條測試。**已寫進 KDoc，
+避免日後有人高估它。
+
+60 tests / 0 failures（round 1 後為 55），`ktfmtCheck` 綠。
+
+## 本輪未改（已評估）
+
+- `StyleDefaultsTest` 改成斷言 `LightTheme.styleSheet.typography == KeyboardTypography()`：
+  在**現狀**下不會多抓到任何東西（兩者字面上就是同一個呼叫，`LightTheme`/`DarkTheme` 都沒有
+  顯式傳 `typography =`）。它的價值只在未來浮現——若哪天有人給主題顯式傳入一份「字面上與預設
+  相同」的 typography，兩者就會開始分岔。記在這裡，等真的出現顯式覆寫時再加。

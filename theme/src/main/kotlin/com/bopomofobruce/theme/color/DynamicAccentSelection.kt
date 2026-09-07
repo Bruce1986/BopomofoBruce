@@ -5,9 +5,15 @@ import kotlin.math.min
 import kotlin.math.pow
 
 /**
- * WCAG 2.x 相對亮度公式：先把 8-bit sRGB channel 轉線性光，再用固定權重加總。與 `BuiltInThemesContrastTest` 私有實作的公式相同（來源：
- * https://www.w3.org/TR/WCAG21/#dfn-relative-luminance）。這裡公開成 internal，讓 [pickAccentColor]
- * 與其單元測試共用同一份實作，避免第三份手抄公式。
+ * WCAG 2.x 相對亮度公式：先把 8-bit sRGB channel 轉線性光，再用固定權重加總
+ * （來源：https://www.w3.org/TR/WCAG21/#dfn-relative-luminance）。
+ *
+ * `internal` 是為了讓 [pickAccentColor]、`BuiltInThemesContrastTest` 與其單元測試**共用這唯一
+ * 一份實作**。`BuiltInThemesContrastTest` 一度自己私有重抄了一份逐字元相同的公式，於是它那 12
+ * 條對比門檻驗的是測試自己抄的版本、對正式實作的任何迴歸完全免疫（2026-09-08 深審用突變 實證：把下方 gamma 由 2.4 改成 2.2，那 12 條全綠）；那份複製品已刪除。
+ *
+ * 只剩一份實作的代價是「它自己錯了就沒有第二份能對照」，所以另有 `ContrastFormulaKnownValuesTest` 拿**獨立於本公式之外的已知答案**（黑白
+ * 21:1、`#767676` 對白 ≈4.5422、同色自比 1.0）驗它——不要把那組測試的期望值改成從這份實作反推出來的數字， 那會讓它退化成自我印證。
  */
 internal fun relativeLuminance(argb: UInt): Double {
     val r = ((argb shr 16) and 0xFFu).toInt()
