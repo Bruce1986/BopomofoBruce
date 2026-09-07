@@ -1,8 +1,6 @@
 package com.bopomofobruce.theme
 
-import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.pow
+import com.bopomofobruce.theme.color.contrastRatio
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -18,37 +16,30 @@ import org.junit.jupiter.api.Test
  * `candidateText/candidateHighlight` 也用 AA 的 4.5——高亮候選的字是主要內容。它與「`candidateHighlight` 對
  * `background` ≥3:1」在深色主題下數學上互斥（可行亮度區間為空，推導見 [DarkTheme] 的註解），取捨是 文字優先、非文字門檻退到已論證的 2.9。
  *
+ * **給日後調色的人：這裡有兩處餘裕極薄，紅了不一定是真的退步。**（2026-09-08 深審實測）
+ * - `DarkTheme` 的 `keyAccent` 對 `background` 現值 2.9485、門檻 2.9，**餘裕只有 0.0485**：往背景 方向線性內插
+ *   2%（`#855196` → `#835094`，R−2、G−1）就會跌到 2.888 而翻紅。這不是裝飾門檻 （舊值 `#4A4458` 的 1.84
+ *   確實會被它擋下），而是這個顏色空間在「文字 4.5 為硬下限」的約束下 本來就窄——現值幾乎正好落在理論上限。所以任何看起來無害的 RGB ±2 美術微調都可能弄紅 CI。
+ * - `DarkTheme` 的 `keyText/keyAccent` 是 4.500011、`candidateText/candidateHighlight` 是
+ *   4.500039，兩者都貼著 4.5 門檻到百萬分之幾。`kotlin.math.pow` 底層是 `java.lang.Math.pow`， JLS **不保證**跨 JVM
+ *   廠商／版本／架構逐位元一致（`StrictMath` 才保證）。CI 固定的 ubuntu + Temurin 組合目前綠，但在別的 JDK 或架構上本機重跑若翻紅，**先確認是不是浮點差異
+ *   而不是顏色真的退步**。
+ *
  * `keyText/keyFill` 是一般鍵的字疊在一般鍵底色上，鍵盤上被讀最多次的畫素，門檻同樣是 AA 的 4.5 （G1：原本只鎖 3.0，Light 17.1:1／Dark 11.1:1
  * 的實測餘裕巨大，鬆門檻擋不住「keyFill 調到 3.x:1 仍全綠」的回歸）。`candidateText` 對 `background`（候選列上未被選中、也就是大多數候選字
  * 畫在背景上的組合）過去完全沒有門檻，一併補上 AA 的 4.5——Light/Dark 現值皆遠高於此。
  */
 class BuiltInThemesContrastTest {
 
-    /**
-     * WCAG 2.x 相對亮度公式：先把 8-bit sRGB channel 轉線性光，再用固定權重加總。
-     * 公式來源：https://www.w3.org/TR/WCAG21/#dfn-relative-luminance
-     */
-    private fun relativeLuminance(argb: UInt): Double {
-        val r = ((argb shr 16) and 0xFFu).toInt()
-        val g = ((argb shr 8) and 0xFFu).toInt()
-        val b = (argb and 0xFFu).toInt()
-
-        fun channel(c: Int): Double {
-            val srgb = c / 255.0
-            return if (srgb <= 0.03928) srgb / 12.92 else ((srgb + 0.055) / 1.055).pow(2.4)
-        }
-
-        return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
-    }
-
-    /** WCAG 對比度公式：(較亮的 +0.05) / (較暗的 +0.05)，恆為 >= 1。 */
-    private fun contrastRatio(a: UInt, b: UInt): Double {
-        val la = relativeLuminance(a)
-        val lb = relativeLuminance(b)
-        val lighter = max(la, lb)
-        val darker = min(la, lb)
-        return (lighter + 0.05) / (darker + 0.05)
-    }
+    // 對比度公式**直接用正式實作** `com.bopomofobruce.theme.color.contrastRatio`（`internal`，
+    // 同一個 module 的測試 source set 本來就看得到）。
+    //
+    // 早一版這裡私有重抄了一份 `relativeLuminance` / `contrastRatio`，與正式實作逐字元相同，
+    // 於是這 12 條門檻**驗的是測試自己抄的那份公式，不是產品程式碼**。突變實測（2026-09-08）：
+    // 把正式 `relativeLuminance` 的 gamma 由 2.4 改成 2.2、或把 `contrastRatio` 的 +0.05 偏移
+    // 拿掉——動態取色那側的 `AccentColorSelectionTest` 各紅 1 條，而本檔 12 條**全數維持綠燈**。
+    // `DynamicAccentSelection.kt` 的 KDoc 早就寫著這份重複的存在、目的是「避免第三份手抄公式」，
+    // 只是沒做完；現在做完了。
 
     @Test
     fun `LightTheme keyText on keyAccent meets WCAG AA text contrast`() {
