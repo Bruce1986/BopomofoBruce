@@ -72,8 +72,13 @@ class KeyboardLoaderTest {
         //
         // 這條同時守兩件事：檔案集合與目錄一致（新增配列卻忘了登記會紅），以及每一個被打包的
         // 檔案都真的通得過嚴格 schema（孤兒也逃不掉）。
+        // `?.`：`javaClass.classLoader` 的型別是 `ClassLoader?`。直接呼叫只會被降級成警告
+        // （nullability 來自 JDK 的 enhanced signature，非嚴格模式下不是 error），ktfmt 也只管
+        // 格式不管型別，所以編得過——但那樣 null 的時候會丟一個沒有訊息的裸 NPE，而不是下面
+        // `requireNotNull` 那句話；同一個 repo 的 `KeyboardLoader.loadFromResource` 正是用
+        // `?.` ＋明確錯誤訊息處理同一種情境，這裡照做。
         val dirUrl =
-            requireNotNull(javaClass.classLoader.getResource("keyboards")) {
+            requireNotNull(javaClass.classLoader?.getResource("keyboards")) {
                 "keyboards/ resource directory not found on the test classpath"
             }
         val bundled =

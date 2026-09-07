@@ -128,3 +128,53 @@ DEVPLAN 的 W2-B 驗收標準）都**沒有**任何地方要求 renderer 顯示 
 7. `datetime_standard` 沒有 AM/PM（也沒有任何字母），若要支援 12 小時制自由輸入需補。
 8. `.kotlin/` 是 Kotlin build 產生的目錄，未被 `.gitignore` 涵蓋，跑過 build 之後會一直出現在
    `git status` 裡。不在本 PR 範圍，但值得順手處理。
+
+---
+
+# 第 2 輪（對抗式複審 round 1 自己的修正）
+
+沙箱同步到 `fec6621` 後跑了 5 條突變，round 1 的三處修正**都如預期轉紅、且互為備援**——
+其中一條突變（把 `hasGenericBack` 退回舊版、同時把 `switch_back` 移到錯的一邊）證實
+`ToggleFreeKeyboardsTest` 的兩條新測試是獨立防線，不依賴 `ReturnPathCoverageTest` 那側的修正。
+
+本輪處理兩條：
+
+## A. `javaClass.classLoader` 少一個 `?.`（round 1 自己寫的）
+
+`KeyboardLoaderTest` 新增那條裡寫的是 `javaClass.classLoader.getResource(...)`，而
+`classLoader` 的型別是 `ClassLoader?`。編譯器只降級成警告（nullability 來自 JDK 的
+enhanced signature，非嚴格模式下不是 error），`ktfmtCheck` 又只管格式不管型別，所以
+一路綠燈過關。但 null 時丟的會是**沒有訊息的裸 NPE**，而不是同一行 `requireNotNull`
+準備好的那句話；同一個 repo 的 `KeyboardLoader.loadFromResource` 處理同一種情境用的正是
+`?.` ＋明確錯誤訊息——等於 round 1 違反了自己檔案裡示範的模式。已補上 `?.`，編譯警告消失。
+
+## B. `isPageSwitchAction` 的「未登記 id 大聲失敗」分支沒有直接測試
+
+那個 `throw` 是 M2 的核心產物（未登記的 `Custom` id 要大聲失敗，而不是靜默當成非切頁鍵），
+但在此之前只能被「常數打錯字」之類的意外**間接**踩到。round 1 既然已經在寫合成鍵盤測試，
+順手補第三個案例：帶一個完全陌生 id 的合成鍵盤 ＋ `assertThrows`，並斷言錯誤訊息有點名
+是哪一個 id。
+
+突變驗證：把該分支改成靜默放行（＝M2 修正前的行為）→ **只有新加的這條轉紅**。
+
+42 tests / 0 failures（round 1 後為 41），`ktfmtCheck` 綠。
+
+## 已查證、疑慮不成立（記錄下來免得下次重查）
+
+- **「resources 被打包成 jar 之後，`File(dirUrl.toURI())` 會爆掉或靜默測不到東西」**——不成立。
+  實測 `:keyboards:testDebugUnitTest` 底下 `getResource("keyboards")` 解析到
+  `.../build/intermediates/java_res/debug/processDebugJavaRes/out/keyboards`，是真實檔案系統
+  目錄（`file:` scheme），`listFiles()` 正常走訪；`processReleaseJavaRes` 的產物也是同樣結構。
+  AGP 的 unit test task 本來就是走「解壓後的目錄」而非 jar，CI 跑的 `testDebugUnitTest` 與此一致。
+
+## 本輪未改（已評估，維持原判）
+
+- `ReturnPathCoverageTest` 在分類錯邊時的失敗訊息確實會誤導（說「沒有返回路徑」，實際是分類錯），
+  但同一個突變下 `ToggleFreeKeyboardsTest` 的兩條新測試一定同時紅，且訊息精準指出分類問題。
+  **殘留風險**：那兩條寫死目前三個常數，若日後新增第四個 `Custom` id 並登記錯邊，就只剩那句
+  容易誤導的訊息單獨紅——新增 `Custom` id 時請一併在「clean partition」那條補一行斷言。
+- `the language_toggle scope note...` 哨兵的**條件**（`Keyboards.all.size == 8`）確實與
+  `KeyboardLoaderTest` 既有兩條重複，價值完全來自訊息文字。但突變實測（加入 `abc-generic`）
+  顯示 4 條一起紅時，**只有這一條**提到 `LanguageToggle` 與 `destinationsOf()`，其餘三條都只說
+  「目錄變了」。更精準的寫法需要資料層有「這份鍵盤是不是 LanguageToggle 目的地」的標記，
+  而 `KeyboardDef` 沒有這種欄位——成本明顯超過這個 trip-wire 的簡單有效，維持現狀。

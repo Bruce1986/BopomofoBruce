@@ -5,6 +5,7 @@ import com.bopomofobruce.common.KeyData
 import com.bopomofobruce.common.KeyboardDef
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -132,5 +133,29 @@ class ToggleFreeKeyboardsTest {
                     ),
             )
         assertTrue(isToggleFree(genuinelyTerminal), "只掛非切頁的 Custom（插入文字）時，這份鍵盤確實是終端頁")
+    }
+
+    @Test
+    fun `an unregistered Custom id fails loudly instead of being treated as non-switching`() {
+        // isPageSwitchAction 最後那個 throw 是 M2 的核心產物：出現兩邊都沒登記的 Custom id 時
+        // 要**大聲失敗**，而不是靜默當成「不是切頁鍵」（那會讓一份其實會換頁的鍵盤被判成終端頁）。
+        // 在此之前這個分支只能被「常數打錯字」之類的意外間接踩到，沒有任何測試直接對它斷言——
+        // 而它守的正是「日後新增 Custom id 卻忘了登記」這個最可能發生的情境。
+        val unregistered =
+            StaticKeyboardDef(
+                id = "synthetic-unregistered",
+                rows =
+                    listOf(
+                        listOf(
+                            KeyData("a", KeyAction.Character('a')),
+                            KeyData("？", KeyAction.Custom("totally_unregistered")),
+                        )
+                    ),
+            )
+        val error = assertThrows(AssertionError::class.java) { isToggleFree(unregistered) }
+        assertTrue(
+            error.message.orEmpty().contains("totally_unregistered"),
+            "錯誤訊息要點名是哪一個 id 沒登記，否則排查時得自己翻遍所有鍵盤：${error.message}",
+        )
     }
 }
