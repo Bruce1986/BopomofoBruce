@@ -74,23 +74,31 @@ object DarkTheme : KeyboardTheme {
                     // 兩項仍不及 1.4.11 的 3:1，但已是此契約下的最佳值（根因同為 KeyboardColors
                     // 缺 on-accent 色，已登記 W2 契約 follow-up）。守門門檻依實測值設定。
                     keyAccent = 0xFF855196u,
-                    candidateText = 0xFFE6E1E5u,
+                    // **純白，不是 M3 dark 的 onSurface #E6E1E5**（owner 裁決，2026-09-08）。
+                    // 這一個 byte 的差別決定了下面那兩條 WCAG 門檻能不能同時成立，推導見
+                    // candidateHighlight 的註解。代價是候選列文字比 M3 基準更「硬」一點；
+                    // 非高亮候選（畫在 background 上）的對比因此從 13.27 升到 17.13，只變好。
+                    candidateText = 0xFFFFFFFFu,
                     // B22：原色 #4A4458 直接搬 M3 secondaryContainer dark，跟 background (#1C1B1F)
                     // 都是深色調、只有 1.84:1，不及 WCAG 1.4.11 非文字 UI 元件 3:1 門檻。
                     //
-                    // **取捨（deliberate，非疏漏）**：深色主題下兩個門檻數學上無法同時滿足——
-                    // background 近黑（相對亮度 0.0113）、candidateText 近白（0.7633），要對
-                    // background 達 3:1 需要亮度 >= 0.1339，要讓白字同時達 AA 4.5:1 需要亮度
-                    // <= 0.1307，可行區間是空的。根因是 KeyboardColors 契約沒有「高亮候選專用的
-                    // 文字色」（M3 的 onSecondaryContainer），contracts-v1 已凍結，已登記為 W2
-                    // 契約 follow-up。
+                    // **這裡曾經被判定為「兩個門檻數學上無法同時滿足」，那個結論只在
+                    // candidateText 維持 #E6E1E5 時成立**（2026-09-08 深審實測推翻）：
+                    // background 近黑（相對亮度 0.0113），要對它達 3:1 需要亮度 >= 0.1339；
+                    // 而 #E6E1E5 當文字時，要同時達 AA 4.5:1 的亮度上限是 0.1307——**只差
+                    // 0.0032**，是險些擦身而過，不是根本不可能。把 candidateText 提到純白之後
+                    // 上限放寬到 0.1833，可行區間 [0.1339, 0.1833] 非空，光是灰階就有 16 個解。
                     //
-                    // 兩個候選值：#6F6A76（背景 3.26、白字 4.07）與 #656471（背景 2.95、白字 4.50）。
-                    // **選 #656471，文字可讀性優先**：候選字看不清楚沒有替代方案，而「這一個被選中」
-                    // 這件事 :ime 還能用邊框／底線／字重表達，不必單靠底色分離度。若 owner 認為
-                    // 應反過來以 1.4.11 為硬門檻，改回 #6F6A76 即可（同時要把
-                    // BuiltInThemesContrastTest 的兩條 Dark 門檻對調回來）。
-                    candidateHighlight = 0xFF656471u,
+                    // 從那 16 個裡選 **#6B6B6B**（白字 5.33、對 background 3.21），而不是區間
+                    // 端點附近的 #676767（3.03，餘裕僅 0.03）或 #767676（白字 4.54，餘裕僅 0.04）
+                    // ——端點的餘裕薄到任何 RGB ±2 的美術微調都會弄紅 CI，正是舊值 #656471
+                    // （對 background 2.9485、餘裕 0.0485）的老問題。#6B6B6B 兩邊都有餘裕。
+                    //
+                    // 於是兩條門檻**都是真的 3.0 / 4.5**，不再需要「取捨」這個說法，
+                    // BuiltInThemesContrastTest 的 Dark 門檻也從 2.9 回到規範值 3.0。
+                    // W2 的 `onSecondaryContainer`（高亮候選專用文字色）仍然值得加——那能讓
+                    // 非高亮候選留在 M3 的 #E6E1E5、只有高亮那一顆用白字——但已不再是達標的前提。
+                    candidateHighlight = 0xFF6B6B6Bu,
                 ),
             dimens = StandardDimens.default,
         )

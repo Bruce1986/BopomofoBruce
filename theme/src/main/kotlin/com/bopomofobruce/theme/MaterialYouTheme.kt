@@ -42,8 +42,24 @@ private constructor(override val id: String, val styleSheet: StyleSheet) : Keybo
         const val ID: String = "material-you"
 
         /** 正式呼叫端用這支：SDK 等級一律取自實際裝置，無法被覆寫。 */
+        /**
+         * 正式路徑讀取執行裝置 API 等級的**唯一**位置。抽成可替換的 provider 是為了讓下面那個 兩參數版本（真正的正式入口）能在純 JVM 被測到。
+         *
+         * 背景（2026-09-08 深審）：在此之前，兩參數版本直接寫 `from(context, darkMode,
+         * Build.VERSION.SDK_INT)`，而**唯二呼叫它的地方是兩個從未實際 render 過的 `@Preview`**。突變實測：把它改成寫死
+         * `from(context, darkMode, 30)`——也就是 Material You 在任何裝置上永遠不會啟用、本模組的招牌功能靜默失效——**52 條測試全綠**。
+         * JVM 單元測試改不動 `Build.VERSION.SDK_INT`（JDK 21 已封死 final 欄位的反射改寫）， 所以改用這個縫。
+         *
+         * **未覆蓋的部分縮到只剩 `{ Build.VERSION.SDK_INT }` 這個單一運算式**（無法在 JVM 驗證）， 而「兩參數版本會依 provider
+         * 的值分流」現在有守門（見 `MaterialYouThemeTest`）。
+         *
+         * 正式程式碼**不得寫入**這個變數——它只有測試會換掉，且測試必須在 `@AfterEach` 還原。
+         */
+        @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+        internal var sdkIntProvider: () -> Int = { Build.VERSION.SDK_INT }
+
         fun from(context: Context, darkMode: Boolean): MaterialYouTheme =
-            from(context, darkMode, Build.VERSION.SDK_INT)
+            from(context, darkMode, sdkIntProvider())
 
         /**
          * 測試用的 SDK 注入版本。**不要在正式程式碼呼叫**——傳入與裝置實際 API 等級不符的 [sdkInt] 會讓 `< 31` 的裝置走進

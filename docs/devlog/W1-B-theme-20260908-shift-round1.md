@@ -348,3 +348,115 @@ tracer 只找到一處恆真，就是 B 節那兩條前置斷言（已修）。�
 `LightTheme.colors` 的 getter 改成不再 delegate 就會紅）。無重複測試。
 
 62 tests / 0 failures（round 3 後為 61），`ktfmtCheck` 綠。
+
+---
+
+# Owner 裁決後的落地（2026-09-08）
+
+owner 對兩項 W1-B 的待裁決事項給了決定，本節記錄實作與驗證。
+
+## 2C — `MaterialYouTheme` 正式入口的測試縫
+
+**裁決**：加可替換的 `sdkInt` 種子（選項 C），並另外評估實機／androidTest 的可行性（見下節）。
+
+`Build.VERSION.SDK_INT` 的讀取抽成 `internal var sdkIntProvider: () -> Int`，正式入口改成
+`from(context, darkMode, sdkIntProvider())`。**未覆蓋範圍因此從「一整行 delegation」縮到
+「`{ Build.VERSION.SDK_INT }` 這個單一運算式」**。
+
+實作過程的關鍵發現：`>= 31` 分支在純 JVM 下**不會丟例外**——mockk 的 relaxed `Context` 讓
+`dynamicLightColorScheme()` 回傳一組 stub 預設值（多半是 0）。所以兩個分支是**可觀察地不同**的，
+測試可以直接斷言「換一個 provider 值，結果就不同」，而**不必**依賴 stub 的具體內容：
+
+| 突變 | 修正前 | 修正後 |
+|---|---|---|
+| 正式入口寫死 `sdkInt = 30`（Material You 永不啟用） | **52 條全綠** | 紅 1 條（`the production entry point actually routes on the sdk provider`） |
+| 預設 provider 寫死 `{ 30 }` | — | 紅 1 條（`the default sdk provider reports the running platform level`） |
+
+第二條測試的鑑別力很窄，已在它的 KDoc 標明：它比對的是 `Build.VERSION.SDK_INT` 與一個本來就是
+該運算式的 provider，**唯一抓得到的是「有人把它換成字面值」**，抓不到（也不該被期待抓到）
+`SDK_INT` 本身回報錯誤。
+
+## 3B — 深色候選色：兩條 WCAG 門檻現在都真的過了
+
+**裁決**：`candidateText` 改純白 ＋ 換 `candidateHighlight`（選項 B）。
+
+| | 改動前 | 改動後 |
+|---|---|---|
+| `candidateText` | `#E6E1E5`（M3 dark onSurface） | **`#FFFFFF`** |
+| `candidateHighlight` | `#656471` | **`#6B6B6B`** |
+| 文字對高亮 | 4.5000（AA 剛好過） | **5.3292**（餘裕 0.83） |
+| 高亮對背景 | 2.9485（1.4.11 **不過**） | **3.2143**（餘裕 0.21） |
+| 非高亮候選對背景 | 13.27 | 17.13 |
+| 測試門檻 | 2.9（規範偏離） | **3.0（規範值）** |
+
+選 `#6B6B6B` 而不是可行區間端點附近的 `#676767`（對背景 3.03、餘裕 0.03）或 `#767676`
+（白字 4.54、餘裕 0.04）——端點的餘裕薄到任何 RGB ±2 的美術微調都會弄紅 CI，正是舊值
+`#656471`（餘裕 0.0485）的老問題。`#6B6B6B` 兩邊都有餘裕。
+
+突變驗證：把 `candidateHighlight` 退回 `#656471` → 收緊後的門檻紅 1 條
+（`expected >= 3.0, was 2.9484939684`）；在舊的 2.9 門檻下它是綠的。
+
+### ⚠️ 只修好了一半——`keyAccent` 那側仍未達標
+
+`keyAccent` 配的是 **`keyText`**（仍是 M3 的 `#E6E1E5`，本次未動），所以它的亮度上限仍是
+0.1307、對 background 仍只有 **2.9485**，達不到 1.4.11 的 3.0，門檻維持 2.9。
+
+若日後把 `keyText` 也提到純白，`keyAccent` 同樣會有解（實算）：
+
+| keyAccent 候選 | 白字 | 對 background | 對 keyFill |
+|---|---|---|---|
+| `#707070` | 4.95 | 3.46 | 2.90 |
+| **`#767676`** | **4.54** | **3.77** | **3.16** |
+| `#7B7B7B` | 4.23 | 4.05 | 3.39 |
+
+`#767676` 是唯一三條門檻（白字 4.5／對背景 3.0／對 keyFill 3.0）**同時**成立的一個。
+代價是所有按鍵文字變純白，視覺影響比候選列大得多，屬另一次設計裁決，本次未動。
+
+## TODO（已登記，本次未做）
+
+- **W2：`:common` 加 `onSecondaryContainer`（高亮候選專用文字色）**——有了它，非高亮候選可以
+  留在 M3 的 `#E6E1E5`、只有高亮那一顆用白字。現在已**不是達標的前提**（3B 已達標），
+  但仍是更精確的做法。
+- **`keyText` 是否也提到純白**（連帶把 `keyAccent` 換成 `#767676`）——見上一節的表。
+- **實機／androidTest 覆蓋 `>= 31` 動態取色**：見下節評估。
+
+## 2D — 本機做 androidTest／實機的可行性（已查證，**未執行**）
+
+結論：**門檻比原先評估的低很多，隨時可做**，但有兩個要 owner 拍板的前提。
+
+### 已經備好的部分（不用另外建置）
+
+| 項目 | 現況 |
+|---|---|
+| 實體裝置 | **已連線**：`ASUS_AI2302`（Zenfone 10），Android 15 / **API 35** |
+| Material You 支援 | ✓ API 35 ≥ 31，**動態取色路徑在這台上是真的會走到的** |
+| `:theme` 的 instrumentation runner | **已宣告**：`testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"` |
+| version catalog | 已有 `androidx-test-ext-junit`、`androidx-test-runner`、`androidx-test-espresso-core`，甚至 `de.mannodermaus.junit5:android-test-runner`（androidTest 的 JUnit 5 支援） |
+| `adb` | `$ANDROID_HOME/platform-tools/adb`，裝置已授權 |
+
+**沒有** emulator 與 system-image（`$ANDROID_HOME/emulator`、`system-images` 都不存在），
+所以只能走實機，不能走模擬器。
+
+### 要做的事（估計 30 分鐘內）
+
+1. `theme/build.gradle.kts` 加 `androidTestImplementation(libs.androidx.test.ext.junit)` 與
+   `androidTestUtil`/`androidTestImplementation(libs.androidx.test.runner)`；若要在 androidTest
+   也用 JUnit 5，再加 `libs.androidx.test.junit5.runner` 並改 runner。
+2. 新增 `theme/src/androidTest/kotlin/.../MaterialYouDynamicColorTest.kt`：拿真實 `Context`
+   呼叫 `MaterialYouTheme.from(context, darkMode)`，斷言它**沒有**退化成 `LightTheme.colors`
+   （在 API 35 上就該走動態路徑），並把算出來的六個顏色跑一次現有的對比度門檻。
+3. `./gradlew :theme:connectedDebugAndroidTest`。
+
+### 兩個要拍板的前提
+
+1. **會在你的手機上安裝測試 APK**（`:theme` 的 androidTest APK ＋ 被測 APK）。這是對你個人
+   裝置的實際寫入動作，**我沒有自行執行**，等你點頭。
+2. **CI 跑不了**：GitHub Actions 沒有裝置，`connectedAndroidTest` 只能在本機跑。所以它
+   **不是回歸守門**，而是「W2-B 接線前後各手動跑一次」的驗收工具。真正的回歸保護仍然是
+   2C 那個 provider 種子。
+
+### 我的評估
+
+值得做，但**時機是 W2-B 接線時**，不是現在——因為現在 `:theme` 還沒有任何消費者，實機測到的
+只會是「這個函式自己算得對不對」，而不是「IME 畫出來對不對」。現在做，等於在功能還沒接上時
+先付一次安裝成本；W2-B 接線時做，同一次可以連 renderer 一起驗。
