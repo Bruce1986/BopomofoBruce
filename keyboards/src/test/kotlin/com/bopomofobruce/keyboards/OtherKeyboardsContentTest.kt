@@ -255,4 +255,40 @@ class OtherKeyboardsContentTest {
             )
         }
     }
+
+    /**
+     * datetime 鍵盤要打得出 AM／PM——`TYPE_DATETIME_VARIATION_TIME` 在 12 小時制情境下需要它們。
+     *
+     * 它們掛的是 `Custom`（不是 `Character`），因為 `KeyAction.Character` 只吃**單一** `Char`， 而 `AM`／`PM`
+     * 是兩個字元。所以這條不能靠掃 `Character` 找到它們——那正是加這條的理由： 既有的 `datetime keyboard has digits and the
+     * date-time separators` 只掃 `Character`， AM／PM 對它是不可見的。
+     */
+    @Test
+    fun `datetime keyboard can type AM and PM`() {
+        val customIds =
+            Keyboards.datetimeStandard.rows.flatten().mapNotNull { key ->
+                (key.action as? KeyAction.Custom)?.id
+            }
+        assertTrue(
+            Keyboards.INSERT_AM_CUSTOM_ID in customIds,
+            "datetime 鍵盤打不出 AM（12 小時制的時間欄位需要）：$customIds",
+        )
+        assertTrue(Keyboards.INSERT_PM_CUSTOM_ID in customIds, "datetime 鍵盤打不出 PM：$customIds")
+    }
+
+    /**
+     * 符號鍵盤要打得出**破折號** `—`（U+2014）。
+     *
+     * 中文用它標插入語／語氣停頓（「他忽然停下——像是想起了什麼」），而本頁原本只有全形連字號 `－`（U+FF0D），兩者語意不同：後者是用來連接範圍或複合詞的。缺了它，使用者會拿 `－`
+     * 或 `…` 代替，排版微妙地錯而且不容易發現。
+     *
+     * 三列各 10 鍵已滿、控制列 6 鍵，加一顆就要動版面，所以掛成 `－` 的 longPress（owner 裁決， 2026-09-08）——兩者語意相鄰，長按位置直覺。**代價是它受
+     * longPress 可見性契約約束** （見 `Keyboards` 的 object KDoc）：`:ime` 沒把 `longPress.label` 畫出來的話，這顆等於不存在。
+     */
+    @Test
+    fun `symbol keyboard can type an em dash`() {
+        val reachable = reachableChars(Keyboards.symbolStandard.rows)
+        assertTrue('—' in reachable, "符號鍵盤打不出破折號 —（U+2014）；目前只有全形連字號 －（U+FF0D），語意不同")
+        assertTrue('－' in reachable, "全形連字號 －（U+FF0D）不見了——它是破折號長按的宿主鍵，不能被取代掉")
+    }
 }

@@ -28,6 +28,18 @@ import com.bopomofobruce.common.KeyboardDef
  * 所以這是一條**契約，不是建議**：`:ime` 的按鍵 renderer 對每一顆帶 [com.bopomofobruce.common.KeyData.longPress] 的鍵，都必須把
  * [com.bopomofobruce.common.LongPressData.label] 常駐顯示（慣例是右上角小字）。 資料層不需要為此改
  * schema——`LongPressData.label` 就是為了被畫出來才存在的。
+ *
+ * ## 無障礙：`label` 目前是螢幕閱讀器**唯一**的資訊來源
+ *
+ * [com.bopomofobruce.common.KeyData] 只有 `label` / `action` / `weight` / `longPress`， **沒有
+ * contentDescription 之類的無障礙欄位**。所以一顆鍵的 `label` 同時決定「看起來長怎樣」 與「TalkBack 讀出什麼」，兩者無法分開。
+ *
+ * 空白鍵因此從 U+3000（表意空格）改成 **`空白`**（owner 裁決，2026-09-08）：U+3000 會渲染成 完全空白，於是**鍵盤上最大的一顆鍵**（weight
+ * 1.5–4.0）對 TalkBack 沒有任何可讀內容。改成 文字標籤也與既有的 `返回` / `注音` / `符號` / `全形` / `英數` 一致。
+ *
+ * ⚠️ **這只是止血，不是解法。**同樣的問題還在 `⌫`（U+232B）、`⏎`（U+23CE）、`⇧`（U+21E7） 這幾顆——它們有可辨識的字形，但被螢幕閱讀器讀出來一樣沒有意義。
+ * **W2 TODO**：在 `:common` 的 [com.bopomofobruce.common.KeyData] 加一個選用的 `contentDescription: String?
+ * = null`，把「畫什麼」與「讀什麼」分開，一次解決所有非字元鍵。 `:common` 是 contracts-v1、已凍結，所以那是 W2 的破壞性變更，不在 W1-C 範圍。
  */
 object Keyboards {
     /**
@@ -55,6 +67,18 @@ object Keyboards {
 
     /** 「插入 `.com`」的 `Custom` id——插入文字，不是切頁鍵（見 [urlQwerty] KDoc）。 */
     const val URL_INSERT_DOT_COM_CUSTOM_ID: String = "url_insert_dot_com"
+
+    /**
+     * 「插入 `AM`」／「插入 `PM`」的 `Custom` id——插入文字，不是切頁鍵（見 [datetimeStandard]）。
+     *
+     * 為什麼不是 [com.bopomofobruce.common.KeyAction.Character]：那個變體只吃**單一** `Char`， 而 `AM`／`PM`
+     * 是兩個字元。`Custom` 是 `:common` 提供的 escape hatch（同 `url_insert_dot_com`）， 用它不必為此擴 sealed 子型別、不動
+     * contracts-v1。
+     */
+    const val INSERT_AM_CUSTOM_ID: String = "insert_am"
+
+    /** 見 [INSERT_AM_CUSTOM_ID]。 */
+    const val INSERT_PM_CUSTOM_ID: String = "insert_pm"
 
     /**
      * [com.bopomofobruce.common.KeyAction.Custom] id 集合，依「是否代表切頁（帶使用者跳去另一份
@@ -89,7 +113,8 @@ object Keyboards {
         setOf(SWITCH_TO_ZHUYIN_CUSTOM_ID, GENERIC_BACK_CUSTOM_ID)
 
     /** 不代表切頁、單純插入文字/其他行為的 `Custom` id（同上，供終端頁判定排除）。 */
-    val NON_PAGE_SWITCH_CUSTOM_IDS: Set<String> = setOf(URL_INSERT_DOT_COM_CUSTOM_ID)
+    val NON_PAGE_SWITCH_CUSTOM_IDS: Set<String> =
+        setOf(URL_INSERT_DOT_COM_CUSTOM_ID, INSERT_AM_CUSTOM_ID, INSERT_PM_CUSTOM_ID)
 
     /**
      * 注音 4×10，直向。大千式配列，見 [KeyboardLoader] 所讀 JSON 內的來源附註。
@@ -139,6 +164,7 @@ object Keyboards {
      * - `"switch_to_zhuyin"`（本鍵盤，切回 [zhuyin4x10Portrait] / [zhuyin4x10Landscape]，依當時 orientation
      *   擇一）——切頁鍵，固定目的地。
      * - `"switch_back"`（本鍵盤，M1 新增）——切頁鍵，目的地是 `:ime` 記住的來源鍵盤，不是固定值。
+     * - `"insert_am"` / `"insert_pm"`（見 [datetimeStandard]）——不是切頁鍵，各插入 `AM` / `PM` 兩個字元。
      */
     val symbolStandard: KeyboardDef by lazy {
         KeyboardLoader.loadFromResource("keyboards/symbol_standard.json")
@@ -213,8 +239,15 @@ object Keyboards {
     }
 
     /**
-     * 日期／時間輸入：數字 + 常用分隔符（`/` `:` `-`）。本頁沒有切頁鍵（終端頁）。終端頁清單與判定方式見 [numericStandard] KDoc（L1，round-11
-     * 審查——本頁先前完全沒被記載為終端頁）。
+     * 日期／時間輸入：數字 ＋ 常用分隔符（`/` `:` `-`）＋ **AM／PM**。本頁沒有切頁鍵（終端頁）。 終端頁清單與判定方式見 [numericStandard]
+     * KDoc（L1，round-11 審查——本頁先前完全沒被記載為 終端頁）。AM／PM 掛的是 [com.bopomofobruce.common.KeyAction.Custom]（見
+     * [INSERT_AM_CUSTOM_ID]）， 已登記在 [NON_PAGE_SWITCH_CUSTOM_IDS]，所以**不影響**本頁的終端頁身分。
+     *
+     * **為什麼有 AM／PM**（owner 裁決，2026-09-08）：先前 13 個字元全是數字與分隔符、沒有任何 字母，於是
+     * `TYPE_DATETIME_VARIATION_TIME` 在 12 小時制情境下打不出 `2:30 PM`。台灣多用 24 小時制，所以這曾被評估為「宣告只支援 24
+     * 小時制」即可；owner 選擇補齊。
+     *
+     * 版面：原本 row4 是 `- ⌫ 　 ⏎` 四鍵（與上面四列的 3 欄節奏不一致），改成 row4 = `- AM PM`（維持 3 欄）、row5 = `⌫ 　 ⏎`（控制列）。
      */
     val datetimeStandard: KeyboardDef by lazy {
         KeyboardLoader.loadFromResource("keyboards/datetime_standard.json")

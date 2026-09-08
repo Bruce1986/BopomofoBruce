@@ -151,6 +151,13 @@
         "action": {
           "type": "character",
           "char": "－"
+        },
+        "longPress": {
+          "label": "—",
+          "action": {
+            "type": "character",
+            "char": "—"
+          }
         }
       },
       {
@@ -242,7 +249,7 @@
         "weight": 1.2
       },
       {
-        "label": "　",
+        "label": "空白",
         "action": {
           "type": "space"
         },

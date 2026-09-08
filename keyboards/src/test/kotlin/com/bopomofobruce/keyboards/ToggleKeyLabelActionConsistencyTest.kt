@@ -30,7 +30,10 @@ class ToggleKeyLabelActionConsistencyTest {
      */
     private val expected: Map<String, KeyAction> = buildMap {
         put("⌫", KeyAction.Backspace)
-        put("　", KeyAction.Space)
+        // 「空白」而不是 U+3000（owner 裁決 2026-09-08）：U+3000 會渲染成完全空白，而
+        // KeyData 只有 label、沒有無障礙欄位，等於鍵盤上最大的一顆鍵對 TalkBack 沒有任何
+        // 可讀內容。詳見 Keyboards 的 object KDoc。
+        put("空白", KeyAction.Space)
         put("⏎", KeyAction.Enter)
         put("⇧", KeyAction.Shift)
         // password_qwerty / url_qwerty control row: see Keyboards.kt passwordQwerty KDoc (F1) --
@@ -50,6 +53,10 @@ class ToggleKeyLabelActionConsistencyTest {
         // password_qwerty / url_qwerty ("全形" -> symbol_toggle -> here) with no way back at
         // all. "返回" is the source-agnostic escape hatch: :ime resolves it against whichever
         // keyboard sent the user here. See Keyboards.kt symbolStandard KDoc.
+        // AM／PM 插入文字，不切頁（見 Keyboards.INSERT_AM_CUSTOM_ID）。刻意寫死字面字串當
+        // 獨立錨點——理由見 Keyboards.GENERIC_BACK_CUSTOM_ID 的 KDoc。
+        put("AM", KeyAction.Custom("insert_am"))
+        put("PM", KeyAction.Custom("insert_pm"))
         put("返回", KeyAction.Custom("switch_back"))
         // zhuyin control row: already self-consistent with KeyAction's literal wording (going
         // *from* zhuyin, "符號" = leave to symbols, "英數" = leave to English/digits).

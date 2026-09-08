@@ -296,3 +296,65 @@ Kotlin 語意、index 30／28／32、8 份 JSON 共 39,828 bytes 都逐一核對
 devlog round 3 段落引用的「冷啟動 3.57 ms」與「10 種形狀 round-trip 一致」，在 repo 裡找不到
 對應的可重跑腳本——它們是 tracer 在自己的 probe worktree 裡量的，probe 已清掉。與本 repo
 既有的「另開 probe worktree」作法一致，但**這兩個數字無法從 repo 重現**，引用時請注意。
+
+---
+
+# Owner 裁決後的落地（2026-09-08）
+
+owner 對 round 1–4 留下的待裁決事項給了決定，本節記錄實作、驗證與仍然開著的 TODO。
+
+## 5d — datetime 補上 AM／PM（裁決：加兩顆鍵）
+
+先前 13 個字元全是數字與分隔符、**沒有任何字母**，於是 `TYPE_DATETIME_VARIATION_TIME` 在
+12 小時制情境下打不出 `2:30 PM`。
+
+實作上有一個不明顯的限制：**`KeyAction.Character` 只吃單一 `Char`**，而 `AM`／`PM` 是兩個字元，
+所以只能走 `Custom`（同 `url_insert_dot_com`）。連帶要做的事：新增兩個 `const val`、登記進
+`NON_PAGE_SWITCH_CUSTOM_IDS`、補進 `:ime` 的待實作 id 清單、補標籤表。
+
+**本班 round 3 補的守門在這裡立刻證明了自己**——我先改 JSON、還沒登記常數就跑測試，三條同時紅，
+訊息各自精準：
+
+```
+CustomIdRegistrationTest: 這些 Custom id 兩邊都沒登記…[insert_am（用於 [datetime-standard]）, insert_pm…]
+ToggleFreeKeyboardsTest:  unregistered Custom id 'insert_am' -- add it to …PAGE_SWITCH… or …NON_PAGE_SWITCH…
+ToggleKeyLabelActionConsistencyTest: label 'AM' (action=Custom(id=insert_am)) has no entry in the expected…
+```
+
+版面：原 row4 是 `- ⌫ 　 ⏎` 四鍵（與上面四列的 3 欄節奏不一致），改成 row4 = `- AM PM`、
+row5 = `⌫ 空白 ⏎`。另補一條內容守門——既有的 `datetime keyboard has digits and the
+date-time separators` 只掃 `Character`，**AM／PM 對它是不可見的**。
+
+## 5a — 破折號 `—`（裁決：掛 longPress）
+
+三列各 10 鍵已滿，加一顆就要動版面，所以掛成 `－`（U+FF0D）的 longPress。兩者語意相鄰，
+長按位置直覺。**代價：它受 longPress 可見性契約約束**——`:ime` 沒把 `longPress.label` 畫出來
+的話這顆等於不存在。新增的守門同時釘住「`－` 這個宿主鍵不能被取代掉」。
+
+## 4b — 空白鍵 label（裁決：改成看得見的標籤）
+
+U+3000 → **`空白`**。理由是 `KeyData` **沒有無障礙欄位**，`label` 同時決定「看起來長怎樣」與
+「TalkBack 讀出什麼」，而 U+3000 讓**鍵盤上最大的一顆鍵**（weight 1.5–4.0）完全沒有可讀內容。
+改成文字也與既有的 `返回` / `注音` / `符號` / `全形` / `英數` 一致。六份配列一起改。
+
+改的時候 `ToggleKeyLabelActionConsistencyTest` 紅了一次——**那正是 round 4 記錄的「獨立錨點的
+代價」如實發生**：合法的協調式改名會讓標籤表紅一次，因為它刻意寫死舊字面值。訊息直接指出要補
+哪一筆，照做即可。
+
+## 4a — `implementation` vs `api`（裁決：維持 `implementation`，列 TODO）
+
+理由與反面都寫進 `keyboards/build.gradle.kts` 的 `TODO(W2)` 註解，重點是**失敗模式是編譯期
+爆炸而不是靜默錯誤**，所以「未來消費者忘了宣告 `:common`」的成本很低；而 repo 內五個模組都是
+同一個慣例，要改就該五個一起改。
+
+## 仍然開著的 TODO
+
+| # | 項目 | 狀態 |
+|---|---|---|
+| 4a | `:keyboards` 改 `api`（連同其他四個模組一起） | 已寫進 `build.gradle.kts` 的 `TODO(W2)` |
+| 4b | `:common` 的 `KeyData` 加 `contentDescription` | 已寫進 `Keyboards` object KDoc；空白鍵只是止血，`⌫`／`⏎`／`⇧` 仍無解 |
+| 5b | **間隔號 `・`(U+30FB) vs `‧`(U+2027)** | **待查證臺灣標點慣例**（教育部《重訂標點符號手冊》）。班規禁止上網，無出處不改。三者語意有別：U+30FB 是片假名中點、U+2027 是 hyphenation point、U+00B7 是 middle dot |
+| 5c | `url_qwerty` 的空白鍵（weight 2.6，URI 欄位不接受字面空白） | **等 W2-B 決定 `inputType` 對應表時一起定**：只綁 `TYPE_TEXT_VARIATION_URI` 就移除、也會用在搜尋框就縮 weight |
+| — | 直向注音打不出數字 | round 1 已記載；最小止血是在 `symbol_standard` 補全形 `０`–`９` |
+
+46 tests / 0 failures（裁決前 44），`ktfmtCheck` 綠。

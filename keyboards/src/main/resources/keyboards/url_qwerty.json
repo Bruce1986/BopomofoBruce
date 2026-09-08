@@ -401,7 +401,7 @@
         }
       },
       {
-        "label": "　",
+        "label": "空白",
         "action": {
           "type": "space"
         },
