@@ -103,11 +103,12 @@
 
 > 與 [`GEMINI.md`](GEMINI.md) 的同名章節保持同步。任何修改請兩邊一起改。
 
-- **語言**：Kotlin 2.x（IME 主程式）+ C/C++（NDK，libchewing JNI 包裝）。不要把 Kotlin 程式碼建議改成 Java。
+- **語言**：Kotlin 2.x（IME 主程式）+ C/C++（NDK，libchewing JNI 包裝）+ Rust（不是我方程式碼——vendored 的 `chewing_capi` crate，經 Corrosion 交叉編成 staticlib 連進 `libbpmf.so`，見 [ADR-0006](docs/adr/0006-libchewing-rust-build-pipeline.md)）。不要把 Kotlin 程式碼建議改成 Java。
 - **UI**：Jetpack Compose only。不要在 IME view 引入 XML layout（candidate row、softkey、settings 全 Compose）。
 - **IME 限制**：Android `InputMethodService` 子類禁用 `requireActivity()` 與一般 Activity 生命週期假設；Compose 要透過 `AbstractComposeView` 掛載。
 - **建置**：`./gradlew assembleDebug`（debug APK）、`./gradlew installDebug`（裝到接好的手機）、`./gradlew testDebugUnitTest`（JVM 單測）、`./gradlew connectedDebugAndroidTest`（裝置測試）。風格檢查走 `./gradlew ktfmtCheck`（**不是** ktlint）。
-- **NDK**：`libchewing` 以子模組方式接入（`decoder-native/cmake/`），ABI 限定 arm64-v8a + armeabi-v7a，不打 x86。
+- **NDK**：`libchewing` 以子模組方式接入（`decoder-native/cmake/`），ABI 限定 arm64-v8a + armeabi-v7a，不打 x86。子模組要 `--recursive`（`data/` 是巢狀 submodule），否則 CMake 直接 `FATAL_ERROR`。
+- **Rust 工具鏈（native build 的必要條件）**：`decoder-native` 的建置需要 rustup 管理的工具鏈加上 `aarch64-linux-android`／`armv7-linux-androideabi` 兩個 target。**若本機同時裝了 Homebrew 的 `rust` formula，它會佔住 `/opt/homebrew/bin/rustc`／`cargo`，Corrosion 會拿到沒有 Android target 的那一份**，錯誤訊息是 `can't find crate for core`，看起來像 target 沒裝好、其實是撿錯 rustc。解法是把 rustup 的路徑排前面：`PATH="/opt/homebrew/opt/rustup/bin:$PATH" ./gradlew :app:assembleDebug`。見 [ADR-0006](docs/adr/0006-libchewing-rust-build-pipeline.md)「開放問題 / 風險」。
 - **金鑰**：簽章金鑰位於 `keystore.properties`（已被 `.gitignore` 排除）。任何 review 建議都不可包含金鑰資訊。
 - **無後端**：本專案 v1 不打網路、不接 Firebase、不接 Google Sign-In。若 review 建議涉及上傳遙測、雲端同步或第三方 SDK 連線，請拒絕。
 

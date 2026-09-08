@@ -25,10 +25,15 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      # recursive：decoder-native/cmake/libchewing 本身是 gitlink submodule，它底下的
+      # data/（libchewing-data 字典來源）又是巢狀 submodule。checkout@v4 預設不拉 submodule，
+      # 不加 recursive 會讓 CMakeLists.txt 看到空目錄直接 FATAL_ERROR（見 ADR-0006 K6）——
+      # 這一步沒修對，後面補 Rust target 也還是紅在這裡。
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          submodules: recursive
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -43,6 +48,22 @@ jobs:
         with:
           packages: 'platforms;android-35 build-tools;35.0.0'
 
+      # decoder-native 現在靠 Corrosion 把 vendored chewing_capi crate 交叉編成
+      # Android staticlib（見 ADR-0006）；沒有這兩個 target，corrosion_import_crate()
+      # 找不到對應 target 的 Rust std，assembleDebug/assembleRelease 會失敗。submodule
+      # 修好之後才會真正卡到這一關（順序見 ADR-0006 K6）。
+      # 版本釘死的理由與上面 runs-on 選 ubuntu-24.04 相同：runner 映像預裝的
+      # Rust 會隨映像 rolling 升級，不釘就等於把「哪個 rustc 編出這顆 .so」交給
+      # GitHub 決定，某次映像更新就能讓沒改過任何一行的 PR 突然變紅（或更糟：
+      # 靜靜換掉產物）。vendored chewing_capi 的 rust-version 是 1.88.0，這裡取
+      # 較新的固定版本，升版時應該是一筆看得到的 diff。
+      - name: Install pinned Rust toolchain and Android targets
+        run: |
+          rustup toolchain install 1.96.1 --profile minimal \
+            --target aarch64-linux-android --target armv7-linux-androideabi
+          rustup default 1.96.1
+          rustc --version
+
       # 用官方 Gradle action 處理 wrapper / ~/.gradle/caches / ~/.gradle/wrapper
       # 三層 cache。Fork PR 把 cache 設成 read-only 防止 cache poisoning。
       - name: Set up Gradle
@@ -56,6 +77,46 @@ jobs:
 
       - name: Assemble debug APK
         run: ./gradlew --no-daemon assembleDebug
+
+      # CMakeLists.txt 沒有自己的 ABI -> Rust target triple 對照表，整條交叉編譯
+      # 靠 Corrosion 讀 AGP 傳進來的 CMAKE_ANDROID_ARCH_ABI 自動推斷。推斷錯到
+      # 完全不同的 ISA 通常會在連結階段就炸，但同家族內的誤選（armv7 的各種
+      # 變體）不會——那種產物照樣 build 成功、CI 照樣全綠，只在裝置上壞。這一步
+      # 是唯一會因為 .so 架構不對而變紅的守門：它斷言的是打包進 APK 的實際檔案，
+      # 不是 build 有沒有跑過。
+      - name: Verify packaged libbpmf.so ABIs
+        run: |
+          python3 - <<'EOF'
+          import glob, struct, sys, zipfile
+
+          # ELF e_machine values (ELF spec): 0x28 = ARM (32-bit), 0xB7 = AArch64.
+          MACHINES = {0x28: "ARM", 0xB7: "AArch64"}
+          EXPECTED = {"arm64-v8a": "AArch64", "armeabi-v7a": "ARM"}
+
+          apks = sorted(glob.glob("app/build/outputs/apk/debug/*.apk"))
+          if not apks:
+              sys.exit("::error::no debug APK found under app/build/outputs/apk/debug/")
+          apk = apks[0]
+          print(f"APK: {apk}")
+
+          failed = False
+          with zipfile.ZipFile(apk) as z:
+              names = set(z.namelist())
+              for abi, want in EXPECTED.items():
+                  entry = f"lib/{abi}/libbpmf.so"
+                  if entry not in names:
+                      print(f"::error::{entry} is not packaged in {apk}")
+                      failed = True
+                      continue
+                  # e_machine is a little-endian u16 at offset 18 of the ELF header.
+                  machine = struct.unpack_from("<H", z.read(entry)[:20], 18)[0]
+                  got = MACHINES.get(machine, hex(machine))
+                  print(f"{entry} -> Machine: {got} (expected {want})")
+                  if got != want:
+                      print(f"::error::{entry} has Machine {got}, expected {want}")
+                      failed = True
+          sys.exit(1 if failed else 0)
+          EOF
 
       - name: Ktfmt check
         run: ./gradlew --no-daemon ktfmtCheck
