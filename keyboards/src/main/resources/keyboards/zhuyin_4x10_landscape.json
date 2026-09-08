@@ -1,0 +1,409 @@
+{
+  "id": "zhuyin-4x10-landscape",
+  "rows": [
+    [
+      {
+        "label": "1",
+        "action": {
+          "type": "character",
+          "char": "1"
+        }
+      },
+      {
+        "label": "2",
+        "action": {
+          "type": "character",
+          "char": "2"
+        }
+      },
+      {
+        "label": "3",
+        "action": {
+          "type": "character",
+          "char": "3"
+        }
+      },
+      {
+        "label": "4",
+        "action": {
+          "type": "character",
+          "char": "4"
+        }
+      },
+      {
+        "label": "5",
+        "action": {
+          "type": "character",
+          "char": "5"
+        }
+      },
+      {
+        "label": "6",
+        "action": {
+          "type": "character",
+          "char": "6"
+        }
+      },
+      {
+        "label": "7",
+        "action": {
+          "type": "character",
+          "char": "7"
+        }
+      },
+      {
+        "label": "8",
+        "action": {
+          "type": "character",
+          "char": "8"
+        }
+      },
+      {
+        "label": "9",
+        "action": {
+          "type": "character",
+          "char": "9"
+        }
+      },
+      {
+        "label": "0",
+        "action": {
+          "type": "character",
+          "char": "0"
+        }
+      }
+    ],
+    [
+      {
+        "label": "ㄅ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄅ"
+        }
+      },
+      {
+        "label": "ㄉ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄉ"
+        }
+      },
+      {
+        "label": "ˇ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ˇ"
+        }
+      },
+      {
+        "label": "ˋ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ˋ"
+        }
+      },
+      {
+        "label": "ㄓ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄓ"
+        }
+      },
+      {
+        "label": "ˊ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ˊ"
+        }
+      },
+      {
+        "label": "˙",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "˙"
+        }
+      },
+      {
+        "label": "ㄚ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄚ"
+        }
+      },
+      {
+        "label": "ㄞ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄞ"
+        }
+      },
+      {
+        "label": "ㄢ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄢ"
+        }
+      }
+    ],
+    [
+      {
+        "label": "ㄆ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄆ"
+        }
+      },
+      {
+        "label": "ㄊ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄊ"
+        }
+      },
+      {
+        "label": "ㄍ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄍ"
+        }
+      },
+      {
+        "label": "ㄐ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄐ"
+        }
+      },
+      {
+        "label": "ㄔ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄔ"
+        }
+      },
+      {
+        "label": "ㄗ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄗ"
+        }
+      },
+      {
+        "label": "ㄧ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄧ"
+        }
+      },
+      {
+        "label": "ㄛ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄛ"
+        }
+      },
+      {
+        "label": "ㄟ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄟ"
+        }
+      },
+      {
+        "label": "ㄣ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄣ"
+        }
+      }
+    ],
+    [
+      {
+        "label": "ㄇ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄇ"
+        }
+      },
+      {
+        "label": "ㄋ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄋ"
+        }
+      },
+      {
+        "label": "ㄎ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄎ"
+        }
+      },
+      {
+        "label": "ㄑ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄑ"
+        }
+      },
+      {
+        "label": "ㄕ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄕ"
+        }
+      },
+      {
+        "label": "ㄘ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄘ"
+        }
+      },
+      {
+        "label": "ㄨ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄨ"
+        }
+      },
+      {
+        "label": "ㄜ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄜ"
+        },
+        "longPress": {
+          "label": "ㄦ",
+          "action": {
+            "type": "zhuyin",
+            "symbol": "ㄦ"
+          }
+        }
+      },
+      {
+        "label": "ㄠ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄠ"
+        }
+      },
+      {
+        "label": "ㄤ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄤ"
+        }
+      }
+    ],
+    [
+      {
+        "label": "ㄈ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄈ"
+        }
+      },
+      {
+        "label": "ㄌ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄌ"
+        }
+      },
+      {
+        "label": "ㄏ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄏ"
+        }
+      },
+      {
+        "label": "ㄒ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄒ"
+        }
+      },
+      {
+        "label": "ㄖ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄖ"
+        }
+      },
+      {
+        "label": "ㄙ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄙ"
+        }
+      },
+      {
+        "label": "ㄩ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄩ"
+        }
+      },
+      {
+        "label": "ㄝ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄝ"
+        }
+      },
+      {
+        "label": "ㄡ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄡ"
+        }
+      },
+      {
+        "label": "ㄥ",
+        "action": {
+          "type": "zhuyin",
+          "symbol": "ㄥ"
+        }
+      }
+    ],
+    [
+      {
+        "label": "符號",
+        "action": {
+          "type": "symbol_toggle"
+        },
+        "weight": 1.2
+      },
+      {
+        "label": "英數",
+        "action": {
+          "type": "language_toggle"
+        },
+        "weight": 1.2
+      },
+      {
+        "label": "空白",
+        "action": {
+          "type": "space"
+        },
+        "weight": 4.0
+      },
+      {
+        "label": "⌫",
+        "action": {
+          "type": "backspace"
+        },
+        "weight": 1.2
+      },
+      {
+        "label": "⏎",
+        "action": {
+          "type": "enter"
+        },
+        "weight": 1.4
+      }
+    ]
+  ]
+}
