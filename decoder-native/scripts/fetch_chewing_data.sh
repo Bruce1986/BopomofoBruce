@@ -39,9 +39,24 @@ EXPECTED_TSI_DAT_SHA256="641ee9784b77e21fdd8b8e4393ed7776b5016b05f26e771fecdcb48
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "${WORK_DIR}"' EXIT
 
-sha256_of() {
-    shasum -a 256 "$1" | awk '{print $1}'
-}
+# Pick a sha256 tool once, up front, rather than discovering it is missing
+# only after the download has already been paid for. `sha256sum` (coreutils)
+# is the one that ships on the Ubuntu CI runners; `shasum` (Perl Digest::SHA)
+# is the one that ships on macOS. Neither is guaranteed on both, and this
+# script runs on both — the Gradle task in build.gradle.kts invokes it during
+# assembleDebug.
+if command -v sha256sum >/dev/null 2>&1; then
+    sha256_of() {
+        sha256sum "$1" | awk '{print $1}'
+    }
+elif command -v shasum >/dev/null 2>&1; then
+    sha256_of() {
+        shasum -a 256 "$1" | awk '{print $1}'
+    }
+else
+    echo "fetch_chewing_data.sh: neither sha256sum nor shasum found; cannot verify the download." >&2
+    exit 1
+fi
 
 if [[ -f "${ASSETS_DIR}/word.dat" && -f "${ASSETS_DIR}/tsi.dat" ]] \
     && [[ "$(sha256_of "${ASSETS_DIR}/word.dat")" == "${EXPECTED_WORD_DAT_SHA256}" ]] \
@@ -51,9 +66,14 @@ if [[ -f "${ASSETS_DIR}/word.dat" && -f "${ASSETS_DIR}/tsi.dat" ]] \
 fi
 
 echo "fetch_chewing_data.sh: downloading ${URL} ..."
-curl -sSfL -o "${WORK_DIR}/${ZIP_NAME}" "${URL}"
+# --max-time/--connect-timeout matter because -f only covers "the server
+# answered with an error"; a half-open connection answers nothing at all, and
+# without a bound curl would sit there until the CI job's own 30-minute
+# timeout-minutes killed the whole run instead of this one step.
+curl -sSfL --connect-timeout 10 --max-time 300 --retry 3 --retry-delay 2 \
+    -o "${WORK_DIR}/${ZIP_NAME}" "${URL}"
 
-ACTUAL_SHA256="$(shasum -a 256 "${WORK_DIR}/${ZIP_NAME}" | awk '{print $1}')"
+ACTUAL_SHA256="$(sha256_of "${WORK_DIR}/${ZIP_NAME}")"
 if [[ "${ACTUAL_SHA256}" != "${EXPECTED_SHA256}" ]]; then
     echo "fetch_chewing_data.sh: sha256 mismatch!" >&2
     echo "  expected: ${EXPECTED_SHA256}" >&2

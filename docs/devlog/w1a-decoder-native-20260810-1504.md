@@ -21,7 +21,20 @@
   `handle->last_candidates`」這條不變量）；P2 把 `verifyChewingDataVersionSync`
   額外掛到 `package*Assets`/`assembleDebug`/`assembleRelease`/`connected*`/
   `install*`，補上「只組裝不跑測試」的路徑（含紅綠實測、`--dry-run` 確認不吃
-  網路）。見該節。**
+  網路）。見該節。
+  第十階段（2026-08-11）修正第十二輪 4 條 finding（Q1–Q4）。**兩條的結論會改寫上面
+  「驗收標準全數通過」的讀法，務必往下讀該節**：Q1 更正 `bpmf_init()` 的 NULL 失敗
+  契約（原本三份文件都寫錯）；**Q2 實測 DEVPLAN「APK size 增量 < 4 MB」在任何一種
+  情境下都沒有通過**（單 ABI 34.25 MiB／兩 ABI 60.62 MiB，即使假設性修好 `:app` 的
+  strip 缺陷，最樂觀仍是 5.26 MiB），已登記為待 owner 裁決，本輪不動手。
+  第十五階段（2026-08-12）修正第十四輪的 R1/R2。
+  第十六階段（2026-09-08，排程班深審第一輪）修正 8 條：C1 `bpmf_commit()` 補 index
+  範圍檢查；C2 test JNI 補 `FindClass`/`NewObjectArray` 的 NULL 檢查；B1 CI 新增
+  「打包進 APK 的 `libbpmf.so` ELF 架構」守門；B2 CI 釘死 Rust 工具鏈版本；B3/B4
+  `fetch_chewing_data.sh` 補 sha256 工具偵測與 curl 逾時；K1/K2 補上兩條測試（並發
+  互斥、孤兒 `.tmp` 復原）。見該節。
+  **上面「驗收標準全數通過」那句的範圍，僅限括號內列出的四項；APK size 不在其中，
+  且經第十階段 Q2 實測確認未達標。**
 
 ## 環境確認（動工前）
 
@@ -181,7 +194,7 @@ ADR-0001 本體。詳細裁示內容見 lead 轉達訊息（本檔不重抄，�
    （`decoder-native/cmake/src/bpmf_test_jni.c` + androidTest sourceset 的
    `testbridge/BpmfTestBridge.kt`），函式名前綴 `nativeTest*`、package 叫
    `testbridge`，跟 W2-A 之後會寫的正式 `ZhuyinDecoder` JNI binding 在命名
-   上不會混淆；W2-A 可以直接刪掉這個檔案换上自己的正式 binding。這個判斷
+   上不會混淆；W2-A 可以直接刪掉這個檔案換上自己的正式 binding。這個判斷
    沒有先跟 lead 對過，如果 lead 認為連這個都算「做了 JNI binding」，可以
    要求砍掉——但砍掉之後 connectedAndroidTest 這條驗收標準在 W1-A 這包就
    無法達成（會需要改用 native `add_executable` + `adb shell` 執行的方式，
@@ -1331,6 +1344,10 @@ BUILD FAILED
 - Q3 沒有可補充的異議。
 
 ---
+
+> 註：階段編號從「第十階段」跳到這裡，中間沒有第十一至十四階段——第十一、十三兩輪
+> 審查只動到 `keyboards`／`theme`（見 commit `295ab15`、`0181388`），未觸及
+> `decoder-native`，因此沒有在本 devlog 開新階段。階段編號與審查輪次是兩套獨立計數。
 
 ## 第十五階段（第十四輪 Opus 追蹤者 R1/R2 修正輪，2026-08-11）
 

@@ -8,8 +8,14 @@ import io.mockk.verify
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.path.createTempDirectory
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -99,6 +105,119 @@ class ChewingDataPathTest {
         assertTrue(
             !File(targetDir, "word.dat").exists(),
             "final file must not exist after an interrupted copy",
+        )
+    }
+
+    @Test
+    fun `recovers from an orphaned tmp file left by an interrupted copy`() {
+        // The KDoc on extractChewingData promises that a process killed mid-copy leaves at most an
+        // orphaned `<name>.tmp`, and that "the next call harmlessly overwrites that `.tmp` and
+        // retries". The interrupted-copy test above only proves the first half (nothing lands at
+        // the final name); nothing proved the recovery actually produces CORRECT content.
+        //
+        // Mutation this kills: switching the copy to append mode
+        // (`FileOutputStream(tmp, true)`) instead of truncating. Every other test starts from an
+        // empty directory, where append and truncate behave identically, so that mutation survives
+        // the whole suite — while in production it would concatenate the dead process's partial
+        // bytes onto the retry and publish the mixture under the final name.
+        val expected = byteArrayOf(1, 2, 3, 4, 5, 6, 7, 8)
+        val assets = fakeAssets(mapOf("word.dat" to expected))
+        val targetDir = File(tempDir, "cache-chewing")
+        targetDir.mkdirs()
+        // Longer than `expected` on purpose: with append-mode the final file would be the leftovers
+        // followed by `expected`, so both the length and the content check below would fail.
+        File(targetDir, "word.dat.tmp").writeBytes(ByteArray(64) { 0x7F })
+
+        extractChewingData(assets, targetDir)
+
+        val extracted = File(targetDir, "word.dat")
+        assertTrue(extracted.exists(), "retry after an orphaned .tmp must produce the final file")
+        assertArrayEquals(
+            expected,
+            extracted.readBytes(),
+            "retry must overwrite the orphaned .tmp, not append to it",
+        )
+        assertFalse(
+            File(targetDir, "word.dat.tmp").exists(),
+            "the .tmp must have been renamed into place, not left behind",
+        )
+    }
+
+    @Test
+    fun `concurrent first-time extraction never overlaps two copies of the same file`() {
+        // extractChewingData's KDoc justifies `synchronized(extractionLock)` by the two-thread race
+        // it prevents: both threads see the final name missing, then interleave writes into the
+        // same `.tmp` path. Every other test in this class is single-threaded and sequential, so
+        // deleting the `synchronized` wrapper entirely leaves the whole suite green — the lock had
+        // no guard at all.
+        //
+        // Rather than hoping a race shows up, this observes the invariant the lock exists to
+        // provide: at no point may two threads be inside the asset copy at the same time. The
+        // stream is deliberately slow, so if the lock is removed the second thread walks straight
+        // in while the first is still reading, and `concurrentReaders` climbs above 1.
+        val concurrentReaders = AtomicInteger(0)
+        val overlapSeen = AtomicBoolean(false)
+        val payload = ByteArray(4096) { (it % 251).toByte() }
+
+        val assets = mockk<AssetManager>()
+        every { assets.list("chewing") } returns arrayOf("word.dat")
+        every { assets.open("chewing/word.dat") } answers
+            {
+                object : java.io.InputStream() {
+                    private val backing = ByteArrayInputStream(payload)
+                    private var entered = false
+
+                    override fun read(): Int {
+                        if (!entered) {
+                            entered = true
+                            if (concurrentReaders.incrementAndGet() > 1) {
+                                overlapSeen.set(true)
+                            }
+                        }
+                        // Slow enough that a second unsynchronized thread is certain to arrive
+                        // while this one is still mid-copy; short enough not to drag out the suite.
+                        Thread.sleep(2)
+                        return backing.read()
+                    }
+
+                    override fun close() {
+                        if (entered) {
+                            concurrentReaders.decrementAndGet()
+                        }
+                        backing.close()
+                    }
+                }
+            }
+
+        val targetDir = File(tempDir, "cache-chewing")
+        val start = CountDownLatch(1)
+        val done = CountDownLatch(2)
+        val failure = AtomicReference<Throwable?>(null)
+        repeat(2) {
+            Thread {
+                    try {
+                        start.await()
+                        extractChewingData(assets, targetDir)
+                    } catch (t: Throwable) {
+                        failure.compareAndSet(null, t)
+                    } finally {
+                        done.countDown()
+                    }
+                }
+                .start()
+        }
+        start.countDown()
+        assertTrue(done.await(30, TimeUnit.SECONDS), "both extraction threads must finish")
+
+        assertEquals(null, failure.get(), "neither thread may fail: ${failure.get()}")
+        assertFalse(
+            overlapSeen.get(),
+            "two threads were inside the asset copy at once — extractionLock is not holding",
+        )
+        assertArrayEquals(
+            payload,
+            File(targetDir, "word.dat").readBytes(),
+            "the published file must be exactly one complete copy of the asset",
         )
     }
 

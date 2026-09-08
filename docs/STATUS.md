@@ -78,7 +78,14 @@ _(無 — W1 幽靈認領已於 2026-08-07 巡視清除；`.claude/worktrees/` �
 
 > ⛔ 狀態的包必在這裡留條目（為什麼卡、誰要解、ETA）。
 
-_(空)_
+- **W4-D（Internal track 上架）— LGPL-2.1 靜態連結尚未履行合規義務。**
+  ADR-0006 走 Corrosion staticlib 路線，把 LGPL-2.1 的 libchewing 靜態連進
+  `libbpmf.so`，換掉了 ADR-0001「動態連結故合規」的前提，但授權論證沒有跟著更新，
+  repo 內也沒有任何 `NOTICE`／授權履行文件。**上架前必須先擇一完成**：依 LGPL §6(a)
+  提供 relink 所需材料（或公開整個 repo），或改回 `cdylib` 動態載入。
+  誰要解：owner（這是授權決策，不是實作決策）。ETA：未定，但為 W4-D 的硬前提。
+  出處：[ADR-0006 K1](adr/0006-libchewing-rust-build-pipeline.md)。
+  （列在這裡的理由：原本只記在 ADR 內文，認領 W4-D 的人若只看本表會完全看不到。）
 
 ---
 

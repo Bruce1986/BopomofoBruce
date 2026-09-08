@@ -7,7 +7,7 @@
 
 ## Context（背景）
 
-[ADR-0001](0001-libchewing-decoder-backend.md) 決定採用 libchewing 當 v1 decoder 後端，假設前提是「C99，無 GUI 依賴，NDK r26 + CMake 理論上可直接 cross-compile」，並明確把「這個假設是否成立」留給 [W1-A spike](DEVPLAN-SubagentFanout-20260620-0851.md#w1-a--decoder-native-把-libchewing-編成-so) 驗證。
+[ADR-0001](0001-libchewing-decoder-backend.md) 決定採用 libchewing 當 v1 decoder 後端，假設前提是「C99，無 GUI 依賴，NDK r26 + CMake 理論上可直接 cross-compile」，並明確把「這個假設是否成立」留給 [W1-A spike](../DEVPLAN-SubagentFanout-20260620-0851.md#w1-a--decoder-native-把-libchewing-編成-so) 驗證。
 
 W1-A 動工前查證 upstream 現況，發現這個假設在近兩年已經不成立：
 
@@ -22,7 +22,7 @@ owner 已就此裁示（見 devlog 2026-08-10 段）：**採用 v0.12.0（commit
 **`decoder-native` 的建置管線是 CMake + [Corrosion](https://github.com/corrosion-rs/corrosion)（pin `v0.6.1`，commit `1499b14e4906a2890f5cee1547c8848db261753d`），不是純 C CMake 編譯：**
 
 - `decoder-native/cmake/CMakeLists.txt`（AGP `externalNativeBuild.cmake.path` 指到這裡）用 `FetchContent` 拉 Corrosion，`corrosion_import_crate()` 把 vendored 的 `chewing_capi` crate（`decoder-native/cmake/libchewing/capi`，`[lib] crate-type = ["rlib", "staticlib"]`）依 AGP 傳入的 `CMAKE_ANDROID_ARCH_ABI` 交叉編譯成對應 ABI 的 Rust staticlib。Corrosion 原生支援從 `CMAKE_ANDROID_ARCH_ABI` 推導 Rust target triple（`aarch64-linux-android` / `armv7-linux-androideabi`），不需要額外的 cargo-ndk 或手寫 `.cargo/config.toml` target 對照。
-- 我們自己寫的一個薄 C wrapper（`decoder-native/cmake/src/bpmf_wrapper.c`，含 DaChen 鍵盤對照表 — 對照表直接照抄 vendored `src/editor/zhuyin_layout/standard.rs`，不是憑記憶重建）`#include` 上游的 `capi/include/chewing.h`，呼叫 `chewing_new3`/`chewing_handle_Default`/`chewing_cand_*`/`chewing_commit_String`/`chewing_delete` 等公開 C API，`target_link_libraries` 連結剛剛的 `chewing_capi` staticlib，一起編成單一 `libbpmf.so`。這條路線完全比照 upstream 自己的 `CMakeLists.txt`（`add_library(libchewing capi/src/chewing.c)` 接 `chewing_capi`），只是我們的 C 檔案換成 `bpmf_wrapper.c` 輸出 DEVPLAN 指定的 4 個簡化 API，而不是把全部 ~60 個 libchewing C API 都轉出去。
+- 我們自己寫的一個薄 C wrapper（`decoder-native/cmake/src/bpmf_wrapper.c`，含 DaChen 鍵盤對照表 — 對照表直接照抄 vendored `src/editor/zhuyin_layout/standard.rs`，不是憑記憶重建）`#include` 上游的 `capi/include/chewing.h`，呼叫 `chewing_new3`/`chewing_handle_Default`/`chewing_cand_*`（`cand_open`/`cand_Enumerate`/`cand_String`/`cand_choose_by_index`/`cand_close`）/`chewing_delete` 等公開 C API，`target_link_libraries` 連結剛剛的 `chewing_capi` staticlib，一起編成單一 `libbpmf.so`。這條路線完全比照 upstream 自己的 `CMakeLists.txt`（`add_library(libchewing capi/src/chewing.c)` 接 `chewing_capi`），只是我們的 C 檔案換成 `bpmf_wrapper.c` 輸出 DEVPLAN 指定的 4 個簡化 API，而不是把全部 ~60 個 libchewing C API 都轉出去。
   **（2026-08-11 第十四輪 Opus 追蹤者 R1 更正，見 devlog）**：以上「而不是把全部 ~60 個
   libchewing C API 都轉出去」在本次更正之前只是**編譯層級**的事實（`bpmf_wrapper.c` 本身只呼叫
   4 個函式），並不是**連結產物層級**的事實。`corrosion_import_crate()` 把整個 `chewing_capi`
@@ -104,6 +104,7 @@ owner 已就此裁示（見 devlog 2026-08-10 段）：**採用 v0.12.0（commit
 - `chewing_capi` 依賴（`env_logger`／`der`／`regex` 等一串 crates.io 套件）比純 C 版多一層供應鏈面（crates.io 套件完整性），不像純 C 版只依賴 libc。
 - 字典資料改用「下載 prebuilt release」而非「自己跑 chewing-cli 從 `.src` 建」，意味著我們現在信任 upstream release 流程的完整性，而不是自己重新產生一份可完全稽核的建置鏈；若未來要換字典內容（例如加自訂詞），需要另外處理（跑 chewing-cli 或直接編輯 .dat，兩者都超出 W1-A 範圍）。
 - **（2026-08-11 第五階段新增）`:lint` 需要連網**：`package*Assets`/`Lint*` 兩類 task 現在都直接依附 `fetchChewingData`，這是修正下游 `:app` 拿不到字典（見 devlog E1）的必然代價——AGP 把 lint 的 model builder 無條件連到 `package*Assets`，這份 build script 無法切斷這條耦合，只能整批接受或整批拒絕。已刻意選擇「整批接受」：APK 正確性優先於 lint 可離線執行。離線環境跑 `:decoder-native:lint` 會失敗；CI 或斷網環境需注意這點。
+- **（2026-09-08 補記，K7）DEVPLAN 的「APK size 增量 < 4 MB」驗收條目已實測不通過**：上面「正面」列的 3.43MB／2.45MB 是 **`libbpmf.so` 自身剝除符號後**的大小，不是 APK 增量。devlog 第十階段 Q2 實測 `:app:assembleRelease` 的實際產物：單 ABI 增量 34.25 MiB、兩 ABI 都包 60.62 MiB，因為 `:app` 自己沒有宣告 `ndkVersion`，AGP 在 `:app` 這層找不到 strip 工具，未剝除的 `.so` 被原樣打包；即使假設性修好那個缺陷，最樂觀的單 ABI 增量仍是 5.26 MiB，**在任何一種情境下都沒有過 4 MB 門檻**。這條與 K1 一樣是「本輪只記案、不動手」，需要 owner 在「精簡字典／ABI splits／修 `:app` strip 缺陷／調整門檻」之間裁決。詳見 devlog 第十階段 Q2。
 - **（2026-08-11 第七階段新增，K1）本 ADR 把 ADR-0001 的動態連結前提改成了靜態連結，授權論證沒有跟著重新過關**：`decoder-native/cmake/CMakeLists.txt` 的
   `corrosion_import_crate()` 把 vendored `chewing_capi`（`[lib] crate-type = ["rlib", "staticlib"]`）整份編成 staticlib，`target_link_libraries` 直接靜態連進 `libbpmf.so`——這正是 ADR-0001 Consequences 段明講「未來若想靜態連結需重新評估授權與逆向工程條款」的那個情境，但本 ADR 決定走 Corrosion staticlib 路線時完全沒提 LGPL、也沒重新評估。libchewing 是 **LGPL-2.1**，ADR-0001 的合規論證原文是「License LGPL-2.1：**動態連結**（JNI 載 `.so`）合規」——前提已經被本 ADR 換掉，論證卻沒有跟著換。目前 repo 內也沒有任何 `NOTICE`／授權履行文件。這代表：
   - 若要維持靜態連結（Corrosion staticlib），需要以 LGPL §6(a) 履行——附我方 wrapper（`bpmf_wrapper.c`／`CMakeLists.txt`）原始碼＋足以讓使用者 relink 成別版 libchewing 的物件檔／連結資訊，或者直接公開整個 repo 滿足「原始碼可得」；
@@ -126,7 +127,7 @@ owner 已就此裁示（見 devlog 2026-08-10 段）：**採用 v0.12.0（commit
 
 ## Alternatives considered（替代方案）
 
-- **cargo-ndk 直出 `.so`**：`cargo ndk -t arm64-v8a -t armeabi-v7a -o jniLibs build --release` 這條路線更常見於「純 Rust Android 專案」（例如 Mozilla application-services），不需要 CMake。沒選的原因：(1) DEVPLAN §4 W1-A 字面就是要求「CMakeLists.txt 編出 libbpmf.so」，cargo-ndk 直出會整個繞過 CMake，需要另外接一個 Gradle 自訂 task 管理 ABI/輸出路徑/增量建置，等於重造 AGP `externalNativeBuild` 已經處理好的一部分邏輯；(2) 我們的 4 個 API 是用 **C** 寫的薄 wrapper（呼叫 libchewing 的 C API），不是 Rust 寫的 shim crate，cargo-ndk 直出假設整個 cdylib 都是 Rust 原始碼，跟我們選的「C wrapper + Rust staticlib」架構不搭；(3) upstream 自己也是走 Corrosion 這條路，跟隨上游配方能减少未來合併 upstream 變更時的落差。
+- **cargo-ndk 直出 `.so`**：`cargo ndk -t arm64-v8a -t armeabi-v7a -o jniLibs build --release` 這條路線更常見於「純 Rust Android 專案」（例如 Mozilla application-services），不需要 CMake。沒選的原因：(1) DEVPLAN §4 W1-A 字面就是要求「CMakeLists.txt 編出 libbpmf.so」，cargo-ndk 直出會整個繞過 CMake，需要另外接一個 Gradle 自訂 task 管理 ABI/輸出路徑/增量建置，等於重造 AGP `externalNativeBuild` 已經處理好的一部分邏輯；(2) 我們的 4 個 API 是用 **C** 寫的薄 wrapper（呼叫 libchewing 的 C API），不是 Rust 寫的 shim crate，cargo-ndk 直出假設整個 cdylib 都是 Rust 原始碼，跟我們選的「C wrapper + Rust staticlib」架構不搭；(3) upstream 自己也是走 Corrosion 這條路，跟隨上游配方能減少未來合併 upstream 變更時的落差。
 - **Rust shim crate（cdylib 直接依賴 `chewing_capi`，不寫 C wrapper）**：技術上可行（`chewing_capi` 的函式雖標記 `extern "C"` 但仍是可從 Rust 呼叫的 `pub` 函式），且能省掉 C 檔案。沒選的原因：需要在 `chewing_capi` 的 Cargo.toml 加 `"cdylib"` 到 crate-type（vendored 原始碼不該改，即使只加一行也會讓「vendor 版本可重現」的驗證多一個變因），或另開一個依賴 `chewing_capi` 的新 crate（等於還是要學 `chewing_capi` 內部模組路徑，且新增一整個 Cargo 專案而非一個 C 檔案，維護面比薄 C wrapper 大）。C wrapper 只需要 `#include` 上游已發布的公開標頭（`capi/include/chewing.h`），耦合面更小、更貼近 DEVPLAN 字面要求。
 - **接受 v0.5.1（2016 年最後純 C 版）**：完全不用碰 Rust 工具鏈，最貼近 ADR-0001 原始假設。沒選的原因：字典/bug fix 停在 2016 年，直接撞上 ADR-0001 自己定義的重評條件；owner 已就這點明確裁示不採用（見 devlog）。
 - **Fork 純 C 版本自維**：ADR-0001 原文的 Plan B（「若 upstream 停更」）講的是「停更」情境，不是「換語言」情境；沿用 2016 年程式碼庫去 fork 一樣繼承詞典過舊問題，且要自己扛住 Rust 版之後 9 年的所有安全修補與 bug fix，solo dev 時間預算撐不住。
@@ -134,8 +135,8 @@ owner 已就此裁示（見 devlog 2026-08-10 段）：**採用 v0.12.0（commit
 ## References
 
 - [ADR-0001](0001-libchewing-decoder-backend.md)
-- [DEVPLAN W1-A 子代理 spec](DEVPLAN-SubagentFanout-20260620-0851.md#w1-a--decoder-native-把-libchewing-編成-so)
-- [W1-A devlog](devlog/w1a-decoder-native-20260810-1504.md) — 完整版本調查與 owner 裁示紀錄
+- [DEVPLAN W1-A 子代理 spec](../DEVPLAN-SubagentFanout-20260620-0851.md#w1-a--decoder-native-把-libchewing-編成-so)
+- [W1-A devlog](../devlog/w1a-decoder-native-20260810-1504.md) — 完整版本調查與 owner 裁示紀錄
 - libchewing 上游：<https://github.com/chewing/libchewing>（`v0.12.0` = commit `05ae6bcb9309c466a1b32d69c146bc583be04747`）
 - libchewing-data：<https://github.com/chewing/libchewing-data>（`v2026.3.22` = commit `c44e81aef24b06f1509f19e1be54c99812d0c43f`，與我們的 `data` submodule 一致）
 - Corrosion：<https://github.com/corrosion-rs/corrosion>（pin `v0.6.1` = commit `1499b14e4906a2890f5cee1547c8848db261753d`）

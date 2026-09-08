@@ -136,6 +136,12 @@ static int bopomofo_key_for(uint32_t codepoint) {
 typedef struct {
     ChewingContext* ctx;
     char* last_candidates;
+    /* How many candidates the last bpmf_input() on this handle returned.
+     * bpmf_commit() uses it as the upper bound for `index`; without it the
+     * only thing standing between a caller-supplied index and libchewing is
+     * libchewing's own internal bounds check, and a caller could not tell a
+     * rejected index apart from an accepted one. */
+    size_t last_candidate_count;
 } BpmfHandle;
 
 /* --- public API ---------------------------------------------------------- */
@@ -234,6 +240,7 @@ void* bpmf_init(const char* data_path) {
     }
     handle->ctx = ctx;
     handle->last_candidates = NULL;
+    handle->last_candidate_count = 0;
     return handle;
 }
 
@@ -292,6 +299,7 @@ size_t bpmf_input(void* opaque_handle, const char* zhuyin, char** candidates_out
 
     free(handle->last_candidates);
     handle->last_candidates = NULL;
+    handle->last_candidate_count = 0;
 
     chewing_Reset(ctx);
 
@@ -366,6 +374,7 @@ size_t bpmf_input(void* opaque_handle, const char* zhuyin, char** candidates_out
     }
 
     handle->last_candidates = joined;
+    handle->last_candidate_count = count;
     *candidates_out = joined;
     return count;
 }
@@ -374,7 +383,22 @@ void bpmf_commit(void* opaque_handle, size_t index) {
     if (opaque_handle == NULL) {
         return;
     }
-    ChewingContext* ctx = ((BpmfHandle*)opaque_handle)->ctx;
+    BpmfHandle* handle = (BpmfHandle*)opaque_handle;
+    /* Reject out-of-range indices here rather than forwarding them to
+     * libchewing. Two reasons this check is not redundant with libchewing's
+     * own: (a) `index` is size_t but chewing_cand_choose_by_index() takes an
+     * int, so a caller that sends a negative value through a signed JNI jint
+     * arrives here as a huge size_t and the (int) cast wraps it straight back
+     * to a negative number — the cast, not the value, is what libchewing
+     * would see; (b) the enumeration bpmf_input() performed is the only place
+     * that knows how many candidates the caller was actually offered, and
+     * that number is not recoverable from the context alone. Out of range is
+     * a no-op, matching the "invalid input fails closed" behaviour the rest
+     * of this API already has (see bpmf_input()'s unmapped-character path). */
+    if (index >= handle->last_candidate_count) {
+        return;
+    }
+    ChewingContext* ctx = handle->ctx;
     if (chewing_cand_open(ctx) == 0) {
         chewing_cand_choose_by_index(ctx, (int)index);
         chewing_cand_close(ctx);

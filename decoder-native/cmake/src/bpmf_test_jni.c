@@ -70,6 +70,13 @@ Java_com_bopomofobruce_decoder_nativ_testbridge_BpmfTestBridge_nativeTestInput(
     JNIEnv* env, jclass clazz, jlong handle, jstring zhuyin) {
     (void)clazz;
     jclass string_class = (*env)->FindClass(env, "java/lang/String");
+    if (string_class == NULL) {
+        /* FindClass has already thrown (NoClassDefFoundError / OOM). Calling
+         * further JNI functions with a pending exception is undefined
+         * behaviour, and every remaining path in this function needs
+         * string_class, so hand control straight back to the JVM. */
+        return NULL;
+    }
     if (zhuyin == NULL) {
         return (*env)->NewObjectArray(env, 0, string_class, NULL);
     }
@@ -84,6 +91,12 @@ Java_com_bopomofobruce_decoder_nativ_testbridge_BpmfTestBridge_nativeTestInput(
     (*env)->ReleaseStringUTFChars(env, zhuyin, zhuyin_utf8);
 
     jobjectArray result = (*env)->NewObjectArray(env, (jsize)count, string_class, NULL);
+    if (result == NULL) {
+        /* Allocation failed and NewObjectArray already threw OutOfMemoryError.
+         * Filling it below would mean calling SetObjectArrayElement on a NULL
+         * array with an exception pending. */
+        return NULL;
+    }
 
     /*
      * bpmf.h's contract guarantees *candidates_out (`joined` here) is never
