@@ -5,6 +5,35 @@
 
 ---
 
+## 2026-09-13 — W1-C #10 排程深審班（Claude Code）
+
+- 兩條既有測試只掃短按、沒掃長按，已改用 `reachableChars()`：
+  `symbol keyboard characters are all full-width`（medium——本 PR 自己就給符號鍵盤加了
+  一個 longPress，等於替它要擋的半形偷渡開了一條看不到的路）與
+  `url keyboard has slash, dot and a dedicated dot-com custom action`（low，防未來的假紅）。
+  兩條都做了 A/B：修正後紅／修正前綠，以及修正後綠／修正前假紅。
+- 複驗無問題：注音 37 符號＋4 聲調兩份配列齊全無重複、八份配列無重複鍵、空白鍵標籤
+  一致、KDoc 列寬總和吻合、無恆真或自我印證斷言、空配列退化點已有守門。
+- 跨模組介面（W1-A／W1-B）**現階段無從查證**——`:decoder`／`:theme` 仍是 Placeholder，
+  沒有任何 consumer 引用 `Keyboards.*`。等真實 JNI 綁定落地後補 smoke test。
+- 第 2 輪（對抗性）找到**第四個**「規則本身不完備、靠現有鍵盤組合湊巧遮住」：
+  `ReturnPathCoverageTest.destinationsOf()` 的寫死 `when` 與權威清單
+  `Keyboards.PAGE_SWITCH_CUSTOM_IDS` 沒有互相核對，新登記的切頁 id 會被
+  `else -> emptyList()` 靜靜吞掉。完整情境實測（登記＋掛鍵＋補 label 表，指向確定沒有
+  返回路徑的 `phone_dialpad`）：加哨兵後 FAILED、加之前 BUILD SUCCESSFUL。已補哨兵
+  `every registered page-switch custom id has a destination in destinationsOf`（46 → 47 tests）。
+- `reachableChars()` 只認 `KeyAction.Character`，而 `Custom` 已有插入半形文字的先例
+  （AM／PM）——id 到文字的對應表在 `:ime`、本模組修不了，已在 KDoc 寫明它不是
+  「所有可觸及字元」的保證。
+- 第 3 輪（Opus tracer）：第 2 輪的哨兵只做了單向核對（清單 → 導航圖），反方向
+  （導航圖認得、卻登記在 NON_PAGE_SWITCH）完全靜音——完整情境實測，加斷言後 FAILED、
+  加之前 47 tests 全綠。另補「帶返回鍵的鍵盤必須是某顆切頁鍵的目的地」（把 switch_back
+  掛在誰都切不到的頁上，真機是 no-op，原本零反應）。47 → 49 tests。
+- 本班三輪**沒有動到任何一行產品碼**，全部落在測試鷹架與文件；依 tracer 判斷收手。
+- 細節：[docs/devlog/W1-C-keyboards-20260913-shift-round1.md](docs/devlog/W1-C-keyboards-20260913-shift-round1.md)
+
+---
+
 ## 2026-08-10 ~ 08-11 — W1 三包實作 + gemini-grade-review fix-loop（Claude Code）
 
 ### 完成
