@@ -5,6 +5,21 @@
 
 ---
 
+## 2026-09-13 — W1-C #10 排程深審班（Claude Code）
+
+- 兩條既有測試只掃短按、沒掃長按，已改用 `reachableChars()`：
+  `symbol keyboard characters are all full-width`（medium——本 PR 自己就給符號鍵盤加了
+  一個 longPress，等於替它要擋的半形偷渡開了一條看不到的路）與
+  `url keyboard has slash, dot and a dedicated dot-com custom action`（low，防未來的假紅）。
+  兩條都做了 A/B：修正後紅／修正前綠，以及修正後綠／修正前假紅。
+- 複驗無問題：注音 37 符號＋4 聲調兩份配列齊全無重複、八份配列無重複鍵、空白鍵標籤
+  一致、KDoc 列寬總和吻合、無恆真或自我印證斷言、空配列退化點已有守門。
+- 跨模組介面（W1-A／W1-B）**現階段無從查證**——`:decoder`／`:theme` 仍是 Placeholder，
+  沒有任何 consumer 引用 `Keyboards.*`。等真實 JNI 綁定落地後補 smoke test。
+- 細節：[docs/devlog/W1-C-keyboards-20260913-shift-round1.md](docs/devlog/W1-C-keyboards-20260913-shift-round1.md)
+
+---
+
 ## 2026-08-07 — 全案審查＋文件校正（Claude Code）
 
 ### 完成

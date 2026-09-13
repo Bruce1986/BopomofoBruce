@@ -28,16 +28,12 @@ class OtherKeyboardsContentTest {
         // A half-width "," slipping in instead of "，" would defeat the point of a 全形標點 keyboard.
         // Walks *all* rows (not just the first 3) so a future page-2 / 半形切換 row inserted anywhere
         // in the layout can't silently smuggle an ASCII half-width character past this check.
-        for (row in Keyboards.symbolStandard.rows) {
-            for (key in row) {
-                val action = key.action
-                if (action is KeyAction.Character) {
-                    assertTrue(
-                        action.char.code > 127,
-                        "expected full-width punctuation, got ASCII '${action.char}'",
-                    )
-                }
-            }
+        //
+        // Uses reachableChars so long-press actions count too. This keyboard already has one
+        // ("－" long-presses to the em dash), and a short-press-only scan would wave the next
+        // one through even if it carried ASCII — the very route this test exists to close.
+        for (char in reachableChars(Keyboards.symbolStandard.rows)) {
+            assertTrue(char.code > 127, "expected full-width punctuation, got ASCII '$char'")
         }
     }
 
@@ -201,7 +197,10 @@ class OtherKeyboardsContentTest {
     @Test
     fun `url keyboard has slash, dot and a dedicated dot-com custom action`() {
         val allKeys = Keyboards.urlQwerty.rows.flatten()
-        val chars = allKeys.mapNotNull { (it.action as? KeyAction.Character)?.char }
+        // "can the user type it" is the question, so long-press counts as well — this keyboard's
+        // digits are already long-press only, so a short-press-only scan answers a narrower
+        // question than the test name claims.
+        val chars = reachableChars(Keyboards.urlQwerty.rows)
         assertTrue('/' in chars && '.' in chars, "url keyboard missing '/' or '.'")
 
         val customActions = allKeys.mapNotNull { it.action as? KeyAction.Custom }
