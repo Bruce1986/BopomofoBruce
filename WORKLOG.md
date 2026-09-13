@@ -25,6 +25,11 @@
 - `reachableChars()` 只認 `KeyAction.Character`，而 `Custom` 已有插入半形文字的先例
   （AM／PM）——id 到文字的對應表在 `:ime`、本模組修不了，已在 KDoc 寫明它不是
   「所有可觸及字元」的保證。
+- 第 3 輪（Opus tracer）：第 2 輪的哨兵只做了單向核對（清單 → 導航圖），反方向
+  （導航圖認得、卻登記在 NON_PAGE_SWITCH）完全靜音——完整情境實測，加斷言後 FAILED、
+  加之前 47 tests 全綠。另補「帶返回鍵的鍵盤必須是某顆切頁鍵的目的地」（把 switch_back
+  掛在誰都切不到的頁上，真機是 no-op，原本零反應）。47 → 49 tests。
+- 本班三輪**沒有動到任何一行產品碼**，全部落在測試鷹架與文件；依 tracer 判斷收手。
 - 細節：[docs/devlog/W1-C-keyboards-20260913-shift-round1.md](docs/devlog/W1-C-keyboards-20260913-shift-round1.md)
 
 ---

@@ -73,11 +73,13 @@ class OtherKeyboardsContentTest {
      *
      * **Deliberately `Character` only — this is NOT "every character a key can emit".** Two other
      * [KeyAction] variants can put text on screen and are invisible here:
-     * - [KeyAction.Custom]: already used for exactly that ([Keyboards.INSERT_AM_CUSTOM_ID] and
-     *   [Keyboards.INSERT_PM_CUSTOM_ID] insert `"AM"`/`"PM"`), so a future `Custom` that inserts
-     *   half-width text onto the full-width symbol page would slip past the check below. The
-     *   mapping from a `Custom` id to the text it inserts lives in `:ime`, not here, so this module
-     *   cannot resolve it; the AM/PM tests scan ids instead.
+     * - [KeyAction.Custom]: already spec'd for exactly that — [Keyboards.INSERT_AM_CUSTOM_ID] and
+     *   [Keyboards.INSERT_PM_CUSTOM_ID] are documented as inserting `"AM"`/`"PM"`, so a future
+     *   `Custom` that inserts half-width text onto the full-width symbol page would slip past the
+     *   check below. Note this is a documented intent, not yet code: nothing in the repo maps a
+     *   `Custom` id to the text it inserts, and `:ime` is still a placeholder. That mapping
+     *   **will** live in `:ime` (W2-B), not here, so this module cannot resolve it; the AM/PM tests
+     *   scan ids instead.
      * - [KeyAction.Zhuyin]: carries a `String`, and its output reaches the buffer through
      *   `ZhuyinDecoder` rather than as a literal keystroke, so it is out of scope by design.
      *

@@ -112,8 +112,9 @@ longPress**（owner 2026-09-08 裁決：破折號 `—` 掛在 `－` 的長按�
 
 - `Custom`：**已經有先例**——`INSERT_AM_CUSTOM_ID`／`INSERT_PM_CUSTOM_ID` 插入的就是
   半形的 `"AM"`／`"PM"`。所以未來若在全形符號頁掛一顆插入半形文字的 `Custom` 鍵，
-  上一輪才剛強化的全形檢查照樣看不到它。**但這個模組修不了**：id 到插入文字的對應表在
-  `:ime` 而不在這裡，所以 AM/PM 那條測試才是改掃 id 的。
+  上一輪才剛強化的全形檢查照樣看不到它。**但這個模組修不了**：id 到插入文字的對應表
+  **將**在 `:ime`（W2-B）而不在這裡——目前 repo 裡沒有任何一行程式碼做這個對應，
+  `:ime` 還是 Placeholder，AM/PM 只有 KDoc 層級的意圖記載——所以 AM/PM 那條測試才是改掃 id 的。
 - `Zhuyin`：帶的是 `String`，而且輸出要經 `ZhuyinDecoder` 才進緩衝區，不是逐字元直達，
   設計上本來就不在範圍內。
 
@@ -128,3 +129,70 @@ longPress**（owner 2026-09-08 裁決：破折號 `—` 掛在 `－` 的長按�
 （`numeric_standard`／`phone_dialpad` 沒有），6 份全部是「空白」文字標籤。列寬總和
 `password_qwerty` 10.0/9.0/9.6/7.6、`url_qwerty` 10.0/9.0/9.6/8.8，與 KDoc 逐列吻合。
 跨模組：`grep -rn "Keyboards\." ime app settings decoder theme` 零命中。
+
+---
+
+# 同日第 3 輪（Opus tracer，本班收尾）
+
+47 → **49 tests / 0 failures**。**產品碼 0 條**；兩條都是測試邏輯。
+
+## 一、第 2 輪的哨兵只做了單向核對
+
+哨兵走的是「清單 → 導航圖」（`PAGE_SWITCH_CUSTOM_IDS` 裡每個 id 都要有目的地）。
+**反方向沒人看**：`destinationsOf()` 認得、卻被登記在 `NON_PAGE_SWITCH_CUSTOM_IDS`
+（＝資料層宣稱「這顆鍵不會帶你去別的鍵盤」）的 id。
+
+**完整情境實測**（新增一個切到 `symbolStandard` 的 id、在 `destinationsOf()` 補好分支、
+在 `datetime_standard` 掛一顆鍵、補 label 表，**但登記在錯邊**）：
+
+| | 結果 |
+|---|---|
+| 本輪新增反向斷言後 | **FAILED** |
+| 本輪之前（同樣補了分支） | **BUILD SUCCESSFUL，47 tests 全綠** |
+
+此時 `datetime_standard` 真的多了一顆會換頁的鍵、導航圖也同意它會換頁，只有資料層說它不是
+⇒ `ToggleFreeKeyboardsTest` 把 datetime 當終端頁、`Keyboards.kt` 的「終端頁是這三份」KDoc
+就此變成錯的，而**沒有任何一條測試紅**。`ToggleFreeKeyboardsTest` 對「登記錯邊」的既有防線
+是三條寫死的 per-id 斷言，對**新增的** id 結構性無效；新的反向斷言用走訪取代列舉。
+
+## 二、排除 `GENERIC_BACK` 之後就沒人再對它問過任何事
+
+排除本身是對的——`destinationsOf()` 只吃 `KeyAction`、沒有「這顆鍵在哪份鍵盤上」的脈絡，
+算不出「所有會切到它所在鍵盤的來源」。**但排除之後，一整類缺陷會無聲落地**：把「返回」掛在
+一份**誰都切不到**的鍵盤上，使用者是靠 InputType 直接進來的，`:ime` 沒有來源狀態可回，
+那顆鍵在真機上是 no-op。
+
+**實測**（在 `url_qwerty` 加一顆 `switch_back`——`url_qwerty` 不是任何 `destinationsOf()`
+的目的地）：
+
+| | 結果 |
+|---|---|
+| 本輪新增後 | **FAILED** |
+| 本輪之前 | **BUILD SUCCESSFUL，47 tests 全綠** |
+
+處置是**換一個問題問**而不是完全不問：帶返回鍵的鍵盤，必須是某顆切頁鍵的目的地。
+
+## 三、另修兩處文件精確性
+
+- 哨兵的失敗訊息只給了兩個選項（補分支／宣稱動態），但還有**第三種**情況：目的地是固定的、
+  但那份鍵盤還不在 `Keyboards.all` 裡（`language_toggle` 的通用 ABC 頁、W2-D 的 emoji 頁）。
+  照原訊息做，只能在排除清單上留一條指不出根據的例外。已把第三種寫進訊息。
+- `reachableChars()` 的 KDoc 把「將來會在 `:ime`」寫成現在式。實查：
+  `grep -rn` 那幾個 custom id 於 `ime`／`app`／`settings`／`decoder`／`theme`／`common`
+  **零命中**，`:ime` 仍是只有一個常數的 Placeholder。AM／PM 插入文字這件事目前**只有
+  KDoc 層級的意圖記載、沒有任何一行程式碼**。已改成未來式並寫明現況。
+  （`Zhuyin` 要經 `ZhuyinDecoder` 那句**有出處**：介面在 `:common`，不受 `:decoder` 仍是
+  Placeholder 影響。）
+
+## 四、merge commit `6b12216` 的衝突解法已複驗
+
+tracer 逐段比對：`git diff origin/main 6b12216 -- WORKLOG.md` **0 行刪除**，
+`git diff 6041b45 6b12216 -- WORKLOG.md` 也 **0 行刪除**；`docs/STATUS.md` 與
+`docs/HANDOVER-W1-fixloop-20260811.md` 與 `origin/main` 逐位元組相同。兩側內容都在，無遺失。
+
+## 五、停止判斷
+
+**本班到此收手。** 依據是 tracer 的判斷，不是「連續兩輪 clean pass」：本班三輪
+（`git diff e6a421d..` 實查）**沒有動到任何一行產品碼**，全部落在測試鷹架與文件；
+而 F1／F2 已經是同一個母題（「規則本身不完備、靠現有鍵盤組合湊巧遮住」）的第 5、6 次分身，
+再開一輪很可能只是在新補的那條規則上再找一個沒覆蓋到的角落。
