@@ -104,6 +104,43 @@ class ReturnPathCoverageTest {
     }
 
     @Test
+    fun `every registered page-switch custom id has a destination in destinationsOf`() {
+        // destinationsOf() 是一個寫死的 when，但「哪些 Custom id 算切頁鍵」的權威來源是
+        // Keyboards.PAGE_SWITCH_CUSTOM_IDS。兩邊沒有任何機制互相核對：在清單裡登記一個新的
+        // 切頁 id、卻忘了在 destinationsOf() 加分支，那條邊就會被 `else -> emptyList()` 靜靜
+        // 吞掉，回程檢查完全看不到它——即使它指向的是一份真正的死路終端頁。
+        //
+        // 實測（2026-09-13）：登記一個新的切頁 id、在符號鍵盤掛一顆指向 phone_dialpad
+        // （目前確定沒有任何切頁鍵的終端頁之一）的鍵，一切都照「正確流程」做，
+        // BUILD SUCCESSFUL、ReturnPathCoverageTest 2 tests / 0 failures——這條真實的導航
+        // 死路沒有任何一條測試攔得下來。
+        //
+        // 這與 M2、round-13、以及 09-08 那輪的 custom id 分類是同一種病：規則本身不完備，
+        // 靠現有鍵盤組合湊巧遮住。這條把「登記」與「有目的地」綁在一起，讓它出不了門。
+        //
+        // GENERIC_BACK 是唯一的例外，理由寫在 destinationsOf() 裡：它的目的地是動態的來源
+        // 鍵盤，本來就不是固定 id。例外只有這一個，多一個都要在這裡顯式排除、並說明理由。
+        val needsDestination = Keyboards.PAGE_SWITCH_CUSTOM_IDS - Keyboards.GENERIC_BACK_CUSTOM_ID
+        for (id in needsDestination) {
+            val destinations = destinationsOf(KeyAction.Custom(id))
+            assertTrue(
+                destinations.isNotEmpty(),
+                "`$id` 登記在 PAGE_SWITCH_CUSTOM_IDS 裡，但 destinationsOf() 給不出目的地——" +
+                    "它切到的那份鍵盤不會被返回路徑檢查看到。請在 destinationsOf() 補上對應分支；" +
+                    "若它的目的地真的是動態的（像 ${Keyboards.GENERIC_BACK_CUSTOM_ID}），" +
+                    "請在本測試顯式排除並寫明理由。",
+            )
+            for (destinationId in destinations) {
+                assertTrue(
+                    Keyboards.all.any { it.id == destinationId },
+                    "`$id` 的目的地 `$destinationId` 不在 Keyboards.all 裡——" +
+                        "destinationsOf() 指向了一份不存在的鍵盤。",
+                )
+            }
+        }
+    }
+
+    @Test
     fun `every reachable page-switch destination has a way back or a registered gap`() {
         val failures = mutableListOf<String>()
         val byId = Keyboards.all.associateBy { it.id }

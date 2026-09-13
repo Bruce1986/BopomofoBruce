@@ -16,6 +16,15 @@
   一致、KDoc 列寬總和吻合、無恆真或自我印證斷言、空配列退化點已有守門。
 - 跨模組介面（W1-A／W1-B）**現階段無從查證**——`:decoder`／`:theme` 仍是 Placeholder，
   沒有任何 consumer 引用 `Keyboards.*`。等真實 JNI 綁定落地後補 smoke test。
+- 第 2 輪（對抗性）找到**第四個**「規則本身不完備、靠現有鍵盤組合湊巧遮住」：
+  `ReturnPathCoverageTest.destinationsOf()` 的寫死 `when` 與權威清單
+  `Keyboards.PAGE_SWITCH_CUSTOM_IDS` 沒有互相核對，新登記的切頁 id 會被
+  `else -> emptyList()` 靜靜吞掉。完整情境實測（登記＋掛鍵＋補 label 表，指向確定沒有
+  返回路徑的 `phone_dialpad`）：加哨兵後 FAILED、加之前 BUILD SUCCESSFUL。已補哨兵
+  `every registered page-switch custom id has a destination in destinationsOf`（46 → 47 tests）。
+- `reachableChars()` 只認 `KeyAction.Character`，而 `Custom` 已有插入半形文字的先例
+  （AM／PM）——id 到文字的對應表在 `:ime`、本模組修不了，已在 KDoc 寫明它不是
+  「所有可觸及字元」的保證。
 - 細節：[docs/devlog/W1-C-keyboards-20260913-shift-round1.md](docs/devlog/W1-C-keyboards-20260913-shift-round1.md)
 
 ---

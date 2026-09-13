@@ -72,3 +72,59 @@ longPress**（owner 2026-09-08 裁決：破折號 `—` 掛在 `－` 的長按�
 
 `contentDescription`、間隔號（U+30FB）的選擇、`url_qwerty` 的空白鍵——都是 2026-09-08
 就記錄在案、待 owner 裁決的設計題。本輪沒有取得任何新證據，故不重提也不推翻。
+
+---
+
+# 同日第 2 輪（對抗性複審上一輪的修正）
+
+46 → **47 tests / 0 failures**（新增一條哨兵）。
+
+## 一、第四個「規則本身不完備、靠現有鍵盤組合湊巧遮住」
+
+`ReturnPathCoverageTest.destinationsOf()` 是一個寫死的 `when`，只認得
+`KeyAction.SymbolToggle` 與 `Custom(SWITCH_TO_ZHUYIN_CUSTOM_ID)` 兩種切頁動作，其餘一律
+`else -> emptyList()`。但「哪些 `Custom` id 算切頁鍵」的**權威來源**是
+`Keyboards.PAGE_SWITCH_CUSTOM_IDS`（`ToggleFreeKeyboardsTest`／`CustomIdRegistrationTest`
+都照那份清單走）。兩邊沒有任何機制互相核對。
+
+**完整情境實測**（照「正確流程」做：登記新 id ＋ 在符號鍵盤掛一顆指向 `phone_dialpad`
+的鍵 ＋ 補上 label 一致性表——`phone_dialpad` 是目前確定沒有任何切頁鍵的終端頁之一，
+所以那真的是一條有去無回的死路）：
+
+| | 結果 |
+|---|---|
+| 本輪新增哨兵後 | **FAILED** |
+| 本輪之前（`git show HEAD:…`） | **BUILD SUCCESSFUL** — 整條死路被 `else -> emptyList()` 靜靜吞掉 |
+
+這與 M2、round-11／13、以及 09-08 那輪的 custom id 分類是同一種病，只是換到導航圖這一層。
+新增的哨兵 `every registered page-switch custom id has a destination in destinationsOf`
+把「登記」與「有目的地」綁在一起，並額外斷言目的地真的存在於 `Keyboards.all`。
+`GENERIC_BACK_CUSTOM_ID` 是唯一的例外（目的地是動態的來源鍵盤），在測試裡顯式排除並寫明理由。
+
+> 中途的教訓：第一版突變只在 `PAGE_SWITCH_CUSTOM_IDS` 裡加了一個 id、沒有任何鍵去用它，
+> 結果兩版都紅——紅的是 `CustomIdRegistrationTest`（「每個登記的 id 都必須被某份鍵盤用到」）。
+> **要驗的缺陷是「登記且使用、但導航圖看不到」，所以突變必須把整條路徑鋪完整**，
+> 少一步就會被相鄰的守門攔下，量到的是別人的紅、不是自己的。
+
+## 二、`reachableChars()` 的型別盲區（已補 KDoc，不改行為）
+
+它只認 `KeyAction.Character`。而 `KeyAction` 還有兩種能讓文字上畫面的變體：
+
+- `Custom`：**已經有先例**——`INSERT_AM_CUSTOM_ID`／`INSERT_PM_CUSTOM_ID` 插入的就是
+  半形的 `"AM"`／`"PM"`。所以未來若在全形符號頁掛一顆插入半形文字的 `Custom` 鍵，
+  上一輪才剛強化的全形檢查照樣看不到它。**但這個模組修不了**：id 到插入文字的對應表在
+  `:ime` 而不在這裡，所以 AM/PM 那條測試才是改掃 id 的。
+- `Zhuyin`：帶的是 `String`，而且輸出要經 `ZhuyinDecoder` 才進緩衝區，不是逐字元直達，
+  設計上本來就不在範圍內。
+
+現況查證：`symbol_standard.json` 目前唯二的 `Custom` 是 `switch_back` 與 `switch_to_zhuyin`，
+都是控制鍵、不插入文字，且該檔沒有任何 `zhuyin` 型別的鍵——**今天不會誤判，但那又是巧合**。
+本輪的處置是在 KDoc 寫明這個函式**不是**「所有可觸及字元」的保證，免得下一個人照名字誤用。
+
+## 三、上一輪宣稱的複驗（全部實跑，無誤）
+
+兩組 A/B 各自重跑一次，結果與 devlog 記載一致。注音符號重數：兩份配列各 **41 個**不重複符號
+（21 聲母＋16 韻母＝37，加 4 聲調），兩份集合完全相同。空白鍵：8 份配列中 **6 份**帶空白鍵
+（`numeric_standard`／`phone_dialpad` 沒有），6 份全部是「空白」文字標籤。列寬總和
+`password_qwerty` 10.0/9.0/9.6/7.6、`url_qwerty` 10.0/9.0/9.6/8.8，與 KDoc 逐列吻合。
+跨模組：`grep -rn "Keyboards\." ime app settings decoder theme` 零命中。

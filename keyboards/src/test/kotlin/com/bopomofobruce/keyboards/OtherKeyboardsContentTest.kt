@@ -70,6 +70,19 @@ class OtherKeyboardsContentTest {
      * and (if present) the long-press [com.bopomofobruce.common.KeyData.longPress] action. Used to
      * check "can a user actually type this character on this keyboard", which a short-press-only
      * scan would under-report once keys start carrying a `longPress`.
+     *
+     * **Deliberately `Character` only — this is NOT "every character a key can emit".** Two other
+     * [KeyAction] variants can put text on screen and are invisible here:
+     * - [KeyAction.Custom]: already used for exactly that ([Keyboards.INSERT_AM_CUSTOM_ID] and
+     *   [Keyboards.INSERT_PM_CUSTOM_ID] insert `"AM"`/`"PM"`), so a future `Custom` that inserts
+     *   half-width text onto the full-width symbol page would slip past the check below. The
+     *   mapping from a `Custom` id to the text it inserts lives in `:ime`, not here, so this module
+     *   cannot resolve it; the AM/PM tests scan ids instead.
+     * - [KeyAction.Zhuyin]: carries a `String`, and its output reaches the buffer through
+     *   `ZhuyinDecoder` rather than as a literal keystroke, so it is out of scope by design.
+     *
+     * Callers that need those must scan for them explicitly — do not read this helper's name as a
+     * guarantee of completeness.
      */
     private fun reachableChars(rows: List<List<com.bopomofobruce.common.KeyData>>): List<Char> =
         rows.flatten().flatMap { key ->
