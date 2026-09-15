@@ -18,6 +18,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -61,6 +62,21 @@ class ChewingDataPathTest {
         extractChewingData(assets, targetDir)
 
         assertTrue(targetDir.isDirectory)
+    }
+
+    @Test
+    fun `fails with a clear message when the target path is an existing plain file`() {
+        val assets = fakeAssets(mapOf("word.dat" to byteArrayOf(1)))
+        val targetDir = File(tempDir, "chewing-collides-with-a-file")
+        targetDir.writeText("not a directory")
+
+        val error =
+            assertThrows(IllegalStateException::class.java) {
+                extractChewingData(assets, targetDir)
+            }
+
+        assertTrue(error.message!!.contains("Could not create chewing data dir"))
+        verify(exactly = 0) { assets.open(any()) }
     }
 
     @Test

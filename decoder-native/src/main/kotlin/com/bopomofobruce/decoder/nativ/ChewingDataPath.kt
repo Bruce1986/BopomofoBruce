@@ -119,7 +119,10 @@ private fun deleteStaleChewingCacheDirs(cacheDir: File) {
  */
 fun extractChewingData(assets: AssetManager, targetDir: File): File =
     synchronized(extractionLock) {
-        if (!targetDir.exists() && !targetDir.mkdirs() && !targetDir.exists()) {
+        // 用 isDirectory 而不是 exists()：同一路徑若已經是一個普通檔案，exists() 為 true 會讓
+        // 這道檢查整個短路，接著在複製迴圈裡以「Not a directory」的 FileNotFoundException
+        // 失敗，而不是這裡明確的訊息。最後一次 isDirectory 容忍另一條執行緒剛好先建好目錄。
+        if (!targetDir.isDirectory && !targetDir.mkdirs() && !targetDir.isDirectory) {
             throw IllegalStateException("Could not create chewing data dir: $targetDir")
         }
 

@@ -115,6 +115,16 @@ Java_com_bopomofobruce_decoder_nativ_testbridge_BpmfTestBridge_nativeTestInput(
             if (segment != NULL) {
                 memcpy(segment, cursor, segment_len);
                 segment[segment_len] = '\0';
+                /*
+                 * NewStringUTF() expects JNI *modified* UTF-8, while libchewing
+                 * returns standard UTF-8 (LIBCHEWING_ENCODING in chewing.h).
+                 * The two agree for BMP characters but not for supplementary-
+                 * plane ones (standard UTF-8 uses one 4-byte sequence; modified
+                 * UTF-8 encodes each surrogate as 3 bytes). Good enough for this
+                 * test-only bridge's smoke assertions; W2-A's production binding
+                 * should not copy this call as-is — convert explicitly (e.g. hand
+                 * the bytes to Kotlin and decode there) instead.
+                 */
                 jstring jsegment = (*env)->NewStringUTF(env, segment);
                 (*env)->SetObjectArrayElement(env, result, i, jsegment);
                 (*env)->DeleteLocalRef(env, jsegment);
