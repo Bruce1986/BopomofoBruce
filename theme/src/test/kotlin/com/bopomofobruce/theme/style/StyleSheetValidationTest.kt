@@ -60,6 +60,32 @@ class StyleSheetValidationTest {
         assertThrows(IllegalArgumentException::class.java) {
             KeyboardTypography(candidateTextSp = -5f)
         }
+        // 0f 要單獨測：`> 0f` 誤寫成 `>= 0f` 時 -5f 照樣被擋，只有 0f 分得出來。
+        assertThrows(IllegalArgumentException::class.java) {
+            KeyboardTypography(candidateTextSp = 0f)
+        }
+    }
+
+    // NaN 在前面的 `>= 0f`／`> 0f` 就已經是 false、走不到 isFinite()，所以上面那幾條 NaN 案例守不住
+    // isFinite()；真正只靠 isFinite() 擋下的是 +Infinity（2026-09-15 突變實測：刪掉六個欄位的 isFinite() 全套仍綠）。
+    @Test
+    fun `KeyboardShapes and KeyboardTypography reject positive infinity in every size field`() {
+        val inf = Float.POSITIVE_INFINITY
+        val builders: Map<String, () -> Any> =
+            mapOf(
+                "keyCornerRadiusDp" to { KeyboardShapes(keyCornerRadiusDp = inf) },
+                "candidateRowCornerRadiusDp" to
+                    {
+                        KeyboardShapes(candidateRowCornerRadiusDp = inf)
+                    },
+                "panelCornerRadiusDp" to { KeyboardShapes(panelCornerRadiusDp = inf) },
+                "keyLabelSp" to { KeyboardTypography(keyLabelSp = inf) },
+                "keySubLabelSp" to { KeyboardTypography(keySubLabelSp = inf) },
+                "candidateTextSp" to { KeyboardTypography(candidateTextSp = inf) },
+            )
+        for ((field, build) in builders) {
+            assertThrows(IllegalArgumentException::class.java, { build() }, field)
+        }
     }
 
     @Test

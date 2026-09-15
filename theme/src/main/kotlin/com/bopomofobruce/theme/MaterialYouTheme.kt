@@ -20,9 +20,10 @@ import kotlin.ConsistentCopyVisibility
  * 仍回報 [ID]，讓呼叫端知道「使用者選的是 Material You」，即使實際顏色是退化值）。
  *
  * SDK 等級不在分支處直接讀 `Build.VERSION.SDK_INT`，而是經 `sdkIntProvider`（正式入口）或 `sdkInt` 參數（測試專用
- * overload）注入，是為了讓分流可以在純 JVM unit test 下驗證，不需要 Robolectric（本專案目前沒有引入）。>=31 分支在 JVM 測試裡拿到的是 relaxed
- * mock `Context` 下的 stub 色盤，只證明「有走進這條路」；真正桌布取色的結果需要 Android runtime 提供的系統資源，只能在
- * connectedAndroidTest / 實機驗證，這裡沒有量測。
+ * overload）注入，是為了讓分流可以在純 JVM unit test 下驗證，不需要 Robolectric（本專案目前沒有引入）。>=31 分支在 JVM 測試裡可以依 resource
+ * id 餵一組 `system_accent*`／`system_neutral*` 色階（material3 在 `SDK_INT < 34` 時經 `Resources.getColor`
+ * 讀它們）， 角色映射與 `keyAccent`／`candidateHighlight` 不撞色因此有守門（見 `MaterialYouThemeTest`）；**真實桌布會產生什麼色值、
+ * 對比度是否達標**仍需要 connectedAndroidTest / 實機驗證，這裡沒有量測。
  *
  * `data class`：equals/hashCode 以 [id] + [styleSheet] 為準，讓相同輸入兩次呼叫 [from] 得到相等的實例 （[styleSheet] 本身已是
  * data class，逐欄位比較）。這只解決值語意，**不會**讓用到 [MaterialYouTheme] 的 composable 自動被 Compose 跳過重組——2.0.20+ 的
@@ -104,9 +105,9 @@ private constructor(override val id: String, val styleSheet: StyleSheet) : Keybo
             // 保留文字達 AA 4.5 的候選，其中挑與 keyFill/background（keyAccent）或 background
             // （candidateHighlight）分離度最大的一個。這個選色函式本身是純數學，已用假造的色彩組合在
             // JVM 覆蓋（見 AccentColorSelectionTest，含「container 與 surface 同 tone」的極端情境）。
-            // 注意：dynamicDarkColorScheme/dynamicLightColorScheme 呼叫本身仍需要系統資源，本檔仍然
-            // 沒有 Robolectric、也沒有實機驗證，只有「給定一組桌布色彩，選色函式會不會選對」是有守門的
-            // ——實際桌布數字未經實機驗證（見本檔 class KDoc 與 devlog 的誠實揭露）。
+            // 注意：本函式的角色映射與不撞色在 JVM 以 resource id 色階 fixture 守門（MaterialYouThemeTest，
+            // 2026-09-15 補），但沒有 Robolectric、也沒有實機驗證——實際桌布數字、以及選出的 keyAccent
+            // 對 background 是否達 3.0，都未經驗證（見本檔 class KDoc 與 devlog 的誠實揭露）。
             val accentCandidates =
                 listOf(
                         scheme.primaryContainer,

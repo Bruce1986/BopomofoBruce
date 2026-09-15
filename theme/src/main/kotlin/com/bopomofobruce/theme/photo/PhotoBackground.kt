@@ -21,6 +21,11 @@ import kotlinx.serialization.UseSerializers
  *   **只接受本機 scheme**（[LOCAL_URI_SCHEMES]）：[PhotoBackgroundLayer] 把 [uri] 原樣交給 Coil，而 Coil 2 對
  *   `http(s)` 字串會走網路載入。IME 看得到使用者輸入的所有文字，ADR-0005 承諾純本地；這個型別會被寫進設定、將來也可能從主題 JSON 反序列化，
  *   所以「相片背景永遠是本機資源」由 `init` 自己強制，不寄託在「沒有任何模組申請 `INTERNET` 權限」這個外部事實上。
+ *
+ *   **反序列化的呼叫端契約**（與 `StyleSheet` 的 O2 同一件事，但 [PhotoBackground] 不在 `StyleSheet` 裡、那段涵蓋不到）： `init` 的
+ *   `require` 在 decode 時丟的是**裸的** `IllegalArgumentException`，不是 `SerializationException`—— 只接
+ *   `SerializationException`（例如 DataStore Serializer 常見寫法）會漏接、讓設定讀取直接炸掉。 另外，**收緊
+ *   [LOCAL_URI_SCHEMES] 會讓已經存下的資料解不出來**，要附遷移或讀取端退回「沒有背景」的容錯。
  * - [blurRadiusDp]：高斯模糊半徑，`0f` 代表不模糊，上限 [MAX_BLUR_RADIUS_DP]（避免呼叫端傳入
  *   離譜大的值——模糊層邊界外擴、在部分渲染路徑上可能造成明顯效能與畫面裁切問題）。
  * - [opacity]：疊加不透明度，`0f`（完全透明）..`1f`（完全不透明）。

@@ -521,3 +521,31 @@ owner 對兩項 W1-B 的待裁決事項給了決定，本節記錄實作與驗�
 
 **評估後未改**：reviewer 提「`KeyboardTheme` 契約缺 shapes／typography、devlog 沒登記」——`feat-w1b-theme.md`
 「被判為範圍外、未做（登記給 W2）」段已登記 `StyleSheet → KeyboardTheme` adapter 與其根因，reviewer 漏看。
+
+# 排程深審 2026-09-15 第 4 輪（歷班第 8 輪；Opus tracer）
+
+產品程式碼行為零改動（只動註解／KDoc），測試 68 → 70 條 / 0 failures，`ktfmtCheck`、`lintDebug` 綠。
+tracer 列了 4 組「預期存活」的突變，**parent 實跑全部存活**（68 條全綠），補守門後逐一重跑轉紅：
+
+| 突變 | 補守門前 | 補守門後 |
+| --- | --- | --- |
+| `candidateHighlight` 的 `separationReferences` 退回 `listOf(background)`（還原 I1） | 綠 | 紅：light 撞在 `0xFFD0BCFF`（fixture 的 inversePrimary，與 H1 推算一致） |
+| `candidateHighlight = keyAccent` | 綠 | 紅 |
+| `background`／`keyFill` 對調 surface／surfaceVariant | （未測前態） | 紅 |
+| 深色模式也用 `dynamicLightColorScheme` | （未測前態） | 紅：dark background |
+| 刪掉 `KeyboardShapes`／`KeyboardTypography` 六個欄位各自的 `isFinite()`（逐一） | 綠 | 各紅 1 |
+| `candidateTextSp > 0f` → `>= 0f` | 綠 | 紅 1 |
+
+- 🟠 **`>= 31` 呼叫處零守門，而文件一直寫「JVM 驗不了」**：`javap` 確認 material3 1.3.x 在 `SDK_INT < 34`
+  （JVM 下是 0）經 `ColorResourceHelper` → `Resources.getColor(android.R.color.system_*, theme)` 讀色階。新測試
+  依 resource id 餵一組 fixture 色階，期望值由 material3 自己的 `dynamic*ColorScheme` 對同一個 mock 算出，
+  守角色映射（background／keyFill／keyText／candidateText）與不撞色。**fixture 數值是近似 M3 baseline、未對照官方表**，
+  也不代表實際桌布；`keyAccent` 對 background 是否達 3.0 仍無守門（已登記未解決）。三處「JVM 驗不了」的敘述已更正。
+- 🟠 **`isFinite()` 名義上有測試、實際沒人守**：既有案例只餵 NaN，而 NaN 在 `>= 0f`／`> 0f` 就已被擋；補 +Infinity。
+  `candidateTextSp` 補 0f 邊界。
+- 🟡 **第 3 輪寫進註解／commit／devlog 的「授權失效＝`openInputStream` 回 null、最常見的失敗情境」沒有出處**：
+  javap 只能證明 Coil 在 null 分支丟含 uri 的 ISE；平台授權失效時實際丟什麼例外未查證。註解改成只寫查證過的部分，
+  並註明別拿 errorType 反推授權失效。（e17e5fc 的 commit message 無法修改，以本段為準。）
+- 🟡 **`PhotoBackground` 反序列化的例外型別契約**：decode 時丟裸 IAE、不是 `SerializationException`（與 StyleSheet 的 O2
+  同一件事，但那段涵蓋不到 `PhotoBackground`）；收緊白名單會讓已存資料解不出來。KDoc 補上，測試比照 O2 加
+  `assertFalse(thrown is SerializationException)`（這條的反向驗證沒跑：要讓它紅得改 kotlinx 的包裝行為，本班沒做）。

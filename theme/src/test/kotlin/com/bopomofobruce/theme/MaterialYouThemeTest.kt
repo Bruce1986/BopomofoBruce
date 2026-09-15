@@ -1,21 +1,27 @@
 package com.bopomofobruce.theme
 
 import android.content.Context
+import android.content.res.Resources
 import android.os.Build
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import com.bopomofobruce.theme.color.toKeyboardUInt
+import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Test
 
 /**
- * `sdkInt < 31` 的退化分支驗到色盤內容（純 Kotlin 邏輯，不需要 Android runtime）。`>= 31` 分支只驗「正式入口會依 provider
- * 分流、走進去的結果與退化值不同」：它呼叫真正的 `dynamicLightColorScheme(Context)`，在 relaxed mock 下拿到的是 stub
- * 色盤，**實際桌布取色的色值未覆蓋**（這裡沒有 Robolectric）— 見 devlog 與 [MaterialYouTheme] 上的 KDoc 說明。
+ * `sdkInt < 31` 的退化分支驗到色盤內容（純 Kotlin 邏輯，不需要 Android runtime）。`>= 31` 分支有兩層：「正式入口會依 provider
+ * 分流」（relaxed mock，stub 色盤），以及「角色映射與不撞色」（依 resource id 餵一組色階 fixture，見 `the dynamic path maps
+ * scheme roles and keeps keyAccent and candidateHighlight apart`）。**真實桌布會產生什麼色值、對比度是否達標，仍未覆蓋**（這裡沒有
+ * Robolectric、也沒有實機）— 見 devlog 與 [MaterialYouTheme] 上的 KDoc 說明。
  */
 class MaterialYouThemeTest {
 
-    // <31 的分支不會呼叫 context 上任何方法；>=31 的分支（只有正式入口那條測試會走到）會經由
-    // dynamicLightColorScheme 去讀 context，relaxed mock 讓它回 stub 值而不是丟例外。
+    // <31 的分支不會呼叫 context 上任何方法；>=31 的分支經由 dynamicLightColorScheme 去讀 context，
+    // relaxed mock 讓它回 stub 值（全 0）而不是丟例外。要餵真正的色階用 contextWithSystemPalettes()。
     private val context: Context = mockk(relaxed = true)
 
     @Test
@@ -98,6 +104,233 @@ class MaterialYouThemeTest {
         } finally {
             MaterialYouTheme.sdkIntProvider = original
         }
+    }
+
+    /**
+     * `>= 31` 路徑的**呼叫處**守門：角色映射，以及 `keyAccent`／`candidateHighlight` 不撞色。
+     *
+     * 在此之前這條路徑只有「與退化值不同」一條斷言；relaxed mock 下所有系統色都是 0，所以 （2026-09-15 突變實測，68 條全綠）把
+     * `candidateHighlight` 的 `separationReferences` 退回 `listOf(background)`（還原 I1 修正）、或直接寫
+     * `candidateHighlight = keyAccent` 都零反應。
+     *
+     * 做法：material3 1.3.x 的 `dynamicLightColorScheme` 在 `SDK_INT < 34` 時走
+     * `dynamicTonalPalette(context)`， 經 `ColorResourceHelper` 讀
+     * `context.resources.getColor(android.R.color.system_*, theme)`（javap 確認）； JVM 單元測試裡 `SDK_INT`
+     * 是 0，一定走這條。所以只要讓 mock 依 resource id 回色值，就能餵進一組色階。
+     *
+     * 期望值由 material3 自己的 `dynamic*ColorScheme` 對**同一個** mock 算出來當對照，不是抄本模組的映射邏輯。 色階
+     * fixture（[TONAL_PALETTES]）只是「tone 由亮到暗單調、五組色相各不相同」的近似 M3 baseline 配色， **數值未對照官方表**，也不代表任何實機桌布。
+     */
+    @Test
+    fun `the dynamic path maps scheme roles and keeps keyAccent and candidateHighlight apart`() {
+        val palettedContext = contextWithSystemPalettes()
+        val original = MaterialYouTheme.sdkIntProvider
+        try {
+            MaterialYouTheme.sdkIntProvider = { Build.VERSION_CODES.S }
+            for (darkMode in listOf(false, true)) {
+                val scheme =
+                    if (darkMode) dynamicDarkColorScheme(palettedContext)
+                    else dynamicLightColorScheme(palettedContext)
+                val colors = MaterialYouTheme.from(palettedContext, darkMode).colors
+                val mode = if (darkMode) "dark" else "light"
+
+                assertEquals(scheme.surface.toKeyboardUInt(), colors.background, "$mode background")
+                assertEquals(
+                    scheme.surfaceVariant.toKeyboardUInt(),
+                    colors.keyFill,
+                    "$mode keyFill",
+                )
+                assertEquals(scheme.onSurface.toKeyboardUInt(), colors.keyText, "$mode keyText")
+                assertEquals(
+                    scheme.onSurface.toKeyboardUInt(),
+                    colors.candidateText,
+                    "$mode candidateText",
+                )
+                assertNotEquals(
+                    colors.keyAccent,
+                    colors.candidateHighlight,
+                    "$mode：candidateHighlight 與 keyAccent 撞成同一色（H1）——功能鍵底色與選中候選分不出來",
+                )
+            }
+        } finally {
+            MaterialYouTheme.sdkIntProvider = original
+        }
+    }
+
+    private fun contextWithSystemPalettes(): Context {
+        val idToColor = HashMap<Int, Int>()
+        for ((ids, tones) in SYSTEM_PALETTE_IDS.zip(TONAL_PALETTES)) {
+            ids.zip(tones).forEach { (id, argb) -> idToColor[id] = argb.toInt() }
+        }
+        val resources = mockk<Resources>()
+        every { resources.getColor(any<Int>(), any()) } answers
+            {
+                val id = firstArg<Int>()
+                idToColor[id] ?: error("dynamicTonalPalette 讀了 fixture 沒提供的 resource id $id")
+            }
+        return mockk(relaxed = true) { every { this@mockk.resources } returns resources }
+    }
+
+    private companion object {
+        /** 每組 13 個 shade，順序 0、10、50、100…1000（對應 tone 100、99、95、90…0）。 */
+        val SYSTEM_PALETTE_IDS: List<List<Int>> =
+            listOf(
+                listOf(
+                    android.R.color.system_accent1_0,
+                    android.R.color.system_accent1_10,
+                    android.R.color.system_accent1_50,
+                    android.R.color.system_accent1_100,
+                    android.R.color.system_accent1_200,
+                    android.R.color.system_accent1_300,
+                    android.R.color.system_accent1_400,
+                    android.R.color.system_accent1_500,
+                    android.R.color.system_accent1_600,
+                    android.R.color.system_accent1_700,
+                    android.R.color.system_accent1_800,
+                    android.R.color.system_accent1_900,
+                    android.R.color.system_accent1_1000,
+                ),
+                listOf(
+                    android.R.color.system_accent2_0,
+                    android.R.color.system_accent2_10,
+                    android.R.color.system_accent2_50,
+                    android.R.color.system_accent2_100,
+                    android.R.color.system_accent2_200,
+                    android.R.color.system_accent2_300,
+                    android.R.color.system_accent2_400,
+                    android.R.color.system_accent2_500,
+                    android.R.color.system_accent2_600,
+                    android.R.color.system_accent2_700,
+                    android.R.color.system_accent2_800,
+                    android.R.color.system_accent2_900,
+                    android.R.color.system_accent2_1000,
+                ),
+                listOf(
+                    android.R.color.system_accent3_0,
+                    android.R.color.system_accent3_10,
+                    android.R.color.system_accent3_50,
+                    android.R.color.system_accent3_100,
+                    android.R.color.system_accent3_200,
+                    android.R.color.system_accent3_300,
+                    android.R.color.system_accent3_400,
+                    android.R.color.system_accent3_500,
+                    android.R.color.system_accent3_600,
+                    android.R.color.system_accent3_700,
+                    android.R.color.system_accent3_800,
+                    android.R.color.system_accent3_900,
+                    android.R.color.system_accent3_1000,
+                ),
+                listOf(
+                    android.R.color.system_neutral1_0,
+                    android.R.color.system_neutral1_10,
+                    android.R.color.system_neutral1_50,
+                    android.R.color.system_neutral1_100,
+                    android.R.color.system_neutral1_200,
+                    android.R.color.system_neutral1_300,
+                    android.R.color.system_neutral1_400,
+                    android.R.color.system_neutral1_500,
+                    android.R.color.system_neutral1_600,
+                    android.R.color.system_neutral1_700,
+                    android.R.color.system_neutral1_800,
+                    android.R.color.system_neutral1_900,
+                    android.R.color.system_neutral1_1000,
+                ),
+                listOf(
+                    android.R.color.system_neutral2_0,
+                    android.R.color.system_neutral2_10,
+                    android.R.color.system_neutral2_50,
+                    android.R.color.system_neutral2_100,
+                    android.R.color.system_neutral2_200,
+                    android.R.color.system_neutral2_300,
+                    android.R.color.system_neutral2_400,
+                    android.R.color.system_neutral2_500,
+                    android.R.color.system_neutral2_600,
+                    android.R.color.system_neutral2_700,
+                    android.R.color.system_neutral2_800,
+                    android.R.color.system_neutral2_900,
+                    android.R.color.system_neutral2_1000,
+                ),
+            )
+
+        /** 與 [SYSTEM_PALETTE_IDS] 一一對應：primary、secondary、tertiary、neutral、neutral variant。 */
+        val TONAL_PALETTES: List<List<UInt>> =
+            listOf(
+                listOf(
+                    0xFFFFFFFFu,
+                    0xFFFFFBFEu,
+                    0xFFF6EDFFu,
+                    0xFFEADDFFu,
+                    0xFFD0BCFFu,
+                    0xFFB69DF8u,
+                    0xFF9A82DBu,
+                    0xFF7F67BEu,
+                    0xFF6750A4u,
+                    0xFF4F378Bu,
+                    0xFF381E72u,
+                    0xFF21005Du,
+                    0xFF000000u,
+                ),
+                listOf(
+                    0xFFFFFFFFu,
+                    0xFFFFFBFEu,
+                    0xFFF6EDFFu,
+                    0xFFE8DEF8u,
+                    0xFFCCC2DCu,
+                    0xFFB0A7C0u,
+                    0xFF958DA5u,
+                    0xFF7A7289u,
+                    0xFF625B71u,
+                    0xFF4A4458u,
+                    0xFF332D41u,
+                    0xFF1D192Bu,
+                    0xFF000000u,
+                ),
+                listOf(
+                    0xFFFFFFFFu,
+                    0xFFFFFBFAu,
+                    0xFFFFECF1u,
+                    0xFFFFD8E4u,
+                    0xFFEFB8C8u,
+                    0xFFD29DACu,
+                    0xFFB58392u,
+                    0xFF986977u,
+                    0xFF7D5260u,
+                    0xFF633B48u,
+                    0xFF492532u,
+                    0xFF31111Du,
+                    0xFF000000u,
+                ),
+                listOf(
+                    0xFFFFFFFFu,
+                    0xFFFFFBFEu,
+                    0xFFF4EFF4u,
+                    0xFFE6E1E5u,
+                    0xFFC9C5CAu,
+                    0xFFAEAAAEu,
+                    0xFF939094u,
+                    0xFF787579u,
+                    0xFF605D62u,
+                    0xFF484649u,
+                    0xFF313033u,
+                    0xFF1C1B1Fu,
+                    0xFF000000u,
+                ),
+                listOf(
+                    0xFFFFFFFFu,
+                    0xFFFFFBFEu,
+                    0xFFF5EEFAu,
+                    0xFFE7E0ECu,
+                    0xFFCAC4D0u,
+                    0xFFAEA9B4u,
+                    0xFF938F99u,
+                    0xFF79747Eu,
+                    0xFF605D66u,
+                    0xFF49454Fu,
+                    0xFF322F37u,
+                    0xFF1D1A22u,
+                    0xFF000000u,
+                ),
+            )
     }
 
     /**

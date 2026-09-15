@@ -1,7 +1,9 @@
 package com.bopomofobruce.theme.photo
 
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 
@@ -89,9 +91,17 @@ class PhotoBackgroundTest {
     fun `decoding a theme json with a network uri is rejected`() {
         val hostile = """{"uri":"https://example.com/pixel.png"}"""
 
-        assertThrows(IllegalArgumentException::class.java) {
-            json.decodeFromString(PhotoBackground.serializer(), hostile)
-        }
+        val thrown =
+            assertThrows(IllegalArgumentException::class.java) {
+                json.decodeFromString(PhotoBackground.serializer(), hostile)
+            }
+
+        // SerializationException 本身繼承 IllegalArgumentException，只斷言 IAE 對「逃出來的是不是裸 IAE」恆真
+        // （同 StyleSheetValidationTest 的 O2）。KDoc 的呼叫端契約靠這條鎖住。
+        assertFalse(
+            thrown is SerializationException,
+            "expected a bare IllegalArgumentException, got ${thrown::class.qualifiedName}",
+        )
     }
 
     @Test

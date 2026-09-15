@@ -264,8 +264,8 @@
   > **2026-09-15 範圍更正**：這裡「已修」的是「寫死映到 container」這個映射，**不是** `keyAccent`
   > 本身的分離度。依下方第十一／十二輪（H1、I1、I2）用 M3 baseline tone 分布的推算（非實機量測），
   > `keyAccent` 最後選中 `inversePrimary`，對 background 只有 light 1.66:1／dark 2.66:1，仍低於
-  > 固定色盤 `LightTheme keyAccent` 守門用的 3.0。這一項**未解決**，也沒有任何測試攔得住
-  > （動態路徑在 JVM 下拿不到真實桌布色），留給 W2-B 實機驗證時處理。
+  > 固定色盤 `LightTheme keyAccent` 守門用的 3.0。這一項**未解決**，也沒有測試守這個 3.0 門檻
+  > （JVM 可以依 resource id 餵色階，但那是 fixture、不是實際桌布），留給 W2-B 實機驗證時處理。
 
   **已修，不是「做不到」**：新增 `theme/src/main/kotlin/com/bopomofobruce/theme/color/DynamicAccentSelection.kt`，
   公開純函式 `pickAccentColor(candidates, textPartner, separationReferences, textThreshold = 4.5)`：
@@ -530,6 +530,10 @@
   文件最先看到的一段，照它寫就會原封不動重現 H1（M3 baseline tone 下兩次呼叫雙雙選中
   `inversePrimary`，light 對 background 1.66:1、dark 2.66:1）。而這個誤用**沒有任何守門**：
   測試驗的是函式本身，`dynamicColorsFor()` 傳什麼參數無法在 JVM 驗證。
+
+  > **2026-09-15 更正**：「無法在 JVM 驗證」不成立——material3 在 `SDK_INT < 34`（JVM 下是 0）經
+  > `Resources.getColor(android.R.color.system_*)` 讀色階，mock 依 id 回值即可。已補
+  > `MaterialYouThemeTest` 的 `the dynamic path maps scheme roles and keeps keyAccent and candidateHighlight apart`；把呼叫處退回 `listOf(background)` 現在會紅。
 
   已修：`@param` 改成與現行呼叫端一致，並明寫「**不要**只傳 `listOf(background)`」與理由。
 
