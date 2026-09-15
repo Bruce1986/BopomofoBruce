@@ -482,3 +482,20 @@ owner 對兩項 W1-B 的待裁決事項給了決定，本節記錄實作與驗�
   同一取捨。W2-B 接線做實機 androidTest 時可一併觀察。
 - `docs/STATUS.md` 的 W1-B 列仍是 2026-08-11 心跳、PR 欄空白、52 tests——那份檔在 main 上，依 DEVPLAN §10.2 由 main 直推更新，
   不在本 PR 分支的範圍，留給 owner。
+
+# 排程深審 2026-09-15 第 2 輪（歷班第 6 輪）
+
+視角：資安／隱私＋跨環境、輸出誠實性（非對比度的 KDoc／註解逐句反查）。64 → 68 tests / 0 failures，`ktfmtCheck` 綠。
+
+- 🟠 **`PhotoBackground.uri` 不限 scheme**：`PhotoBackgroundLayer` 把它原樣交給 Coil，本機 Gradle cache 的
+  `coil-base-2.6.0` 內含 `coil/fetch/HttpUriFetcher`（已用 `unzip -l` 實查），`https://…` 會走網路載入；
+  目前擋住外連的只有「七個 manifest 都沒申請 `INTERNET`」（coil-base 的 manifest 也沒有）這個外部事實。
+  改成 `init` 只接受 `content`／`file`／`android.resource`（不分大小寫），反序列化主題 JSON 時同樣會擋。
+  突變 A/B：拿掉這條 `require` → 新測試紅 3 條；大小寫敏感 → 紅 1 條。
+- 🟠 **`onError` 把完整 uri 寫進 logcat**（指向使用者相簿裡的特定圖片，會進 bug report）：改成只記 scheme；
+  新的 `require` 訊息也只帶 scheme。突變：訊息改帶完整 uri → `rejection message does not leak the full uri` 紅。
+  （logcat 那一行在 `@Composable` 裡，純 JVM 測不到，沒有守門。）
+- 🟡 `MaterialYouTheme.kt` 的 I1 註解用反引號逐字引用一個**不存在**的測試名稱，改成實際那條
+  `does not sacrifice separation from background just to dodge a collision with keyAccent`。
+- 🟡 「Photo Picker 的 URI 不支援 `takePersistableUriPermission`」在 KDoc 與 devlog O1 都寫成事實，repo 內查無出處，
+  改標 ⚠️ 未查證（排程班禁用網路，無法當場查證；留給 W2-C 實作前確認）。

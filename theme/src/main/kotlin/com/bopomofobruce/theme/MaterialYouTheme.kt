@@ -155,8 +155,8 @@ private constructor(override val id: String, val styleSheet: StyleSheet) : Keybo
             // 自己一個候選通過文字門檻（見 DynamicAccentSelection.kt 的 AccentColorSelectionTest
             // 案例），candidateHighlight 會等於 keyAccent（撞色），但這是候選清單本身別無選擇下最好
             // 的結果，不是本函式為了避開撞色硬推去一個分離度更差的顏色——已用
-            // `keyAccent excluded from candidates causes a worse pick than scoring against it as a
-            // separation reference` 測試證明：舊的 excluded 呼叫方式在這個候選集合下會選到分離度
+            // `AccentColorSelectionTest` 的 `does not sacrifice separation from background just to
+            // dodge a collision with keyAccent` 測試證明：舊的 excluded 呼叫方式在這個候選集合下會選到分離度
             // 明顯更差的顏色，新的呼叫方式不會。
             val candidateHighlight =
                 pickAccentColor(

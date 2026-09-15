@@ -442,6 +442,9 @@
   當下測試完全正常、重開機後相片背景整個消失的功能，唯一訊號是 `PhotoBackgroundLayer` 的一行
   `Log.w`（把它寫成「來源 App 移除授權」這種外部偶發因素，沒提到呼叫端本來就要履行的前置契約）。
 
+  > **2026-09-15 標註未查證**：「Photo Picker 的 URI 不支援 `takePersistableUriPermission`」這句
+  > 在 repo 內找不到任何出處，KDoc 已改標 ⚠️ 未查證；W2-C 實作選圖前要先對照官方文件。
+
   **純文件修正**：`theme/src/main/kotlin/com/bopomofobruce/theme/photo/PhotoBackground.kt`，
   `uri` 欄位 KDoc（class KDoc 內第一個條列項）補上呼叫端契約：要用 SAF `ACTION_OPEN_DOCUMENT` +
   `takePersistableUriPermission` 取得可持久化授權後才能存進 `uri`；Photo Picker 的 URI 存下來會在

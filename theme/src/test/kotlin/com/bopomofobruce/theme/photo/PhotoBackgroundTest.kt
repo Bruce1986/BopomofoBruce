@@ -60,6 +60,45 @@ class PhotoBackgroundTest {
     }
 
     @Test
+    fun `rejects network and scheme-less uris`() {
+        for (uri in listOf("https://example.com/a.png", "HTTP://example.com/a.png", "media/42")) {
+            assertThrows(IllegalArgumentException::class.java, { PhotoBackground(uri = uri) }, uri)
+        }
+    }
+
+    @Test
+    fun `accepts every local scheme regardless of case`() {
+        for (uri in
+            listOf(
+                "content://media/external/images/42",
+                "CONTENT://media/external/images/42",
+                "file:///sdcard/a.png",
+                "android.resource://com.bopomofobruce/drawable/bg",
+            )) {
+            assertEquals(uri, PhotoBackground(uri = uri).uri)
+        }
+    }
+
+    @Test
+    fun `decoding a theme json with a network uri is rejected`() {
+        val hostile = """{"uri":"https://example.com/pixel.png"}"""
+
+        assertThrows(IllegalArgumentException::class.java) {
+            json.decodeFromString(PhotoBackground.serializer(), hostile)
+        }
+    }
+
+    @Test
+    fun `rejection message does not leak the full uri`() {
+        val secret = "https://example.com/users/alice/private.png"
+
+        val error =
+            assertThrows(IllegalArgumentException::class.java) { PhotoBackground(uri = secret) }
+
+        assert(!error.message.orEmpty().contains("alice")) { "例外訊息帶出了完整 uri：${error.message}" }
+    }
+
+    @Test
     fun `rejects negative blur radius`() {
         assertThrows(IllegalArgumentException::class.java) {
             PhotoBackground(uri = "content://x", blurRadiusDp = -1f)

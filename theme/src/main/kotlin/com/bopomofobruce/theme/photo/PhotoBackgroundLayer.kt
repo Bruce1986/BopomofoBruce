@@ -47,7 +47,9 @@ fun PhotoBackgroundLayer(background: PhotoBackground, modifier: Modifier = Modif
         contentScale = ContentScale.Crop,
         colorFilter = colorFilter,
         onError = {
-            Log.w(TAG, "Failed to load photo background: ${background.uri}", it.result.throwable)
+            // 不記完整 uri：它指向使用者相簿裡的特定圖片，logcat 會進 bug report。scheme 足夠分辨是哪一類來源失效。
+            val scheme = background.uri.substringBefore(':')
+            Log.w(TAG, "Failed to load photo background (scheme=$scheme)", it.result.throwable)
         },
         modifier = modifier.fillMaxSize().alpha(background.opacity).then(blurModifier),
     )

@@ -13,9 +13,14 @@ import kotlinx.serialization.UseSerializers
  *   這個 `@Serializable` 型別的存在目的就是被寫進 DataStore 長期保存，但 `content://` 授權預設不是持久的）**： 呼叫端在把使用者選的圖片存進
  *   [uri] 之前，必須先透過 SAF `ACTION_OPEN_DOCUMENT` 取得該 URI，並呼叫
  *   `contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)`
- *   取得可持久化授權， 授權才會跨重開機存活。`MediaStore.ACTION_PICK_IMAGES`（Android Photo Picker）發出的 URI **不支援**
- *   `takePersistableUriPermission`——授權隨 task／process 結束即失效，把這種 URI 存進 [uri] 會在下次重開機後讓相片背景
- *   悄悄消失（唯一訊號是 [PhotoBackgroundLayer] 的一行 `Log.w`，見該檔 KDoc）。
+ *   取得可持久化授權， 授權才會跨重開機存活。⚠️ **未查證**：本段原本斷言 `MediaStore.ACTION_PICK_IMAGES`（Android Photo Picker）發出的
+ *   URI 不支援 `takePersistableUriPermission`，但 repo 內沒有任何出處；W2-C 實作選圖流程前要先對照官方文件確認，
+ *   不要把它當成已驗證的平台行為。無論走哪條路，沒取得持久授權的 URI 存進 [uri]，都會在授權失效後讓相片背景悄悄消失 （唯一訊號是 [PhotoBackgroundLayer] 的一行
+ *   `Log.w`，見該檔 KDoc）。
+ *
+ *   **只接受本機 scheme**（[LOCAL_URI_SCHEMES]）：[PhotoBackgroundLayer] 把 [uri] 原樣交給 Coil，而 Coil 2 對
+ *   `http(s)` 字串會走網路載入。IME 看得到使用者輸入的所有文字，ADR-0005 承諾純本地；這個型別會被寫進設定、將來也可能從主題 JSON 反序列化，
+ *   所以「相片背景永遠是本機資源」由 `init` 自己強制，不寄託在「沒有任何模組申請 `INTERNET` 權限」這個外部事實上。
  * - [blurRadiusDp]：高斯模糊半徑，`0f` 代表不模糊，上限 [MAX_BLUR_RADIUS_DP]（避免呼叫端傳入
  *   離譜大的值——模糊層邊界外擴、在部分渲染路徑上可能造成明顯效能與畫面裁切問題）。
  * - [opacity]：疊加不透明度，`0f`（完全透明）..`1f`（完全不透明）。
@@ -33,6 +38,11 @@ data class PhotoBackground(
 ) {
     init {
         require(uri.isNotBlank()) { "PhotoBackground uri must not be blank" }
+        // 訊息只帶 scheme、不帶完整 uri：它指向使用者相簿裡的特定圖片，不該跟著例外進 log／錯誤報告。
+        val scheme = uri.substringBefore(':', missingDelimiterValue = "").lowercase()
+        require(scheme in LOCAL_URI_SCHEMES) {
+            "PhotoBackground uri must use a local scheme $LOCAL_URI_SCHEMES, but was '$scheme'"
+        }
         require(blurRadiusDp in 0f..MAX_BLUR_RADIUS_DP) {
             "blurRadiusDp must be within 0f..$MAX_BLUR_RADIUS_DP, but was $blurRadiusDp"
         }
@@ -42,5 +52,11 @@ data class PhotoBackground(
     companion object {
         /** [blurRadiusDp] 上限，見上方 class KDoc。 */
         const val MAX_BLUR_RADIUS_DP: Float = 50f
+
+        /**
+         * [uri] 允許的 scheme（比對時不分大小寫）。見上方 class KDoc 的 [uri] 條目：`http`／`https` 等網路 scheme 在 `init`
+         * 就被拒絕。
+         */
+        val LOCAL_URI_SCHEMES: Set<String> = setOf("content", "file", "android.resource")
     }
 }
