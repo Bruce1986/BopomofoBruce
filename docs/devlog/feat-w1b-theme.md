@@ -68,6 +68,10 @@
     本專案沒開 `warningsAsErrors`，擋不住模組外部呼叫；`internal` 才是編譯期強制，
     而同 module 的 unit test source set 仍呼叫得到（已實測編譯與全部測試皆過，見上方驗收表）。
 
+  > **2026-09-08 後已不是最終形態**：owner 裁決後，兩參數版改成經 `internal var sdkIntProvider`
+  > 讀 SDK 等級（測試可換掉），不再是「無法被覆寫」。原因與突變實證見
+  > [W1-B-theme-20260908-shift-round1.md「Owner 裁決後的落地」§2C](W1-B-theme-20260908-shift-round1.md)。
+
   >=31 呼叫
   `dynamicLightColorScheme(Context)` 需要真系統資源，這條分支沒有
   Robolectric、也沒有連實機驗證，留在 `MaterialYouTheme` KDoc 與本檔明說。
@@ -153,6 +157,11 @@
   是指示選中，`:ime` 還能用邊框/底線補強；候選字看不清楚沒有替代方案。最終取
   `#656471`——在「白字達 4.50:1」前提下對 background 分離度最大者（2.95:1）。
   **已登記為 W2 契約 follow-up**：`KeyboardColors` 是否需要 `onCandidateHighlight`。
+
+  > **2026-09-08 已推翻**：「數學上無法同時滿足」只在 candidateText 維持 #E6E1E5 時成立；
+  > owner 裁決改成白字 `#FFFFFF`＋高亮 `#6B6B6B`（文字 5.33、對 background 3.21），
+  > Dark 門檻回到規範值 3.0。下面提到的 `#656471`／2.9 都是當時的值，現況見
+  > [W1-B-theme-20260908-shift-round1.md「Owner 裁決後的落地」§3B](W1-B-theme-20260908-shift-round1.md)。
 
   守門測試 `BuiltInThemesContrastTest`：純 Kotlin 的 WCAG 計算（不需 Android
   runtime），對兩套色盤斷言 `keyText/keyAccent >= 4.5`、`candidateText/candidateHighlight

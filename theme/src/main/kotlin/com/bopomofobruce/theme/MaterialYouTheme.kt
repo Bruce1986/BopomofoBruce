@@ -19,9 +19,10 @@ import kotlin.ConsistentCopyVisibility
  * `dynamicLightColorScheme` / `dynamicDarkColorScheme` 可用，退化為固定的 [LightTheme] / [DarkTheme] 色盤 （id
  * 仍回報 [ID]，讓呼叫端知道「使用者選的是 Material You」，即使實際顏色是退化值）。
  *
- * [sdkInt] 開一個建構參數而非直接讀 `Build.VERSION.SDK_INT`，是為了讓「<31 退化」這條分支可以在純 JVM unit test 下驗證，不需要
- * Robolectric（本專案目前沒有引入）。>=31 分支呼叫真正的 `dynamicLightColorScheme(Context)` 需要 Android runtime
- * 提供的系統資源，只能在 connectedAndroidTest / 實機驗證，這裡沒有量測。
+ * SDK 等級不在分支處直接讀 `Build.VERSION.SDK_INT`，而是經 `sdkIntProvider`（正式入口）或 `sdkInt` 參數（測試專用
+ * overload）注入，是為了讓分流可以在純 JVM unit test 下驗證，不需要 Robolectric（本專案目前沒有引入）。>=31 分支在 JVM 測試裡拿到的是 relaxed
+ * mock `Context` 下的 stub 色盤，只證明「有走進這條路」；真正桌布取色的結果需要 Android runtime 提供的系統資源，只能在
+ * connectedAndroidTest / 實機驗證，這裡沒有量測。
  *
  * `data class`：equals/hashCode 以 [id] + [styleSheet] 為準，讓相同輸入兩次呼叫 [from] 得到相等的實例 （[styleSheet] 本身已是
  * data class，逐欄位比較）。這只解決值語意，**不會**讓用到 [MaterialYouTheme] 的 composable 自動被 Compose 跳過重組——2.0.20+ 的
@@ -41,7 +42,6 @@ private constructor(override val id: String, val styleSheet: StyleSheet) : Keybo
     companion object {
         const val ID: String = "material-you"
 
-        /** 正式呼叫端用這支：SDK 等級一律取自實際裝置，無法被覆寫。 */
         /**
          * 正式路徑讀取執行裝置 API 等級的**唯一**位置。抽成可替換的 provider 是為了讓下面那個 兩參數版本（真正的正式入口）能在純 JVM 被測到。
          *
@@ -53,7 +53,7 @@ private constructor(override val id: String, val styleSheet: StyleSheet) : Keybo
          * **未覆蓋的部分縮到只剩 `{ Build.VERSION.SDK_INT }` 這個單一運算式**（無法在 JVM 驗證）， 而「兩參數版本會依 provider
          * 的值分流」現在有守門（見 `MaterialYouThemeTest`）。
          *
-         * 正式程式碼**不得寫入**這個變數——它只有測試會換掉，且測試必須在 `@AfterEach` 還原。
+         * 正式程式碼**不得寫入**這個變數——它只有測試會換掉，且測試必須在結束前還原（`MaterialYouThemeTest` 用 `try`／`finally`）。
          */
         @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
         internal var sdkIntProvider: () -> Int = { Build.VERSION.SDK_INT }
@@ -69,9 +69,9 @@ private constructor(override val id: String, val styleSheet: StyleSheet) : Keybo
         internal fun from(context: Context, darkMode: Boolean, sdkInt: Int): MaterialYouTheme {
             val fallback = if (darkMode) DarkTheme.styleSheet else LightTheme.styleSheet
             // Lint 的 NewApi 資料流分析只認得對 `Build.VERSION.SDK_INT` 的直接比較；這裡刻意透過
-            // `sdkInt` 參數（正式路徑由上面的兩參數版本填入 `Build.VERSION.SDK_INT`）注入，讓 <31 退化分支能在純 JVM unit
-            // test 驗證（見 class KDoc）。實際執行路徑與直接寫 `Build.VERSION.SDK_INT >= S` 等價，
-            // 手動抑制這條誤報。
+            // `sdkInt` 參數注入（正式路徑由上面的兩參數版本經 `sdkIntProvider` 填入
+            // `Build.VERSION.SDK_INT`），讓分流能在純 JVM unit test 驗證（見 class KDoc）。
+            // 實際執行路徑與直接寫 `Build.VERSION.SDK_INT >= S` 等價，手動抑制這條誤報。
             @Suppress("NewApi")
             val colors =
                 if (sdkInt >= Build.VERSION_CODES.S) {

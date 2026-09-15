@@ -8,13 +8,14 @@ import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Test
 
 /**
- * 只驗證 `sdkInt < 31` 的退化分支（純 Kotlin 邏輯，不需要 Android runtime）。`>= 31` 分支呼叫真正的
- * `dynamicLightColorScheme(Context)` / `dynamicDarkColorScheme(Context)`，需要系統資源，這裡沒有 Robolectric
- * 可用，未覆蓋 — 見 devlog 與 [MaterialYouTheme] 上的 KDoc 說明。
+ * `sdkInt < 31` 的退化分支驗到色盤內容（純 Kotlin 邏輯，不需要 Android runtime）。`>= 31` 分支只驗「正式入口會依 provider
+ * 分流、走進去的結果與退化值不同」：它呼叫真正的 `dynamicLightColorScheme(Context)`，在 relaxed mock 下拿到的是 stub
+ * 色盤，**實際桌布取色的色值未覆蓋**（這裡沒有 Robolectric）— 見 devlog 與 [MaterialYouTheme] 上的 KDoc 說明。
  */
 class MaterialYouThemeTest {
 
-    // 分支不會真的呼叫 context 上任何方法，relaxed mock 只是滿足型別簽章。
+    // <31 的分支不會呼叫 context 上任何方法；>=31 的分支（只有正式入口那條測試會走到）會經由
+    // dynamicLightColorScheme 去讀 context，relaxed mock 讓它回 stub 值而不是丟例外。
     private val context: Context = mockk(relaxed = true)
 
     @Test

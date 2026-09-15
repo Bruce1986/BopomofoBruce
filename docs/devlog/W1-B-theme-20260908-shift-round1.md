@@ -460,3 +460,25 @@ owner 對兩項 W1-B 的待裁決事項給了決定，本節記錄實作與驗�
 值得做，但**時機是 W2-B 接線時**，不是現在——因為現在 `:theme` 還沒有任何消費者，實機測到的
 只會是「這個函式自己算得對不對」，而不是「IME 畫出來對不對」。現在做，等於在功能還沒接上時
 先付一次安裝成本；W2-B 接線時做，同一次可以連 renderer 一起驗。
+
+---
+
+# 排程深審 2026-09-15 第 1 輪（歷班第 5 輪；接在 owner 的 d84a538 之後）
+
+視角換成前四輪沒跑過的兩個：錯誤處理／失敗模式、規格對照＋契約＋接手性；Codex 另跑一次（零 finding）。
+全部是 d84a538 落地後**沒跟著更新的敘述**，產品行為零改動，64 tests / 0 failures、`ktfmtCheck` 綠。
+
+- `MaterialYouTheme.kt`：`sdkIntProvider` 上方殘留舊版單行 KDoc「SDK 等級一律取自實際裝置，**無法被覆寫**」，
+  跟緊接的新 KDoc 結論相反，已刪；class KDoc 與分支註解還在說「`sdkInt` 建構參數」「兩參數版直接填
+  `Build.VERSION.SDK_INT`」，改成經 provider；「測試必須在 `@AfterEach` 還原」與測試實際的 `try`／`finally` 對齊。
+- `MaterialYouThemeTest.kt`：class KDoc 寫「只驗證 `<31`、`>=31` 未覆蓋」、`context` 註解寫「分支不會呼叫
+  context 上任何方法」——正式入口那條測試會走進 `>=31`、經 `dynamicLightColorScheme` 讀 relaxed mock，兩句都已不成立。
+- `feat-w1b-theme.md`：「兩支 overload、無法被覆寫＝最終形態」與「深色兩門檻數學上無法同時滿足、取 `#656471`／2.9」
+  兩段加上已被 2026-09-08 裁決取代的指引（保留原文當歷史）。
+
+**評估後未改**：
+- reviewer 提的 high「`dynamicLightColorScheme` 沒包 try/catch，OEM 缺系統色資源時會炸穿 IME」——失敗情境是推測、
+  沒有證據（`system_accent*` 屬 API 31 平台資源），寬 catch 也違反 styleguide §3；與 2026-08-10 B14「不為推測中的失敗加防禦碼」
+  同一取捨。W2-B 接線做實機 androidTest 時可一併觀察。
+- `docs/STATUS.md` 的 W1-B 列仍是 2026-08-11 心跳、PR 欄空白、52 tests——那份檔在 main 上，依 DEVPLAN §10.2 由 main 直推更新，
+  不在本 PR 分支的範圍，留給 owner。
