@@ -1,5 +1,6 @@
 # --- Android / Gradle ---
 .gradle/
+.kotlin/
 build/
 local.properties
 captures/
@@ -20,6 +21,14 @@ captures/
 # --- NDK ---
 obj/
 libs/*/*.so
+
+# --- decoder-native: libchewing dictionary data ---
+# Downloaded + sha256-verified by decoder-native/scripts/fetch_chewing_data.sh
+# (see ADR-0006); not committed to keep the repo lean.
+decoder-native/src/main/assets/chewing/
+
+# --- Rust (decoder-native/cmake) ---
+decoder-native/cmake/**/target/
 
 # --- Keystores & secrets ---
 *.jks
