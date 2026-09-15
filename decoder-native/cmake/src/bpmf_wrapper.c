@@ -88,7 +88,22 @@ static const size_t kBopomofoKeyCount = sizeof(kBopomofoKeys) / sizeof(kBopomofo
  */
 static const char kEmptyCandidates[] = "";
 
-/** Decodes one UTF-8 codepoint starting at `s`; advances `*len` past it. Returns 0 on invalid/empty input. */
+/* True for a UTF-8 continuation byte (10xxxxxx). A NUL terminator is not one,
+ * so the && chains below never read past the end of the string. */
+static int is_utf8_continuation(unsigned char b) {
+    return (b & 0xC0) == 0x80;
+}
+
+/**
+ * Decodes one UTF-8 codepoint starting at `s`; advances `*len` past it.
+ * Returns 0 with *len == 0 at end of string, and 0xFFFFFFFF with *len == 1 for
+ * any malformed sequence: a bad lead byte, a missing/non-continuation byte, an
+ * overlong encoding, a surrogate (U+D800-U+DFFF), or a value above U+10FFFF.
+ * The strictness matters because bpmf_input() looks the result up in the
+ * bopomofo table: a lenient decoder turned e.g. E3 'D' 'E' into U+3105 (ㄅ)
+ * and C0 A0 into a space, so malformed input produced candidates instead of
+ * failing closed as bpmf.h promises.
+ */
 static uint32_t next_utf8_codepoint(const char* s, size_t* len) {
     const unsigned char* p = (const unsigned char*)s;
     if (p[0] == 0) {
@@ -99,20 +114,28 @@ static uint32_t next_utf8_codepoint(const char* s, size_t* len) {
         *len = 1;
         return p[0];
     }
-    if ((p[0] & 0xE0) == 0xC0 && p[1]) {
-        *len = 2;
-        return ((uint32_t)(p[0] & 0x1F) << 6) | (p[1] & 0x3F);
+    if ((p[0] & 0xE0) == 0xC0 && is_utf8_continuation(p[1])) {
+        uint32_t cp = ((uint32_t)(p[0] & 0x1F) << 6) | (p[1] & 0x3F);
+        if (cp >= 0x80) {
+            *len = 2;
+            return cp;
+        }
+    } else if ((p[0] & 0xF0) == 0xE0 && is_utf8_continuation(p[1]) && is_utf8_continuation(p[2])) {
+        uint32_t cp = ((uint32_t)(p[0] & 0x0F) << 12) | ((uint32_t)(p[1] & 0x3F) << 6) | (p[2] & 0x3F);
+        if (cp >= 0x800 && (cp < 0xD800 || cp > 0xDFFF)) {
+            *len = 3;
+            return cp;
+        }
+    } else if ((p[0] & 0xF8) == 0xF0 && is_utf8_continuation(p[1]) && is_utf8_continuation(p[2]) &&
+               is_utf8_continuation(p[3])) {
+        uint32_t cp = ((uint32_t)(p[0] & 0x07) << 18) | ((uint32_t)(p[1] & 0x3F) << 12) |
+                      ((uint32_t)(p[2] & 0x3F) << 6) | (p[3] & 0x3F);
+        if (cp >= 0x10000 && cp <= 0x10FFFF) {
+            *len = 4;
+            return cp;
+        }
     }
-    if ((p[0] & 0xF0) == 0xE0 && p[1] && p[2]) {
-        *len = 3;
-        return ((uint32_t)(p[0] & 0x0F) << 12) | ((uint32_t)(p[1] & 0x3F) << 6) | (p[2] & 0x3F);
-    }
-    if ((p[0] & 0xF8) == 0xF0 && p[1] && p[2] && p[3]) {
-        *len = 4;
-        return ((uint32_t)(p[0] & 0x07) << 18) | ((uint32_t)(p[1] & 0x3F) << 12) |
-               ((uint32_t)(p[2] & 0x3F) << 6) | (p[3] & 0x3F);
-    }
-    /* Invalid lead byte: skip one byte so the caller makes forward progress. */
+    /* Malformed: skip one byte so the caller makes forward progress. */
     *len = 1;
     return 0xFFFFFFFFu;
 }

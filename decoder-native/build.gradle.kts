@@ -29,8 +29,11 @@ android {
                 // build/cmake/flags.cmake 在開啟時對 arm64-v8a／x86_64 加上
                 // -Wl,-z,max-page-size=16384。CI 的「Verify packaged libbpmf.so ABIs」
                 // 一併斷言打包進 APK 的 arm64 libbpmf.so 對齊。
-                arguments +=
-                    listOf("-DANDROID_STL=c++_shared", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
+                //
+                // ANDROID_STL=none：專案只有 C（CMakeLists.txt 是 LANGUAGES C），Rust staticlib
+                // 的原生依賴也只有 dl／log／unwind／m／c。先前的 c++_shared 讓 AGP 把
+                // NDK 的 libc++_shared.so 打包進 APK，但沒有任何 .so 的 DT_NEEDED 需要它。
+                arguments += listOf("-DANDROID_STL=none", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
             }
         }
     }

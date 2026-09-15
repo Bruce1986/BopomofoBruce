@@ -85,6 +85,22 @@ mkdir -p "${ASSETS_DIR}"
 unzip -oq "${WORK_DIR}/${ZIP_NAME}" -d "${WORK_DIR}/extracted"
 
 EXTRACTED_DATA_DIR="${WORK_DIR}/extracted/libchewing-data-${VERSION}-Generic/share/libchewing"
+# Check the extracted files against the same per-file constants the fast path
+# above trusts. Without this, bumping VERSION/EXPECTED_SHA256 but forgetting the
+# per-file constants goes unnoticed everywhere: a clean checkout downloads and
+# installs the new files anyway, and a machine that still has the old files
+# matches the stale constants and skips the download, packaging the old data.
+for pair in "word.dat:${EXPECTED_WORD_DAT_SHA256}" "tsi.dat:${EXPECTED_TSI_DAT_SHA256}"; do
+    name="${pair%%:*}"
+    expected="${pair#*:}"
+    actual="$(sha256_of "${EXTRACTED_DATA_DIR}/${name}")"
+    if [[ "${actual}" != "${expected}" ]]; then
+        echo "fetch_chewing_data.sh: extracted ${name} does not match its expected sha256!" >&2
+        echo "  expected: ${expected}" >&2
+        echo "  actual:   ${actual}" >&2
+        exit 1
+    fi
+done
 # Atomic install: copy into a `.tmp` sibling in the SAME directory (so `mv`
 # is a same-filesystem rename, not a cross-filesystem copy) and only rename
 # into place after the copy fully succeeds. An interrupted `cp` straight to

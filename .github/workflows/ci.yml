@@ -79,11 +79,11 @@ jobs:
         run: ./gradlew --no-daemon assembleDebug
 
       # CMakeLists.txt 沒有自己的 ABI -> Rust target triple 對照表，整條交叉編譯
-      # 靠 Corrosion 讀 AGP 傳進來的 CMAKE_ANDROID_ARCH_ABI 自動推斷。推斷錯到
-      # 完全不同的 ISA 通常會在連結階段就炸，但同家族內的誤選（armv7 的各種
-      # 變體）不會——那種產物照樣 build 成功、CI 照樣全綠，只在裝置上壞。這一步
-      # 是唯一會因為 .so 架構不對而變紅的守門：它斷言的是打包進 APK 的實際檔案，
-      # 不是 build 有沒有跑過。
+      # 靠 Corrosion 讀 AGP 傳進來的 CMAKE_ANDROID_ARCH_ABI 自動推斷。這一步斷言的
+      # 是打包進 APK 的實際檔案，不是 build 有沒有跑過：每個 ABI 目錄下 libbpmf.so
+      # 的 ELF e_machine 要對得上（抓得到 32／64 位元放錯目錄），arm64 另外檢查
+      # 16 KB page 對齊。它只讀 e_machine，分不出 32 位元 ARM 的各種 triple 變體
+      # （armv7 與 thumbv7neon 都是 EM_ARM）；跨 ISA 的誤選通常在連結階段就會失敗。
       - name: Verify packaged libbpmf.so ABIs
         run: |
           python3 - <<'EOF'
