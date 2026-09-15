@@ -286,20 +286,29 @@ static void bpmf_forward_space_if_pending(ChewingContext* ctx) {
 }
 
 size_t bpmf_input(void* opaque_handle, const char* zhuyin, char** candidates_out) {
+    BpmfHandle* handle = (BpmfHandle*)opaque_handle;
+    /* Forget the previous call's candidates before ANY return, including the
+     * NULL-argument early returns just below. bpmf_commit() bounds-checks
+     * against last_candidate_count and bpmf.h promises that every index is a
+     * no-op after a call that returned 0; leaving the old count in place on
+     * these paths let bpmf_commit() pick a stale candidate from an earlier,
+     * still-live composition. Freeing last_candidates here is within the
+     * ownership contract: the previous string is only valid until the next
+     * bpmf_input() call, whatever its arguments. */
+    if (handle != NULL) {
+        free(handle->last_candidates);
+        handle->last_candidates = NULL;
+        handle->last_candidate_count = 0;
+    }
     if (candidates_out == NULL) {
         return 0;
     }
     /* See bpmf.h: 0 candidates always means *candidates_out == "", never NULL. */
     *candidates_out = (char*)kEmptyCandidates;
-    if (opaque_handle == NULL || zhuyin == NULL) {
+    if (handle == NULL || zhuyin == NULL) {
         return 0;
     }
-    BpmfHandle* handle = (BpmfHandle*)opaque_handle;
     ChewingContext* ctx = handle->ctx;
-
-    free(handle->last_candidates);
-    handle->last_candidates = NULL;
-    handle->last_candidate_count = 0;
 
     chewing_Reset(ctx);
 
