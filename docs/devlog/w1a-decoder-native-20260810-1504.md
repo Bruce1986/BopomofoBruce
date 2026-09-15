@@ -32,7 +32,8 @@
   範圍檢查；C2 test JNI 補 `FindClass`/`NewObjectArray` 的 NULL 檢查；B1 CI 新增
   「打包進 APK 的 `libbpmf.so` ELF 架構」守門；B2 CI 釘死 Rust 工具鏈版本；B3/B4
   `fetch_chewing_data.sh` 補 sha256 工具偵測與 curl 逾時；K1/K2 補上兩條測試（並發
-  互斥、孤兒 `.tmp` 復原）。見該節。
+  互斥、孤兒 `.tmp` 復原）。（本檔沒有補寫第十六階段的內文章節；逐條修正內容與突變驗證
+  記在 commit `988bced` 的訊息裡。）
   **上面「驗收標準全數通過」那句的範圍，僅限括號內列出的四項；APK size 不在其中，
   且經第十階段 Q2 實測確認未達標。**
 

@@ -24,7 +24,13 @@ android {
                 // automatically per abiFilters entry; Corrosion (see
                 // cmake/CMakeLists.txt) reads those to pick the matching Rust
                 // target triple.
-                arguments += listOf("-DANDROID_STL=c++_shared")
+                // ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES：NDK r27 預設不開，arm64 的 libbpmf.so
+                // LOAD segment 只有 0x1000 對齊，16 KB page 的裝置無法正常載入。r27 的
+                // build/cmake/flags.cmake 在開啟時對 arm64-v8a／x86_64 加上
+                // -Wl,-z,max-page-size=16384。CI 的「Verify packaged libbpmf.so ABIs」
+                // 一併斷言打包進 APK 的 arm64 libbpmf.so 對齊。
+                arguments +=
+                    listOf("-DANDROID_STL=c++_shared", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
             }
         }
     }

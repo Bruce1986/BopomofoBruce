@@ -115,6 +115,22 @@ jobs:
                   if got != want:
                       print(f"::error::{entry} has Machine {got}, expected {want}")
                       failed = True
+                  # 16 KB page 支援只適用 64 位元 ABI：每個 PT_LOAD 的 p_align 都要 >= 0x4000。
+                  # ELF64 header：e_phoff @32（u64）、e_phentsize @54、e_phnum @56（u16）；
+                  # program header：p_type @0（u32，PT_LOAD = 1）、p_align @48（u64）。
+                  if abi == "arm64-v8a" and got == "AArch64":
+                      data = z.read(entry)
+                      phoff = struct.unpack_from("<Q", data, 32)[0]
+                      phentsize, phnum = struct.unpack_from("<HH", data, 54)
+                      aligns = [
+                          struct.unpack_from("<Q", data, phoff + i * phentsize + 48)[0]
+                          for i in range(phnum)
+                          if struct.unpack_from("<I", data, phoff + i * phentsize)[0] == 1
+                      ]
+                      print(f"{entry} -> PT_LOAD p_align: {[hex(a) for a in aligns]}")
+                      if not aligns or min(aligns) < 0x4000:
+                          print(f"::error::{entry} is not 16 KB page aligned (PT_LOAD p_align {[hex(a) for a in aligns]})")
+                          failed = True
           sys.exit(1 if failed else 0)
           EOF
 

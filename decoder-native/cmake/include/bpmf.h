@@ -137,6 +137,14 @@ void* bpmf_init(const char* data_path);
  * If `candidates_out` itself is NULL, returns 0 without dereferencing it —
  * there is nothing to write to, so the "*candidates_out == \"\"" guarantee
  * above does not (and cannot) apply to that case.
+ *
+ * Length limit: bpmf_init() sets libchewing's pre-edit limit to
+ * MAX_CHI_SYMBOL_LEN (MAX_PHONE_SEQ_LEN - MAX_PHRASE_LEN = 50 - 11 = 39
+ * characters, per the vendored chewing.h). chewing.h documents that a
+ * pre-edit string longer than that has its leading part committed
+ * automatically, and this four-function API has no way to read committed
+ * text back — callers should keep a single `zhuyin` buffer within that
+ * limit rather than rely on the overflow behaviour.
  */
 size_t bpmf_input(void* handle, const char* zhuyin, char** candidates_out);
 
