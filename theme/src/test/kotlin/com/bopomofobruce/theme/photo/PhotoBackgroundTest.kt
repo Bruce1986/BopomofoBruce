@@ -60,19 +60,25 @@ class PhotoBackgroundTest {
     }
 
     @Test
-    fun `rejects network and scheme-less uris`() {
-        for (uri in listOf("https://example.com/a.png", "HTTP://example.com/a.png", "media/42")) {
+    fun `rejects network, file, scheme-less and upper-case scheme uris`() {
+        for (uri in
+            listOf(
+                "https://example.com/a.png",
+                "http://example.com/a.png",
+                "file:///data/data/com.bopomofobruce/files/a.png",
+                "media/42",
+                // Coil 只認小寫 scheme：放行的話建構成功、渲染時卻悄悄載不出來。
+                "CONTENT://media/external/images/42",
+            )) {
             assertThrows(IllegalArgumentException::class.java, { PhotoBackground(uri = uri) }, uri)
         }
     }
 
     @Test
-    fun `accepts every local scheme regardless of case`() {
+    fun `accepts the local schemes coil can actually load`() {
         for (uri in
             listOf(
                 "content://media/external/images/42",
-                "CONTENT://media/external/images/42",
-                "file:///sdcard/a.png",
                 "android.resource://com.bopomofobruce/drawable/bg",
             )) {
             assertEquals(uri, PhotoBackground(uri = uri).uri)

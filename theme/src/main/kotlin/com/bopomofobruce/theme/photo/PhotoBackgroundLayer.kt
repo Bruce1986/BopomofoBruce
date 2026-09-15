@@ -47,9 +47,14 @@ fun PhotoBackgroundLayer(background: PhotoBackground, modifier: Modifier = Modif
         contentScale = ContentScale.Crop,
         colorFilter = colorFilter,
         onError = {
-            // 不記完整 uri：它指向使用者相簿裡的特定圖片，logcat 會進 bug report。scheme 足夠分辨是哪一類來源失效。
-            val scheme = background.uri.substringBefore(':')
-            Log.w(TAG, "Failed to load photo background (scheme=$scheme)", it.result.throwable)
+            // 不記完整 uri：它指向使用者相簿裡的特定圖片，logcat 會進 bug report。
+            // 也**不能把 throwable 本身傳給 Log.w**：Log.w 會印出它的 toString()，而 Coil 2.6 的
+            // ContentUriFetcher 在授權失效（openInputStream 回 null）時丟的正是
+            // IllegalStateException("Unable to open '<完整 uri>'.")——最常見的失敗情境就會把 uri 帶出去。
+            // 只記 scheme 與例外型別，足夠分辨是哪一類來源、哪一類失敗。
+            val scheme = background.uri.substringBefore(':', missingDelimiterValue = "")
+            val errorType = it.result.throwable::class.java.name
+            Log.w(TAG, "Failed to load photo background (scheme=$scheme, error=$errorType)")
         },
         modifier = modifier.fillMaxSize().alpha(background.opacity).then(blurModifier),
     )

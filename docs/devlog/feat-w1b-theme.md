@@ -261,6 +261,12 @@
   M3 的 `*Container` 與 `surface` 是固定 tone 目標（light 下 surface≈98/container≈90，
   dark 下 10/30），桌布只換色相與彩度、不換 tone，所以這個映射在任何桌布下都只有
   約 1–2:1 的自身分離度——跟固定色盤剛修掉的缺陷同源，且影響每一個 Material You 使用者。
+  > **2026-09-15 範圍更正**：這裡「已修」的是「寫死映到 container」這個映射，**不是** `keyAccent`
+  > 本身的分離度。依下方第十一／十二輪（H1、I1、I2）用 M3 baseline tone 分布的推算（非實機量測），
+  > `keyAccent` 最後選中 `inversePrimary`，對 background 只有 light 1.66:1／dark 2.66:1，仍低於
+  > 固定色盤 `LightTheme keyAccent` 守門用的 3.0。這一項**未解決**，也沒有任何測試攔得住
+  > （動態路徑在 JVM 下拿不到真實桌布色），留給 W2-B 實機驗證時處理。
+
   **已修，不是「做不到」**：新增 `theme/src/main/kotlin/com/bopomofobruce/theme/color/DynamicAccentSelection.kt`，
   公開純函式 `pickAccentColor(candidates, textPartner, separationReferences, textThreshold = 4.5)`：
   先篩出對 `textPartner` 達 4.5 的候選，若有則取「與 `separationReferences` 的最小分離度」

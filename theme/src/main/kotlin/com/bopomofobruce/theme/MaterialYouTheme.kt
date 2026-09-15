@@ -58,6 +58,12 @@ private constructor(override val id: String, val styleSheet: StyleSheet) : Keybo
         @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
         internal var sdkIntProvider: () -> Int = { Build.VERSION.SDK_INT }
 
+        /**
+         * 正式入口。回傳的是**呼叫當下**的快照：桌布色與 [darkMode] 在這一刻被讀進來、算成固定的色值，之後不會自己更新。
+         *
+         * 呼叫端契約：本模組**不監聽**桌布變更或系統深色模式切換，也不提供快取失效機制。IME 顯示期間若這兩者改變， 呼叫端（W2-B 接線處）必須自己偵測並重新呼叫本函式。
+         * `ThemePreviews` 裡的 `remember { from(...) }` 不帶 key，是 Preview 只渲染一次才成立的寫法，**不要照抄進 IME**。
+         */
         fun from(context: Context, darkMode: Boolean): MaterialYouTheme =
             from(context, darkMode, sdkIntProvider())
 

@@ -499,3 +499,25 @@ owner 對兩項 W1-B 的待裁決事項給了決定，本節記錄實作與驗�
   `does not sacrifice separation from background just to dodge a collision with keyAccent`。
 - 🟡 「Photo Picker 的 URI 不支援 `takePersistableUriPermission`」在 KDoc 與 devlog O1 都寫成事實，repo 內查無出處，
   改標 ⚠️ 未查證（排程班禁用網路，無法當場查證；留給 W2-C 實作前確認）。
+
+# 排程深審 2026-09-15 第 3 輪（歷班第 7 輪；對抗式複審第 2 輪自己的修正＋可執行性／反方論證）
+
+68 tests / 0 failures（條數不變、內容改寫），`ktfmtCheck` 綠。**第 2 輪的兩項修正本身都有洞，本輪補上**：
+
+- 🔴 **第 2 輪說「log 不再寫出完整 uri」不成立**：訊息字串清掉了，但 `it.result.throwable` 仍原樣傳給 `Log.w`，
+  而 `Log.w` 會印出 throwable 的 `toString()`。`javap` 反組譯 coil-base 2.6.0 的 `ContentUriFetcher`：
+  `openInputStream` 回 null 時丟 `IllegalStateException("Unable to open '<uri>'.")`——正是「授權失效」這個最常見的失敗情境。
+  改成只記 scheme 與例外型別名稱、不傳 throwable。（`@Composable` 內，純 JVM 仍無守門。）
+- 🟠 **第 2 輪的 scheme 比對「不分大小寫」與 Coil 不一致**：`javap` 確認 Coil 2.6 的 `ContentUriFetcher$Factory`／
+  `ResourceUriFetcher$Factory`／`FileUriMapper`／`HttpUriFetcher$Factory` 全是 `Intrinsics.areEqual` 精確比對小寫字串，
+  `CONTENT://…` 會通過 `init`、渲染時卻載不出來。改成精確比對。突變：加回 `.lowercase()` → 紅 1 條。
+- 🟠 **第 2 輪把 `file` 放進白名單**：`file://` 沒有 ContentResolver 那層仲介，等於 IME 行程讀得到的任何路徑。
+  目前沒有任何呼叫端需要它，先拿掉；KDoc 寫明若 W2-C 改成複製進 app 儲存區再用 `file://`，要連路徑範圍限制一起加回。
+  突變：加回 `"file"` → 紅 1 條。
+- 🟡 `MaterialYouTheme.from(context, darkMode)` 補呼叫端契約：回傳的是快照，本模組不監聽桌布／深色模式變更；
+  `ThemePreviews` 的 `remember { }` 無 key 寫法只適用 Preview。
+- 🟡 `feat-w1b-theme.md` 的 G3「已修」加範圍更正：修掉的是寫死映射，`keyAccent` 對 background 依 H1/I1/I2 的推算
+  仍只有 1.66／2.66（非實機），低於固定色盤的 3.0，未解決。
+
+**評估後未改**：reviewer 提「`KeyboardTheme` 契約缺 shapes／typography、devlog 沒登記」——`feat-w1b-theme.md`
+「被判為範圍外、未做（登記給 W2）」段已登記 `StyleSheet → KeyboardTheme` adapter 與其根因，reviewer 漏看。

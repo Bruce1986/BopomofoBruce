@@ -39,7 +39,9 @@ data class PhotoBackground(
     init {
         require(uri.isNotBlank()) { "PhotoBackground uri must not be blank" }
         // 訊息只帶 scheme、不帶完整 uri：它指向使用者相簿裡的特定圖片，不該跟著例外進 log／錯誤報告。
-        val scheme = uri.substringBefore(':', missingDelimiterValue = "").lowercase()
+        // 刻意分大小寫：Coil 2.6 的 ContentUriFetcher／ResourceUriFetcher 用精確字串比對小寫 scheme，
+        // `CONTENT://…` 過了這裡也載不出來，只會變成一張悄悄消失的背景。
+        val scheme = uri.substringBefore(':', missingDelimiterValue = "")
         require(scheme in LOCAL_URI_SCHEMES) {
             "PhotoBackground uri must use a local scheme $LOCAL_URI_SCHEMES, but was '$scheme'"
         }
@@ -54,9 +56,13 @@ data class PhotoBackground(
         const val MAX_BLUR_RADIUS_DP: Float = 50f
 
         /**
-         * [uri] 允許的 scheme（比對時不分大小寫）。見上方 class KDoc 的 [uri] 條目：`http`／`https` 等網路 scheme 在 `init`
-         * 就被拒絕。
+         * [uri] 允許的 scheme（精確比對、只收小寫，與 Coil 一致）。見上方 class KDoc 的 [uri] 條目：`http`／`https` 等網路 scheme
+         * 在 `init` 就被拒絕。
+         *
+         * **刻意不收 `file`**：`file://` 沒有 ContentResolver／資源系統那層存取仲介，等於「IME 行程讀得到的任何路徑」，
+         * 不是「使用者選的那張圖」。若 W2-C 決定把選到的圖複製進 app 自己的儲存區再用 `file://` 參照，要連同路徑範圍限制 （例如限定在 `filesDir`
+         * 底下）一起加回來。
          */
-        val LOCAL_URI_SCHEMES: Set<String> = setOf("content", "file", "android.resource")
+        val LOCAL_URI_SCHEMES: Set<String> = setOf("content", "android.resource")
     }
 }
