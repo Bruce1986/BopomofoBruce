@@ -41,3 +41,8 @@ node_modules/
 
 # Claude Code 本機工作目錄（含殘留 worktree），不入版控
 .claude/
+
+# Kotlin Gradle Plugin 的 compiler session 檔（.kotlin/sessions/*.salive）。
+# 每次跑 gradle 編譯都會新增，未被忽略時會一直出現在 git status 裡，
+# 讓 `git add -A` 有機會把它們一起 commit 進去。
+.kotlin/
