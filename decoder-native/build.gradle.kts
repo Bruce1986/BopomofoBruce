@@ -159,8 +159,20 @@ tasks.matching { it.name.contains("Assets") }.configureEach {
 // ensureChewingDataDir) is consistent with the accepted trade-off above: :lint already requires
 // network transitively via package*Assets, so there is no remaining "keep lint offline" case
 // left to preserve by splitting these two off onto the mkdir-only task.
+//
+// The "Lint" substring also matches the custom-lint-rule publishing tasks (compileLintChecks,
+// prepareLintJarForPublish, bundle*LocalLintAar). This module ships no lint rules, those tasks
+// never read the assets dir, and wiring them to fetchChewingData would make them need network
+// for nothing — so they are excluded explicitly.
+val lintPublishingTasks = setOf("compileLintChecks", "prepareLintJarForPublish")
+val localLintAarTask = Regex("bundle\\w*LocalLintAar")
+
 tasks
-    .matching { it.name.contains("Lint", ignoreCase = true) }
+    .matching {
+        it.name.contains("Lint", ignoreCase = true) &&
+            it.name !in lintPublishingTasks &&
+            !localLintAarTask.matches(it.name)
+    }
     .configureEach { dependsOn(fetchChewingData) }
 
 // Tasks that actually produce or install a real artifact also get

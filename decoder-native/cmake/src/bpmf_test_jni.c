@@ -126,6 +126,11 @@ Java_com_bopomofobruce_decoder_nativ_testbridge_BpmfTestBridge_nativeTestInput(
                  * the bytes to Kotlin and decode there) instead.
                  */
                 jstring jsegment = (*env)->NewStringUTF(env, segment);
+                if (jsegment == NULL) {
+                    /* OutOfMemoryError is pending; no further JNI calls allowed — let it propagate. */
+                    free(segment);
+                    return NULL;
+                }
                 (*env)->SetObjectArrayElement(env, result, i, jsegment);
                 (*env)->DeleteLocalRef(env, jsegment);
                 free(segment);
