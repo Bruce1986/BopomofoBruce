@@ -160,11 +160,11 @@ tasks.matching { it.name.contains("Assets") }.configureEach {
 // network transitively via package*Assets, so there is no remaining "keep lint offline" case
 // left to preserve by splitting these two off onto the mkdir-only task.
 //
-// The "Lint" substring also matches the custom-lint-rule publishing tasks (compileLintChecks,
-// prepareLintJarForPublish, bundle*LocalLintAar). This module ships no lint rules, those tasks
-// never read the assets dir, and wiring them to fetchChewingData would make them need network
-// for nothing — so they are excluded explicitly.
-val lintPublishingTasks = setOf("compileLintChecks", "prepareLintJarForPublish")
+// The "Lint" substring also matches the custom-lint-rule compile/publishing tasks (compileLint,
+// compileLintChecks, prepareLintJarForPublish, bundle*LocalLintAar). This module ships no lint
+// rules, those tasks never read the assets dir, and wiring them to fetchChewingData would make
+// them need network for nothing — so they are excluded explicitly.
+val lintPublishingTasks = setOf("compileLint", "compileLintChecks", "prepareLintJarForPublish")
 val localLintAarTask = Regex("bundle\\w*LocalLintAar")
 
 tasks
