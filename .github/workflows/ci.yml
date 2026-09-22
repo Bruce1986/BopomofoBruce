@@ -25,10 +25,10 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      # recursive：decoder-native/cmake/libchewing 本身是 gitlink submodule，它底下的
-      # data/（libchewing-data 字典來源）又是巢狀 submodule。checkout@v4 預設不拉 submodule，
-      # 不加 recursive 會讓 CMakeLists.txt 看到空目錄直接 FATAL_ERROR（見 ADR-0006 K6）——
-      # 這一步沒修對，後面補 Rust target 也還是紅在這裡。
+      # decoder-native/cmake/libchewing 是 gitlink submodule；checkout@v4 預設不拉 submodule，
+      # 不拉的話 CMakeLists.txt 看到空目錄（沒有 Cargo.toml）直接 FATAL_ERROR（見 ADR-0006 K6）——
+      # 這一步沒修對，後面補 Rust target 也還是紅在這裡。用 recursive 是保守作法：它底下巢狀的
+      # data/（libchewing-data）目前建置不會讀，字典檔由 fetch_chewing_data.sh 下載。
       - name: Checkout
         uses: actions/checkout@v4
         with:
