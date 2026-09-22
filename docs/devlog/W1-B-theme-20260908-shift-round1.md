@@ -549,3 +549,14 @@ tracer 列了 4 組「預期存活」的突變，**parent 實跑全部存活**�
 - 🟡 **`PhotoBackground` 反序列化的例外型別契約**：decode 時丟裸 IAE、不是 `SerializationException`（與 StyleSheet 的 O2
   同一件事，但那段涵蓋不到 `PhotoBackground`）；收緊白名單會讓已存資料解不出來。KDoc 補上，測試比照 O2 加
   `assertFalse(thrown is SerializationException)`（這條的反向驗證沒跑：要讓它紅得改 kotlinx 的包裝行為，本班沒做）。
+
+# 排程深審 2026-09-22 第 1 輪（歷班第 9 輪）
+
+兩個視角並行（測試品質突變複審／產品碼＋文件一致性），產品碼與測試 0 改動，條數維持 **70**
+（`:theme:testDebugUnitTest --rerun-tasks`，讀 XML：tests=70、failures=0）。
+
+- 突變複審：8 個針對性突變全數轉紅——還原 I1（candidateHighlight 只避開 background）、background／keyFill
+  對調、拿掉 `keyLabelSp` 的 `isFinite()`、`candidateTextSp > 0f` 改 `>= 0f`、scheme 比對改不分大小寫、白名單多收
+  `file`、`pickAccentColor` 改挑最差分離度（6 條紅）、dark 也走 light scheme。與上一輪自報的突變矩陣一致（獨立重跑）。
+- 🟡 **跨檔「最新一輪」指標過期**：`feat-w1b-theme.md` 兩處仍寫「目前最新：2026-08-11 第十四輪」，但該檔後面還有第十五、
+  十七輪，而 08-11 之後的輪次（含 70 條的現況）都記在本檔。兩處改成指向本檔最後一節，並寫明那份檔只記到第十七輪。

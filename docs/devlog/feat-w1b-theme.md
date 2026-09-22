@@ -33,7 +33,8 @@
   round-trip、內建主題對比度守門、MaterialYouTheme 退化分支與值語意、動態取色
   選色函式 `pickAccentColor`）。**條數不在此處寫死**（第十二輪審查，I3：曾經在「交付」/「驗收結果」/
   各輪紀錄三處各寫一個數字、每輪都要手動同步卻每輪都漏），實際條數與最新一輪的紅綠驗證結果見本檔
-  最新一輪紀錄（目前最新：下方「2026-08-11 第十四輪」）。
+  最新一輪紀錄。本檔的各輪紀錄只到「2026-08-11 第十七輪」；之後的輪次（含目前的條數）記在
+  [W1-B-theme-20260908-shift-round1.md](W1-B-theme-20260908-shift-round1.md)，以該檔最後一節為準。
 
 ## 驗收結果
 
@@ -42,7 +43,7 @@
 | 三主題各有 `@Preview` | ✅ 過（`LightThemePreview` / `DarkThemePreview` / `MaterialYouThemeFallbackPreview` + `MaterialYouThemeDynamicPreview`，共 4 個；B14 後 Material You 拆成兩條路徑各一個）。證據等級：函式存在且編譯通過，未實際在 Android Studio 內 render 過。 |
 | 主題序列化/反序列化 round-trip test | ✅ 過（`StyleSheetSerializationTest`、`PhotoBackgroundTest`，含巢狀 `UIntHexSerializer`） |
 | `./gradlew :theme:assembleDebug` | ✅ 過 |
-| `./gradlew :theme:testDebugUnitTest` | ✅ 全綠（條數見各輪紀錄，第十二輪審查 I3 後不在此處寫死絕對條數，避免每輪手動同步漏更新——見下方最新一輪「2026-08-11 第十四輪」） |
+| `./gradlew :theme:testDebugUnitTest` | ✅ 全綠（條數見各輪紀錄，第十二輪審查 I3 後不在此處寫死絕對條數，避免每輪手動同步漏更新——最新一輪在 [W1-B-theme-20260908-shift-round1.md](W1-B-theme-20260908-shift-round1.md) 最後一節，本檔各輪紀錄只到 2026-08-11 第十七輪） |
 | `./gradlew :theme:ktfmtCheck` | ✅ 過（`BUILD SUCCESSFUL`；期間跑過 `:theme:ktfmtFormat` 修過格式後才綠——含 2026-08-10 B12/B14/B15 修正後、最後一次 commit 之後重跑的結果） |
 | `./gradlew :theme:lint` | ✅ 過（`BUILD SUCCESSFUL`，`lint-results-debug.txt`：`No issues found.`——2026-08-10 B12/B14/B15 修正後、最後一次 commit 之後重跑的結果） |
 | PhotoBackground 實機渲染 < 200 ms | ❌ **沒有量測**——沒有連上 Pixel 6 / 任何實機做這項；本 session 只跑到 JVM unit test 與 AGP 編譯層級，誠實回報未驗證，不編數字。 |
