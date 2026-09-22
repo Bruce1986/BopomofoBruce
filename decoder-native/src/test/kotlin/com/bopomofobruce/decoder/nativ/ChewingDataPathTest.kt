@@ -328,4 +328,66 @@ class ChewingDataPathTest {
         assertTrue(unrelatedDir.exists(), "only chewing-* prefixed dirs should be cleaned up")
         assertTrue(File(unrelatedDir, "marker").exists())
     }
+
+    @Test
+    fun `getDataPath does not wipe and re-extract its own current-version dir on a second call`() {
+        // The stale-dir sweep must skip the current version's dir; without that exclusion every
+        // app start deletes the freshly extracted dictionary and copies it all over again.
+        val assets = fakeAssets(mapOf("word.dat" to byteArrayOf(1, 2, 3)))
+        val context = fakeContext(assets, tempDir)
+
+        getDataPath(context)
+        getDataPath(context)
+
+        verify(exactly = 1) { assets.open("chewing/word.dat") }
+    }
+
+    @Test
+    fun `getDataPath still cleans up a stale dir even when extraction itself fails`() {
+        val staleDir = File(tempDir, "chewing-2016.1.1")
+        staleDir.mkdirs()
+        File(staleDir, "word.dat").writeBytes(byteArrayOf(9, 9, 9))
+
+        val assets = mockk<AssetManager>()
+        every { assets.list("chewing") } returns arrayOf("word.dat")
+        every { assets.open("chewing/word.dat") } throws IOException("simulated asset read failure")
+        val context = fakeContext(assets, tempDir)
+
+        assertThrows(IOException::class.java) { getDataPath(context) }
+
+        assertFalse(staleDir.exists(), "stale dir must be cleaned up even when extraction fails")
+    }
+
+    @Test
+    fun `a failed rename is not silently swallowed - it still throws and leaves no final file`() {
+        // Forces File.renameTo() to return false by making the target dir read-only right after
+        // the tmp copy is written (when the asset stream is closed). Relies on not running as
+        // root, which holds for local runs and GitHub-hosted runners.
+        val targetDir = File(tempDir, "cache-chewing")
+        val payload = byteArrayOf(1, 2, 3)
+        val assets = mockk<AssetManager>()
+        every { assets.list("chewing") } returns arrayOf("word.dat")
+        every { assets.open("chewing/word.dat") } answers
+            {
+                object : java.io.InputStream() {
+                    private val backing = ByteArrayInputStream(payload)
+
+                    override fun read(): Int = backing.read()
+
+                    override fun close() {
+                        backing.close()
+                        targetDir.setWritable(false)
+                    }
+                }
+            }
+        try {
+            assertThrows(IOException::class.java) { extractChewingData(assets, targetDir) }
+            assertFalse(
+                File(targetDir, "word.dat").exists(),
+                "a failed rename must not leave anything at the final name",
+            )
+        } finally {
+            targetDir.setWritable(true)
+        }
+    }
 }
