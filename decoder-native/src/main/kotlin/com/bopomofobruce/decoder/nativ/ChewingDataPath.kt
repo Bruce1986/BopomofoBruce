@@ -26,10 +26,11 @@ private const val CHEWING_CACHE_DIR_PREFIX = "chewing-"
 /**
  * Must be bumped in lockstep with `VERSION` in `decoder-native/scripts/fetch_chewing_data.sh` every
  * time that script's `VERSION` changes (i.e. every time the packaged `word.dat`/`tsi.dat` content
- * changes). There is no automated check tying these two together — they are two different languages
- * (Kotlin vs. bash) built at different times (this one at app-compile time, the script's at
- * CI/dev-machine asset-fetch time) — so this is a manual invariant, not a mechanically-enforced
- * one.
+ * changes). The two live in different languages (Kotlin vs. bash) and are consumed at different
+ * times (this one at app-compile time, the script's at CI/dev-machine asset-fetch time), so nothing
+ * ties them together at the language level; instead the `verifyChewingDataVersionSync` task in
+ * `decoder-native/build.gradle.kts` regex-compares the two literals and fails the build on drift
+ * (wired onto the unit-test, `package*Assets`, and `assemble*` tasks — see that file).
  *
  * Why this exists at all (K5): [extractChewingData] only checks "does the file already exist at its
  * final cache path" — it has no way to tell "cached word.dat" apart from "this app version's

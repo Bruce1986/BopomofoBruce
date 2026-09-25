@@ -29,7 +29,10 @@ VERSION="2026.3.22"
 ZIP_NAME="libchewing-data-${VERSION}-Generic.zip"
 URL="https://github.com/chewing/libchewing-data/releases/download/v${VERSION}/${ZIP_NAME}"
 # Verified 2026-08-10 against the GitHub Releases API asset digest for
-# v2026.3.22, and against `shasum -a 256` on the downloaded file.
+# v2026.3.22, and against `shasum -a 256` on the downloaded file. To re-check
+# the upstream side when bumping VERSION (needs network; not run by this script):
+#   gh api "repos/chewing/libchewing-data/releases/tags/v${VERSION}" \
+#     --jq ".assets[] | select(.name == \"${ZIP_NAME}\") | .digest"
 EXPECTED_SHA256="db8248f7a46be17beda41aedd94e7e846d01e3b2cfa3b45fcfae453acf9c62be"
 # Verified 2026-08-10 with `shasum -a 256` on the already-extracted files in
 # this repo (same v2026.3.22 Generic release as EXPECTED_SHA256 above).

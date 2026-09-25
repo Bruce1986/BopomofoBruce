@@ -82,8 +82,10 @@ Java_com_bopomofobruce_decoder_nativ_testbridge_BpmfTestBridge_nativeTestInput(
     }
     const char* zhuyin_utf8 = (*env)->GetStringUTFChars(env, zhuyin, NULL);
     if (zhuyin_utf8 == NULL) {
-        /* OOM converting the jstring; GetStringUTFChars already threw OutOfMemoryError. */
-        return (*env)->NewObjectArray(env, 0, string_class, NULL);
+        /* OOM converting the jstring; GetStringUTFChars already threw OutOfMemoryError.
+         * Same rule as the FindClass branch above: no further JNI calls with an
+         * exception pending — return and let it propagate. */
+        return NULL;
     }
 
     char* joined = NULL;

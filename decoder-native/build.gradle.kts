@@ -193,9 +193,9 @@ tasks
     .configureEach { dependsOn(fetchChewingData) }
 
 // K5's CHEWING_DATA_VERSION (Kotlin constant in ChewingDataPath.kt) and this script's own
-// VERSION (scripts/fetch_chewing_data.sh) are a hand-maintained invariant by design — see the
-// KDoc on CHEWING_DATA_VERSION, which is honest that "there is no automated check tying these
-// two together". This task IS that check: a pure regex-extract-and-compare over the two source
+// VERSION (scripts/fetch_chewing_data.sh) live in two languages with nothing tying them together
+// at the language level — see the KDoc on CHEWING_DATA_VERSION. This task is the check that
+// ties them together: a pure regex-extract-and-compare over the two source
 // files already on disk, no network involved, so bumping one without the other now fails the
 // build instead of silently shipping a cache-dir name that never matches its own asset content.
 val verifyChewingDataVersionSync by tasks.registering {
