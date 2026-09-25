@@ -240,12 +240,13 @@ val verifyChewingDataVersionSync by tasks.registering {
     }
 }
 
-// Wired onto testDebugUnitTest/testReleaseUnitTest specifically (NOT preBuild/assemble*):
+// Wired onto testDebugUnitTest/testReleaseUnitTest here, and additionally onto *Assets and
+// assembleDebug/assembleRelease/connected*/install* further below (round-10 finding).
 // verifyChewingDataVersionSync needs no network (pure text regex over two files already on
-// disk), so attaching it here does not violate the "unit tests run offline from a clean
-// checkout" rule documented above fetchChewingData (ADR-0006 / devlog A4) — it still runs on
-// every unit-test invocation, which is frequent enough to catch drift promptly, without pulling
-// fetchChewingData's network dependency onto testDebugUnitTest's task graph.
+// disk), so attaching it to the unit-test tasks does not violate the "unit tests run offline
+// from a clean checkout" rule documented above fetchChewingData (ADR-0006 / devlog A4) — it
+// runs on every unit-test invocation without pulling fetchChewingData's network dependency onto
+// testDebugUnitTest's task graph.
 tasks
     .matching { it.name == "testDebugUnitTest" || it.name == "testReleaseUnitTest" }
     .configureEach { dependsOn(verifyChewingDataVersionSync) }
