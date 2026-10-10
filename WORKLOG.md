@@ -5,6 +5,89 @@
 
 ---
 
+## 2026-09-13 — W1-C #10 排程深審班（Claude Code）
+
+- 兩條既有測試只掃短按、沒掃長按，已改用 `reachableChars()`：
+  `symbol keyboard characters are all full-width`（medium——本 PR 自己就給符號鍵盤加了
+  一個 longPress，等於替它要擋的半形偷渡開了一條看不到的路）與
+  `url keyboard has slash, dot and a dedicated dot-com custom action`（low，防未來的假紅）。
+  兩條都做了 A/B：修正後紅／修正前綠，以及修正後綠／修正前假紅。
+- 複驗無問題：注音 37 符號＋4 聲調兩份配列齊全無重複、八份配列無重複鍵、空白鍵標籤
+  一致、KDoc 列寬總和吻合、無恆真或自我印證斷言、空配列退化點已有守門。
+- 跨模組介面（W1-A／W1-B）**現階段無從查證**——`:decoder`／`:theme` 仍是 Placeholder，
+  沒有任何 consumer 引用 `Keyboards.*`。等真實 JNI 綁定落地後補 smoke test。
+- 第 2 輪（對抗性）找到**第四個**「規則本身不完備、靠現有鍵盤組合湊巧遮住」：
+  `ReturnPathCoverageTest.destinationsOf()` 的寫死 `when` 與權威清單
+  `Keyboards.PAGE_SWITCH_CUSTOM_IDS` 沒有互相核對，新登記的切頁 id 會被
+  `else -> emptyList()` 靜靜吞掉。完整情境實測（登記＋掛鍵＋補 label 表，指向確定沒有
+  返回路徑的 `phone_dialpad`）：加哨兵後 FAILED、加之前 BUILD SUCCESSFUL。已補哨兵
+  `every registered page-switch custom id has a destination in destinationsOf`（46 → 47 tests）。
+- `reachableChars()` 只認 `KeyAction.Character`，而 `Custom` 已有插入半形文字的先例
+  （AM／PM）——id 到文字的對應表在 `:ime`、本模組修不了，已在 KDoc 寫明它不是
+  「所有可觸及字元」的保證。
+- 第 3 輪（Opus tracer）：第 2 輪的哨兵只做了單向核對（清單 → 導航圖），反方向
+  （導航圖認得、卻登記在 NON_PAGE_SWITCH）完全靜音——完整情境實測，加斷言後 FAILED、
+  加之前 47 tests 全綠。另補「帶返回鍵的鍵盤必須是某顆切頁鍵的目的地」（把 switch_back
+  掛在誰都切不到的頁上，真機是 no-op，原本零反應）。47 → 49 tests。
+- 本班三輪**沒有動到任何一行產品碼**，全部落在測試鷹架與文件；依 tracer 判斷收手。
+- 細節：[docs/devlog/W1-C-keyboards-20260913-shift-round1.md](docs/devlog/W1-C-keyboards-20260913-shift-round1.md)
+
+---
+
+## 2026-08-10 ~ 08-11 — W1 三包實作 + gemini-grade-review fix-loop（Claude Code）
+
+### 完成
+- **W1 三包全部實作完成**，各自獨立 worktree／分支，**未 push、未開 PR**（等 owner 裁決）：
+  - `feat/w1a-decoder-native`（20 commits）— libchewing v0.12.0 → `libbpmf.so`
+  - `feat/w1b-theme`（22 commits）— `:theme` 主題引擎
+  - `feat/w1c-keyboards`（18 commits）— `:keyboards` 8 份鍵盤定義
+- **最大技術風險已去除**：W1-A 在實機（ASUS_AI2302, API 15）跑通 `bpmf_init` + `bpmf_input`，
+  輸入「ㄋㄧˇㄏㄠˇ」拿到真實候選 `[好, 郝, 㚼, 㝀]`。
+- 三包各跑 10~17 輪 `/gemini-grade-review` fix-loop（Sonnet 廣審 + Opus tracer 深審 + codex 交叉
+  檢查 + 獨立驗證者裁決），合計修掉 **60+ 條經獨立驗證的 finding**。
+
+### 關鍵發現（都是「照原驗收標準看完全合格」的東西）
+- **W1-A**：測試專用 JNI 符號會進 release APK（含可對任意位址 `free()` 的入口）；字典解壓非原子
+  導致壞檔永不自癒；一聲（陰平）會**靜默回傳上一個音節的候選**；`:app` 建置**不會**觸發字典下載
+  → APK 打包空 assets（乾淨 checkout 才會現形）；libchewing 內建使用者字典其實從未啟用。
+- **W1-B**：`Modifier.blur` 在 minSdk 涵蓋的 API 28–30 完全無效但註解宣稱有 fallback；相片 tint
+  用 `SrcAtop` 在 alpha=0xFF（調色盤常態）時會整片蓋掉相片；內建色盤 `keyText` 疊在 `keyAccent`
+  上只有 **1.32:1**（AA 要 4.5）；動態取色路徑重現同一缺陷。
+- **W1-C**：密碼／URL 鍵盤**打不出任何數字**，唯一出口的符號頁 30 鍵全是全形（誤按送出的是
+  U+FF03 之類）；`KeyboardLoader` 的 strict 契約**零測試覆蓋**；符號頁的兩顆切換鍵依契約語意都
+  到不了標籤宣稱的目的地；修好之後又發現從 password/url 進符號頁**回不去**。
+
+### 反覆出現的兩個失效型態（值得寫進規範）
+1. **「不可能失敗的測試」出現至少五次** —— `weight` 恆真斷言、Light/Dark 只比整個 data class、
+   對比度守門只量會過的配對、tie-break 用同一個值放兩次、`assertThrows(IAE)` 卻不知
+   `SerializationException` 是其子類。全部都是「補測試」這個動作本身產生的，且都製造了
+   「已覆蓋」的錯覺——CI 全綠。
+2. **「修正 A 造成缺陷 B」出現至少六次** —— 修對比度→強調色自己消失；解耦 lint→APK 打包空字典；
+   排除撞色→分離度倒退；改標籤誠實→把使用者導向更明顯的死路；加返回鍵前→符號頁有去無回。
+
+### 問題 / 決策
+- **owner 已裁決**：libchewing 靜態連結造成的 LGPL-2.1 義務**本輪只記案**，已在 ADR-0006 記錄
+  「ADR-0001 的動態連結授權前提已失效」並登記為 **W4-D（上架）blocker**。
+- W1-B 深色主題下 WCAG 1.4.11（3:1）與 AA 文字（4.5:1）**數學上互斥**（可行亮度區間為空），
+  根因是 `KeyboardColors` 缺 on-candidate-highlight 色（contracts-v1 凍結）。目前採**文字優先**，
+  兩個候選值與切換方式已寫進 `BuiltInThemes.kt` 註解供 owner 推翻。
+- 兩位獨立驗證者對兩條 finding **判斷相反**，未單方裁決、已上呈 owner：
+  `:keyboards` 的 `implementation` 是否該改 `api`、空白鍵 label 是否該沿用 U+3000。
+- 過程中 lead 兩度誤判 subagent 停擺而接手同一個 worktree，造成一次實際覆寫（W1-B 的
+  `candidateHighlight` 色值與測試斷言）。已比對還原、無成果遺失，但停擺判準（22 分鐘無輸出）
+  太短，應拉長並在接手前先確認沒有正在跑的建置。
+
+### 下一步
+1. owner 決定三包是否開 PR（fix-loop 已收斂，但 `:ime` 不存在使得許多契約無法實測驗證）。
+2. 進 W2 前建議先改寫 DEVPLAN 的驗收標準：目前多為「檔案存在／測試綠」，本輪幾乎所有 high
+   都是「照驗收標準看完全合格但功能不能用」。建議改成可否證的形式（「在 X 情境下能打出 Y」
+   「把 Z 改壞時哪條測試會紅」）。
+3. W2-B（`:ime`）開工前需先處理：`language_toggle` 沒有目的地鍵盤、`Custom` id 契約
+   （`switch_to_zhuyin`／`switch_back`／`url_insert_dot_com`）、`KeyboardTheme` 是否納入
+   shapes/typography。
+
+---
+
 ## 2026-08-07 — 全案審查＋文件校正（Claude Code）
 
 ### 完成
