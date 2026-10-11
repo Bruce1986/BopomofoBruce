@@ -8,6 +8,8 @@ import kotlinx.serialization.Serializable
  * - [keyCornerRadiusDp]：單一按鍵圓角。
  * - [candidateRowCornerRadiusDp]：候選詞列容器圓角。
  * - [panelCornerRadiusDp]：整個鍵盤面板（IME window）圓角，通常只有上緣兩角有效。
+ *
+ * 三個欄位的合法範圍都是 `0f`..[MAX_CORNER_RADIUS_DP]。
  */
 @Serializable
 data class KeyboardShapes(
@@ -16,14 +18,25 @@ data class KeyboardShapes(
     val panelCornerRadiusDp: Float = 0f,
 ) {
     init {
-        require(keyCornerRadiusDp >= 0f && keyCornerRadiusDp.isFinite()) {
-            "keyCornerRadiusDp must be >= 0 and finite, but was $keyCornerRadiusDp"
-        }
-        require(candidateRowCornerRadiusDp >= 0f && candidateRowCornerRadiusDp.isFinite()) {
-            "candidateRowCornerRadiusDp must be >= 0 and finite, but was $candidateRowCornerRadiusDp"
-        }
-        require(panelCornerRadiusDp >= 0f && panelCornerRadiusDp.isFinite()) {
-            "panelCornerRadiusDp must be >= 0 and finite, but was $panelCornerRadiusDp"
+        requireRadius("keyCornerRadiusDp", keyCornerRadiusDp)
+        requireRadius("candidateRowCornerRadiusDp", candidateRowCornerRadiusDp)
+        requireRadius("panelCornerRadiusDp", panelCornerRadiusDp)
+    }
+
+    companion object {
+        /**
+         * 三個圓角欄位共用的上限。這是防呆上限，不是美術規範：只擋掉「dp 值有限、乘上螢幕密度後 px 變成無限大」的輸入—— 那種值過得了 `isFinite()`，卻會讓
+         * `RoundedCornerShape` 在畫的時候丟 `IllegalArgumentException`（2026-10-12 實測：`2e38f` 在密度 2.625
+         * 下如此）， 而且是在解碼成功之後才丟，解析主題 JSON 的 catch 接不到。數值待 owner 複核；**要調請在主題 JSON 開始被存下來之前調**，
+         * 之後調低會讓已存的資料解不出來。
+         */
+        const val MAX_CORNER_RADIUS_DP: Float = 1000f
+
+        private fun requireRadius(name: String, value: Float) {
+            // NaN 與 ±Infinity 都不在任何閉區間內，所以這一條同時擋非有限值。
+            require(value in 0f..MAX_CORNER_RADIUS_DP) {
+                "$name must be within 0f..$MAX_CORNER_RADIUS_DP, but was $value"
+            }
         }
     }
 }

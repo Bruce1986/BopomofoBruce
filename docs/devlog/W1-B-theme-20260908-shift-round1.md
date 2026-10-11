@@ -36,7 +36,14 @@
    「TODO（已登記，本次未做）」的 `onSecondaryContainer` 那項；on-accent 只記在 `BuiltInThemes.kt` 註解與 `feat-w1b-theme.md` 第七、八輪。
 7. `SrcAtop` 的 tint alpha 為 `0xFF` 時會完全蓋掉底圖（刻意，`init` 不限制），W2-C 設定頁要自己限制——`PhotoBackground.kt` KDoc。
 
+8a. 圓角與字級的防呆上限（`KeyboardShapes.MAX_CORNER_RADIUS_DP`、`KeyboardTypography.MAX_FONT_SIZE_SP`，目前都是 1000）是歷班第 21 輪
+   加的，數值沒有設計依據、只求擋掉會讓 px 變成無限大的輸入；請 owner 複核。主題 JSON 開始被存下來之後再調低，會讓已存的資料解不出來。
+
 **B. 契約與邊界**
+
+8b. `:common` 的 `KeyboardDimens` 四個欄位只擋負值、沒有上限（contracts-v1 凍結，本 PR 不能動）。reviewer 實跑
+   `Constraints.fixedHeight(262143)` 會丟例外；極大的 `keyHeightDp` 經 `Modifier.height` 實際會怎樣，純 JVM 驗不了。
+   解析不受信任的主題 JSON 之後、交給 Compose 之前，呼叫端要自己夾住——歷班第 21 輪。
 
 8. `PhotoBackground` 只驗 scheme、不驗 authority：`android.resource://其他套件名/…` 會通過白名單。Coil 2.6 的 `ResourceUriFetcher`
    在 authority 不是本套件時會經 `PackageManager.getResourcesForApplication` 去讀（2026-10-12 反組譯所見，未實機驗證）。
@@ -850,3 +857,19 @@ Light `keyFill` 改成 `#FEFEFE`（色值不設絕對快照是刻意的）；亮
   reviewer 逐一實跑 15 個放寬突變全數轉紅，既有三個突變（少傳 `keyFill`、候選縮減、門檻 3.0）仍由原本那條抓到；
   parent 另跑兩個（dark `keyAccent` 3.0、`candidateHighlight` 4.2），各只紅新測試。
   **殘餘**：呼叫處把門檻放寬到約 4.45 以上、4.5 以下，仍沒有測試會紅。
+
+# 手動 GGR fix-loop 2026-10-12 第 12 輪（歷班第 21 輪；Opus tracer）
+
+視角：不分 lens 的 merge 前全案審查（Compose compiler 報告、密度換算、fixture 的 resource id、mock 保真度都有實跑）；Codex 第二次複檢（No findings）。
+**產品碼改了兩個檔**（多擋一類輸入）；測試 91 → **92** 條 / 0 failures，`ktfmtCheck`、`lintDebug` 綠。
+
+- 🟠 **有限的 dp 不代表有限的 px**。圓角三欄與字級三欄的 `init` 只擋負值與非有限值。`keyCornerRadiusDp = 2e38f` 過得了 `init`，
+  也過得了 `Json.decodeFromString`；交給 `RoundedCornerShape` 後，在密度 2.625 下 px 變成無限大，`createOutline` 丟
+  `IllegalArgumentException: Corner size in Px can't be negative(topStart = NaN, …)`（reviewer 沙箱實跑；`1.2e38` 正常、`1.4e38` 起丟）。
+  例外發生在畫的時候、不在解碼的時候，照 `StyleSheet` KDoc 的呼叫端契約寫的 catch 接不到，鍵盤每次顯示都會當。字級同理（`2e38f.sp.toPx()`
+  得 `Infinity`；之後文字排版會怎樣純 JVM 驗不了）。加上具名的防呆上限（各 1000），`init` 改用閉區間檢查。
+  突變：圓角上限拿掉、字級上限拿掉、上限改成不含端點——各自單獨跑，92 條裡只紅 `KeyboardShapes and KeyboardTypography cap every size field`。
+  上限數值待 owner 複核（總表 8a）；`:common` 的 `KeyboardDimens` 同樣沒有上限但已凍結（總表 8b）。
+- 其餘查過沒有問題、且有實跑的：Compose compiler 報告中 `:theme` 自己的四個資料型別都是 stable、`PhotoBackgroundLayer` 可跳過；
+  `android.R.color.system_*` 在 JVM 單元測試下是真常數（五個互不相同），fixture 不會退化成同一格；`Resources` 是嚴格 mock，
+  沒餵到的 id 會直接丟錯、不會靜靜回 0；四個 `@Preview` 與 `ThemeSwatch` 都是 `private`，`ui-tooling` 只在 debug。

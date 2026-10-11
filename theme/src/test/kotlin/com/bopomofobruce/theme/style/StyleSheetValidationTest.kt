@@ -193,4 +193,40 @@ class StyleSheetValidationTest {
         assertEquals(1, KeyboardTypography(fontWeight = 1).fontWeight)
         assertEquals(1000, KeyboardTypography(fontWeight = 1000).fontWeight)
     }
+
+    /**
+     * 有限的 dp／sp 不代表乘上密度後的 px 有限：`2e38f` 過得了 `isFinite()`，卻會讓 `RoundedCornerShape` 在畫的時候丟例外
+     * （2026-10-12 實測）。上限本身可過、超過一點就拒，三個圓角與三個字級逐欄驗。
+     */
+    @Test
+    fun `KeyboardShapes and KeyboardTypography cap every size field`() {
+        val maxRadius = KeyboardShapes.MAX_CORNER_RADIUS_DP
+        val maxFont = KeyboardTypography.MAX_FONT_SIZE_SP
+        assertEquals(1000f, maxRadius, "圓角上限的數值變了——已存的主題 JSON 可能因此解不出來")
+        assertEquals(1000f, maxFont, "字級上限的數值變了——已存的主題 JSON 可能因此解不出來")
+
+        KeyboardShapes(maxRadius, maxRadius, maxRadius)
+        KeyboardTypography(maxFont, maxFont, maxFont)
+
+        val tooRound = Math.nextUp(maxRadius)
+        val tooBig = Math.nextUp(maxFont)
+        val builders: List<Pair<String, () -> Unit>> =
+            listOf(
+                "keyCornerRadiusDp" to { KeyboardShapes(keyCornerRadiusDp = tooRound) },
+                "candidateRowCornerRadiusDp" to
+                    {
+                        KeyboardShapes(candidateRowCornerRadiusDp = tooRound)
+                    },
+                "panelCornerRadiusDp" to { KeyboardShapes(panelCornerRadiusDp = tooRound) },
+                "keyLabelSp" to { KeyboardTypography(keyLabelSp = tooBig) },
+                "keySubLabelSp" to { KeyboardTypography(keySubLabelSp = tooBig) },
+                "candidateTextSp" to { KeyboardTypography(candidateTextSp = tooBig) },
+            )
+        for ((field, build) in builders) {
+            assertThrows(IllegalArgumentException::class.java, { build() }, field)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            KeyboardShapes(keyCornerRadiusDp = 2e38f)
+        }
+    }
 }
