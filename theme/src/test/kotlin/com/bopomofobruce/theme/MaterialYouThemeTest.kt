@@ -33,6 +33,9 @@ class MaterialYouThemeTest {
 
         assertEquals(MaterialYouTheme.ID, lightFallback.id)
         assertEquals(MaterialYouTheme.ID, darkFallback.id)
+        // 上面兩條比的是常數自己，常數的值改掉時照樣綠（2026-10-12 突變實測）。id 是「使用者選了哪個主題」的識別字串，
+        // 與 `BuiltInThemesTest` 釘 "light"／"dark" 同一個理由，字面值要釘住。
+        assertEquals("material-you", MaterialYouTheme.ID)
     }
 
     @Test

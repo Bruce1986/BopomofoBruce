@@ -762,3 +762,29 @@ Codex 與產品碼視角皆零 finding（產品碼視角只做靜態讀碼，沒
   **殘餘**：冒號前整段剛好符合 scheme 形狀的字串（最長 32 字元，例如 `alice-private.diary:page1`）仍會被印出，無法與真的 scheme 區分。
 - 操作備忘：沙箱若連 `.gradle/` 一起複製，configuration cache 會把建置導回原 worktree；用過 `--tests` 之後 cache 也會沿用篩選。
   沙箱複製要排除 `.gradle/`，或加 `--no-configuration-cache`。
+
+# 手動 GGR fix-loop 2026-10-12 第 8 輪（歷班第 17 輪；Opus tracer）
+
+視角：全面突變掃描（55 個，專挑先前沒掃過的區域）、全案最終掃描（Compose 層逐行、建置／lint／編譯警告實跑、release 混淆規則、公開 API 表面）。
+產品碼 0 改動；測試 87 → **90** 條 / 0 failures，`ktfmtCheck` 綠。全案最終掃描零 finding。
+
+- 🟠 **持久化格式只有一半被釘住**。往返測試都是 encode→decode 自洽，欄位改名時兩邊一起變。逐一加 `@SerialName` 實跑：
+  `StyleSheet` 的 `shapes`、三個圓角欄、`keySubLabelSp`、`candidateTextSp`、`fontWeight` 共七個改名後 87 條全綠；`PhotoBackground` 的
+  `blurRadiusDp`、`opacity` 改名，以及三個欄位的預設值變動（`opacity` 1f→0.99f 等）也全綠。已存的 JSON 遇到改名，在預設 `Json` 下會丟未知欄位、
+  在 `ignoreUnknownKeys = true` 下會靜靜退回預設值。補兩條 golden JSON 測試（固定字面值雙向比對，`PhotoBackground` 另釘省略欄位時的預設值）。
+- 🟡 內建主題是否真的沿用預設的 shapes／typography 沒有守門（歷班第 10 輪只接上了 dimens 與 id）；`MaterialYouTheme.ID` 的斷言是常數對常數，
+  改值不會紅。各補一條／一行。
+
+| 突變 | 補之前（87 條） | 補之後紅的測試 |
+| --- | --- | --- |
+| `StyleSheet` 七個欄位各自改名 | 綠 | `StyleSheet wire format is pinned by a golden json in both directions` |
+| `PhotoBackground` 的 `blurRadiusDp`／`opacity` 改名、三個預設值變動 | 綠 | `wire format and omitted-field defaults are pinned by golden json` |
+| Light／Dark 另外指定 shapes 或 typography | 綠 | `built-in themes use the default shapes and typography` |
+| `MaterialYouTheme.ID` 改值 | 綠 | `id is always material-you regardless of fallback` |
+
+  表內各突變由 reviewer 逐一單獨跑；parent 另在獨立沙箱抽 6 個分兩批重跑（`ID`、`opacity` 預設、`fontWeight` 改名、Light 指定 shapes、
+  `blurRadiusDp` 改名、`shapes` 改名），四條新斷言都實際紅過。
+
+**已評估、未補**：`MAX_BLUR_RADIUS_DP` 50→49／51（測試以符號引用常數，數值本身沒被釘；調低會讓已存資料解不出來，要不要釘由 owner 決定）；
+Light `keyFill` 改成 `#FEFEFE`（色值不設絕對快照是刻意的）；亮度門檻 0.03928→0.04045、`toKeyboardUInt` 改截斷（8-bit 輸入下等價）。
+色彩轉換「兩個方向一起把 R、B 對調」只被 `MaterialYouThemeTest` 的 fixture 測試順帶抓到，`ColorConversionsTest` 自己三條全綠。

@@ -57,6 +57,39 @@ class PhotoBackgroundTest {
         assertEquals(original, decoded)
     }
 
+    /**
+     * 持久化 schema 的字面值快照（[PhotoBackground] 的存在目的就是寫進設定長期保存）。上面三條 round-trip 都是 encode → decode
+     * 自洽：`blurRadiusDp`／`opacity` 改名、三個預設值改掉，87 條全綠（2026-10-12 突變實測）。
+     *
+     * 兩件事分開釘：欄位名（全欄位、非預設值、雙向），以及**省略欄位時的預設值**——以 `encodeDefaults = false` 寫出的舊資料不含這些欄位，
+     * 預設值一改，已存設定的意義就跟著變。
+     */
+    @Test
+    fun `wire format and omitted-field defaults are pinned by golden json`() {
+        val golden =
+            """{"uri":"content://media/external/images/42","blurRadiusDp":12.0,"opacity":0.6,"tint":"0x804A90E2"}"""
+        val expected =
+            PhotoBackground(
+                uri = "content://media/external/images/42",
+                blurRadiusDp = 12f,
+                opacity = 0.6f,
+                tint = 0x804A90E2u,
+            )
+        assertEquals(expected, json.decodeFromString(PhotoBackground.serializer(), golden))
+        assertEquals(golden, json.encodeToString(PhotoBackground.serializer(), expected))
+
+        val minimal =
+            json.decodeFromString(PhotoBackground.serializer(), """{"uri":"content://x"}""")
+        assertEquals("content://x", minimal.uri)
+        assertEquals(0f, minimal.blurRadiusDp, "blurRadiusDp 預設值變了")
+        assertEquals(1f, minimal.opacity, "opacity 預設值變了")
+        assertEquals(null, minimal.tint, "tint 預設值變了")
+        assertEquals(
+            """{"uri":"content://x","blurRadiusDp":0.0,"opacity":1.0,"tint":null}""",
+            json.encodeToString(PhotoBackground.serializer(), minimal),
+        )
+    }
+
     @Test
     fun `rejects blank uri`() {
         assertThrows(IllegalArgumentException::class.java) { PhotoBackground(uri = "") }
