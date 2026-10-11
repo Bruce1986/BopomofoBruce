@@ -23,7 +23,7 @@ import kotlinx.serialization.Serializable
  * `IllegalArgumentException`（或接兩者共同的上層 `RuntimeException`）。
  *
  * **解碼成功不代表可以直接交給 Compose**：[KeyboardShapes] 與 [KeyboardTypography] 的尺寸欄位有防呆上限，但 [KeyboardDimens]
- * （`:common`，已凍結）只擋負值、沒有上限；極大的值乘上螢幕密度後會讓 px 溢位。解析不受信任的主題 JSON 之後，呼叫端在包成 `Dp` 之前要自己夾住。
+ * （`:common`，已凍結）只擋負值與非有限值、沒有上限；極大的值乘上螢幕密度後會讓 px 溢位。解析不受信任的主題 JSON 之後，呼叫端在包成 `Dp` 之前要自己夾住。
  */
 @Serializable
 data class StyleSheet(

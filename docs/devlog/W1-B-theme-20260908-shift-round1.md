@@ -12,9 +12,10 @@
 | 2C／3B／2D（不算一輪） | 本檔 `# Owner 裁決後的落地（2026-09-08）` | 2026-09-08 |
 | 歷班第 5～8 輪 | 本檔 `# 排程深審 2026-09-15 第 1～4 輪` | 2026-09-15 |
 | 歷班第 9 輪 | 本檔 `# 排程深審 2026-09-22 第 1 輪` | 2026-09-22 |
-| 歷班第 10 輪起 | 本檔 `# 手動 GGR fix-loop … 第 N 輪` | 2026-10-10 起 |
+| 歷班第 10 輪起 | 本檔 `# 手動 GGR fix-loop … 第 N 輪（歷班第 N+9 輪）` | 2026-10-10 起 |
 
-`feat-w1b-theme.md` 的「第十二輪」（I1）與本檔的「歷班第 12 輪」是不同的兩輪。程式碼註解裡只寫中文數字輪次的
+手動 GGR fix-loop 各節的標題有兩個數字：「第 N 輪」是那次 fix-loop 自己的輪次，「歷班第 M 輪」是接續前面各班的累計輪次，M＝N＋9。
+本檔內文與總表引用這幾節時一律用歷班輪次。`feat-w1b-theme.md` 的「第十二輪」（I1）與本檔的「歷班第 12 輪」是不同的兩輪。程式碼註解裡只寫中文數字輪次的
 （第十一輪、第十二輪、第十四輪…），指的都是 `feat-w1b-theme.md`。
 
 ## 未解決／待 owner 裁決總表（2026-10-12 彙整）
@@ -41,13 +42,12 @@
 
 **B. 契約與邊界**
 
-8b. `:common` 的 `KeyboardDimens` 四個欄位只擋負值、沒有上限（contracts-v1 凍結，本 PR 不能動）。reviewer 實跑
-   `Constraints.fixedHeight(262143)` 會丟例外；極大的 `keyHeightDp` 經 `Modifier.height` 實際會怎樣，純 JVM 驗不了。
-   解析不受信任的主題 JSON 之後、交給 Compose 之前，呼叫端要自己夾住——歷班第 21 輪。
-
 8. `PhotoBackground` 只驗 scheme、不驗 authority：`android.resource://其他套件名/…` 會通過白名單。Coil 2.6 的 `ResourceUriFetcher`
    在 authority 不是本套件時會經 `PackageManager.getResourcesForApplication` 去讀（2026-10-12 反組譯所見，未實機驗證）。
    讀到的是別的 app 的 APK 資源、只拿來當圖片畫，沒有外送路徑；要不要限定本套件由 owner 決定。**這一項在本表之前沒有任何記載。**
+8b. `:common` 的 `KeyboardDimens` 四個欄位只擋負值與非有限值、沒有上限（contracts-v1 凍結，本 PR 不能動）。reviewer 實跑
+   `Constraints.fixedHeight(262143)` 會丟例外；極大的 `keyHeightDp` 經 `Modifier.height` 實際會怎樣，純 JVM 驗不了。
+   解析不受信任的主題 JSON 之後、交給 Compose 之前，呼叫端要自己夾住——歷班第 21 輪。
 9. `KeyboardColors` 不驗證任何欄位（含 alpha 為 0 的透明色）——`StyleSheet.kt` KDoc、本檔歷班第 11 輪。
 10. 反序列化時 `init` 丟的是裸的 `IllegalArgumentException`、不是 `SerializationException`（`StyleSheet` 與 `PhotoBackground` 皆然）；
     收緊 scheme 白名單會讓已存資料解不出來——兩處 KDoc。`PhotoBackground` 那條 `assertFalse(thrown is SerializationException)` 的反向驗證在歷班第 8 輪沒跑，歷班第 16 輪由 reviewer 在沙箱補跑：
@@ -62,8 +62,8 @@
 15. （已解，2026-10-12 實跑）「`pickAccentColor` 永遠回傳第一個候選」這個突變，本檔「留給 owner」第 3 項記的是當時 7 條裡有 3 條全綠；
     現在整套有 7 條會紅（`AccentColorSelectionTest` 5 條、`MaterialYouThemeTest` 2 條）。原本那 3 條仍綠：同分取前者與單一候選本來就不該紅，
     `excludes an already-chosen color…` 是預期答案剛好排第一。
-16. 已評估、仍存活的突變——本檔歷班第 10 輪「仍存活、未補」、第 13 輪與第 17 輪「已評估、未補」。歷班第 19 輪記的缺口（只在 dark 把 `keyAccent` 的文字門檻放寬）
-    已在第 20 輪補上；殘餘是呼叫處把門檻放寬到約 4.45 以上、4.5 以下，仍沒有測試會紅。
+16. 已評估、仍存活的突變——本檔歷班第 10 輪「仍存活、未補」、歷班第 13 輪與第 17 輪「已評估、未補」。歷班第 19 輪記的缺口（只在 dark 把 `keyAccent` 的文字門檻放寬）
+    已在歷班第 20 輪補上；殘餘是呼叫處把門檻放寬到約 4.45 以上、4.5 以下，仍沒有測試會紅。
 
 **D. 屬 W2 範圍（本 PR 不做）**
 
@@ -71,6 +71,10 @@
     `:common` 的 `KeyboardTheme` 標 `@Stable`——`feat-w1b-theme.md` 的 B15 段、`MaterialYouTheme.kt` class KDoc。
     `isDynamic`／`degraded`、匯出 `ThemeJson`／`schemaVersion`、`PhotoBackground` 併進 `StyleSheet`——兩份 devlog 都沒有獨立記載，
     只列在 main 上的 `docs/HANDOVER-W1-fixloop-20260811.md` §4（審查時被判為 W2 範圍、不再重提的清單）。
+
+## round 1（2026-09-08 排程深審班；歷班第 1 輪）
+
+以下到 `# 第 2 輪` 之前（含「一、二、三」「已驗證、沒有問題的部分」「留給 owner」）都屬於這一輪；裡面的條數是當時的數字。
 
 自動 PR 深審 routine 對 #9 跑的一輪：兩個並行 reviewer 視角（色彩／對比數學正確性、測試守門
 有效性＋突變）＋ parent 自審。**所有結論都在本機實跑驗證過**
@@ -700,11 +704,11 @@ Codex 與產品碼視角皆零 finding（產品碼視角只做靜態讀碼，沒
   在評分裡對自己恆為 1.0，只要還有別的候選過文字門檻，結果就與硬性排除幾乎相同（light 下新舊寫法選到同一色）。
   過得了文字門檻的只有三個 container 與 `inversePrimary`，沒有一個同時對 background 達 3:1。**行為未改**（要改候選來源或契約，
   屬設計裁決，留給 owner／W2-B）；`MaterialYouTheme.kt` 的 I1 註解、`pickAccentColor` 的 `@param`、`feat-w1b-theme.md`
-  的範圍更正段已改成與實況相符。注意第 10 輪補的 `the dynamic path picks the best separated role…` 斷言的是
+  的範圍更正段已改成與實況相符。注意歷班第 10 輪補的 `the dynamic path picks the best separated role…` 斷言的是
   「候選裡分離度最大」，這個結果在它眼中是綠的。
 - 🟡 `pickAccentColor` KDoc 說 fallback 時「呼叫端可以自行用 `contrastRatio` 判斷」——`contrastRatio` 是 `internal`，
   模組外用不到，模組內唯一的呼叫端也沒檢查；`MaterialYouTheme.from` 的 KDoc 完全沒提這個失敗模式。兩處已據實改寫。
-- 🟠 **第 10 輪補的守門自己還有洞**，補 5 條後重跑：
+- 🟠 **歷班第 10 輪補的守門自己還有洞**，補 5 條後重跑：
 
 | 突變 | 補之前（80 條） | 補之後紅的測試 |
 | --- | --- | --- |
@@ -725,15 +729,15 @@ Codex 與產品碼視角皆零 finding（產品碼視角只做靜態讀碼，沒
 
 # 手動 GGR fix-loop 2026-10-12 第 5 輪（歷班第 14 輪）
 
-視角：文件全文＋輸出誠實性（只審本次 fix-loop 自己寫下的四筆 commit）、執行成本＋第 13 輪新測試複審。
+視角：文件全文＋輸出誠實性（只審本次 fix-loop 自己寫下的四筆 commit）、執行成本＋歷班第 13 輪新測試複審。
 產品行為 0 改動，85 tests / 0 failures，`ktfmtCheck` 綠。執行成本與新測試複審零 finding（8 個突變全數被抓到，含上一輪 parent 沒重跑的
 `accentCandidates` 縮減；未突變連跑三次穩定）。
 
-- 🟡 **第 13 輪自己寫的五處敘述又不準**，全部是更正句：
+- 🟡 **歷班第 13 輪自己寫的五處敘述又不準**，全部是更正句：
   - `MaterialYouTheme.kt`「新舊寫法唯一有差的情境是…」被同段前一句推翻（dark 下新舊寫法選到不同色，只是對 background 數字相同）。
   - `pickAccentColor` 的 `@param` 把 1.66／2.66（tone 推算）與 1.23／1.99（測試 fixture）說成「同一組」；fixture 下撞色寫法是 1.62／2.88。
   - 新 fixture 測試的 KDoc 寫「每個模式只改一格」，實際改兩格；行內註解「分離度比所有達標的角色都好」只在 light 成立。
-  - 本檔第 13 輪「第 2、3 列…只有 reviewer 跑過」指錯列，實際只有第 2 列。
+  - 本檔歷班第 13 輪「第 2、3 列…只有 reviewer 跑過」指錯列，實際只有第 2 列。
   - `feat-w1b-theme.md` 第十二輪 I1 一節仍把「併入 `separationReferences`」寫成解法、沒有指向新的更正。
 
 # 手動 GGR fix-loop 2026-10-12 第 6 輪（歷班第 15 輪）
@@ -750,7 +754,7 @@ Codex 與產品碼視角皆零 finding（產品碼視角只做靜態讀碼，沒
 - 🟡 **解碼失敗的例外訊息會帶出整個 uri，而 KDoc 的呼叫端契約沒提**：kotlinx 的 `JsonDecodingException` 訊息內嵌
   `JSON input: …` 原文，uri 合法、別的欄位壞掉時 uri 就在裡面。這不是本模組丟的訊息，改不了；`PhotoBackground` 的
   KDoc 補上「記錄解碼失敗時只記例外類別名稱」。
-- 🟡 **接手性**：未解決與待裁決事項散在約 15 處、沒有單一入口——在本檔檔首加了總表（17 項）與輪次稱呼對照；
+- 🟡 **接手性**：未解決與待裁決事項散在約 15 處、沒有單一入口——在本檔檔首加了總表（當時 17 項；歷班第 21 輪加入 8a、8b 後是 19 項）與輪次稱呼對照；
   2026-09-08 的「留給 owner」一節與 `feat-w1b-theme.md` 第八輪「定案為文字優先」補上已被處理／推翻的標記；
   `BuiltInThemesContrastTest` 一處「第 2 輪 §A」的引用在本檔有三個標題對得上，改成寫出完整節名。
 - 反序列化實跑的結論：實際丟出的例外只有 `JsonDecodingException`、`SerializationException`、`MissingFieldException`
@@ -873,3 +877,19 @@ Light `keyFill` 改成 `#FEFEFE`（色值不設絕對快照是刻意的）；亮
 - 其餘查過沒有問題、且有實跑的：Compose compiler 報告中 `:theme` 自己的四個資料型別都是 stable、`PhotoBackgroundLayer` 可跳過；
   `android.R.color.system_*` 在 JVM 單元測試下是真常數（五個互不相同），fixture 不會退化成同一格；`Resources` 是嚴格 mock，
   沒餵到的 id 會直接丟錯、不會靜靜回 0；四個 `@Preview` 與 `ThemeSwatch` 都是 `private`，`ui-tooling` 只在 debug。
+
+# 手動 GGR fix-loop 2026-10-12 第 13 輪（歷班第 22 輪）
+
+視角：上一輪防呆上限的回歸檢查、本檔檔首索引區與歷班第 10～21 輪的內部一致性。產品行為 0 改動，92 tests / 0 failures，`ktfmtCheck` 綠。
+
+- 回歸檢查零 finding（全部實跑）：十種邊界輸入逐欄比對新舊寫法，除了「大於 1000 現在會被拒」沒有任何差異（`-0.0f` 的結果相同）；
+  六個欄位的檢查各刪一次，上限那條測試每次都會紅；`1000.dp`／`1000.sp` 在密度 4、字型縮放 2 之下仍是有限的 px；
+  全新 JVM 第一個動作就解碼超上限的值，丟的是預期的 IAE。順手改了兩處低於 medium 的措辭（`KeyboardDimens` 也擋非有限值；
+  `KeyboardTypography` KDoc 的新段落原本插在清單中間）。
+- 🟡 **本檔檔首的結構三處**：
+  - round 1 的導言（「基準：52 tests…本輪後：55 tests」）在歷班第 15 輪插入總表之後，變成掛在總表那一節底下，讀起來像是現況條數。
+    補上 round 1 自己的小節標題。
+  - 輪次對照沒有寫明「標題的第 N 輪＝歷班第 N+9 輪」，而內文有幾處只寫「第 10 輪」「第 13 輪」指的是歷班輪次，會和另一節的標題撞號。
+    對照表補上規則，內文與總表改成一律寫歷班輪次。
+  - 總表的 8b 原本排在 8 前面；移到 8 之後。「加了總表（17 項）」補註現在是 19 項。
+- 條數鏈逐 commit 實數（70→80→85→87→90→91→92）與各節宣稱一致；各節引用的測試名都逐字存在；回改後的互相指向都指得到。

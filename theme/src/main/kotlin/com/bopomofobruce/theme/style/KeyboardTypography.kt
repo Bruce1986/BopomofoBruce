@@ -8,11 +8,11 @@ import kotlinx.serialization.Serializable
  * - [keyLabelSp]：按鍵主要 label（注音符號 / 字母）字級。
  * - [keySubLabelSp]：按鍵右上角次要 label（例如注音鍵位的英數 shift 標示）字級。
  * - [candidateTextSp]：候選詞列文字字級。
- *
- *   三個字級欄位的合法範圍都是大於 `0f`、不超過 [MAX_FONT_SIZE_SP]。
  * - [fontWeight]：對應 `androidx.compose.ui.text.font.FontWeight.weight`，合法範圍 1..1000（CSS font-weight
  *   慣例），400 為 normal、700 為 bold。存 Int 而非直接依賴 Compose 型別，讓 `:theme` 的 model 層維持可在無 Android runtime
  *   情境下序列化。
+ *
+ * 三個字級欄位的合法範圍都是大於 `0f`、不超過 [MAX_FONT_SIZE_SP]。
  */
 @Serializable
 data class KeyboardTypography(
