@@ -280,6 +280,10 @@
   > 解掉的是撞色，**不是**它自己描述的「分離度倒退」——light 下新舊寫法選到同一色。8 個候選角色裡過得了文字門檻的
   > 只有三個 container 與 `inversePrimary`，沒有一個能同時對 background 達 3:1；要解得改候選來源或改契約，
   > 屬設計裁決，留給 owner／W2-B。
+  >
+  > **同日另一項更正**：本檔各輪「M3 baseline tone 分布」的 dark 數字（`inversePrimary` 對 background 2.66、container 1.84）
+  > 是拿 baseline 色票算的，dark surface 用了 `#1C1B1F`（tone 10）。material3 1.3.1 的 `dynamicDarkColorScheme31` 反組譯所見是
+  > `neutralVariant6`，比它暗，所以動態路徑 dark 實際約為 2.88／1.99（與色階 fixture 實跑一致）。light 的 surface 是 tone 98，不受影響。
 
   **已修，不是「做不到」**：新增 `theme/src/main/kotlin/com/bopomofobruce/theme/color/DynamicAccentSelection.kt`，
   公開純函式 `pickAccentColor(candidates, textPartner, separationReferences, textThreshold = 4.5)`：

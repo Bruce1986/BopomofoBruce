@@ -26,7 +26,8 @@
 1. DEVPLAN W1-B 寫「Compose `Brush` 套用」，實作沒有用 `Brush`；是否為硬性要求——`feat-w1b-theme.md`「交付」段。
 2. 動態路徑 `candidateHighlight` 對 background 只有 light 1.23:1／dark 1.99:1（測試色階 fixture 實跑，非實機），固定色盤守的是 3.0；
    過得了文字門檻的候選角色沒有一個同時對 background 達 3:1，要解得改候選來源或改契約——本檔歷班第 13 輪、`MaterialYouTheme.kt` 的 I1 註解。
-3. 動態路徑 `keyAccent` 對 background：tone 推算 light 1.66:1／dark 2.66:1，fixture 實跑 1.62:1／2.88:1（皆非實機），無守門——
+3. 動態路徑 `keyAccent` 對 background：fixture 實跑 light 1.62:1／dark 2.88:1（非實機），無守門。早期各輪寫的「1.66／2.66」是拿
+   M3 baseline 色票算的，dark surface 的 tone 假設錯了（用 10，material3 1.3.1 實際是 6），以 fixture 的數字為準——
    `feat-w1b-theme.md` 第九輪 G3 的範圍更正。
 4. 動態路徑在所有候選都不過文字門檻時，回傳「文字對比最高但仍低於 4.5」的色，不通知呼叫端——`MaterialYouTheme.from` 與 `pickAccentColor` 的 KDoc。
 5. Dark 的 `keyAccent` 對 background 2.9485，未達 3.0，門檻維持 2.9；解法與代價——本檔「3B」節的「只修好了一半」。
@@ -788,3 +789,19 @@ Codex 與產品碼視角皆零 finding（產品碼視角只做靜態讀碼，沒
 **已評估、未補**：`MAX_BLUR_RADIUS_DP` 50→49／51（測試以符號引用常數，數值本身沒被釘；調低會讓已存資料解不出來，要不要釘由 owner 決定）；
 Light `keyFill` 改成 `#FEFEFE`（色值不設絕對快照是刻意的）；亮度門檻 0.03928→0.04045、`toKeyboardUInt` 改截斷（8-bit 輸入下等價）。
 色彩轉換「兩個方向一起把 R、B 對調」只被 `MaterialYouThemeTest` 的 fixture 測試順帶抓到，`ColorConversionsTest` 自己三條全綠。
+
+# 手動 GGR fix-loop 2026-10-12 第 9 輪（歷班第 18 輪）
+
+視角：歷班第 16、17 輪新測試的複審（8 個新突變全數被抓到，零 finding）、產品碼 KDoc／註解逐句讀完（10 個檔）。
+產品行為 0 改動（只動 KDoc／註解與一句斷言訊息），90 tests / 0 failures，`ktfmtCheck` 綠。
+
+- 🟠 **dark 的 surface tone 假設錯了，連帶兩個推算數字不對**。`MaterialYouTheme.kt` 與 `DynamicAccentSelection.kt` 寫
+  「dark 下 container≈30、surface≈10」；反組譯 material3 1.3.1 的 `dynamicDarkColorScheme31`，background／surface 取的是
+  `neutralVariant6`（light 是 `neutralVariant98`，沒問題）。早期各輪的「dark `inversePrimary` 對 background 2.66、container 1.84」
+  是拿 M3 baseline 色票（dark surface `#1C1B1F`，tone 10）算的；tone 6 之下約為 2.88／1.99，正好就是色階 fixture 實跑的數字。
+  上一輪把兩組數字的落差解釋成「不是同一份資料」，沒說到原因。「動態路徑把 `BuiltInThemes` 的 1.84 撿回來」也只是那個色票假設下的巧合。
+  四處註解、`feat-w1b-theme.md` 的範圍更正段、檔首總表第 3 項已改。
+- 🟡 `pickAccentColor` 的 `@param` 寫「併入 `keyAccent` 只保證不撞色」——`keyAccent` 是唯一過文字門檻的候選時，回傳的就是它自己（撞色），
+  同模組的呼叫處註解與測試都這樣寫。拿掉「保證」，補上但書。
+- 🟡 `MaterialYouTheme.kt` G3 註解仍寫「`keyAccent` 對 background 是否達 3.0 未經驗證」；fixture 上已知是 1.62／2.88，未驗證的只剩實際桌布。
+- 🟡 `StandardDimens` 的 KDoc 與 `StyleDefaultsTest` 的斷言訊息寫「三個內建主題」，內建的只有 Light／Dark 兩個。

@@ -103,14 +103,15 @@ private constructor(override val id: String, val styleSheet: StyleSheet) : Keybo
             // G3（codex 獨立審查 + 第八輪 Opus tracer 的推理）：B22 把 keyAccent 寫死映到
             // scheme.primaryContainer、candidateHighlight 寫死映到 scheme.secondaryContainer，跟
             // BuiltInThemes 修掉的缺陷同源——M3 的 *Container 與 surface 是固定 tone 目標（light 下
-            // surface≈98/container≈90，dark 下 10/30），桌布只換色相與彩度、不換 tone，所以這個映射
+            // surface≈98/container≈90，dark 下 6/30——material3 1.3.1 的 dynamicDarkColorScheme31 取
+            // neutralVariant6；這裡原本寫 10），桌布只換色相與彩度、不換 tone，所以這個映射
             // 在任何桌布下都只有約 1–2:1 的自身分離度。改成用 pickAccentColor 從多個候選角色中選：
             // 保留文字達 AA 4.5 的候選，其中挑與 keyFill/background（keyAccent）或 background
             // （candidateHighlight）分離度最大的一個。這個選色函式本身是純數學，已用假造的色彩組合在
             // JVM 覆蓋（見 AccentColorSelectionTest，含「container 與 surface 同 tone」的極端情境）。
             // 注意：本函式的角色映射與不撞色在 JVM 以 resource id 色階 fixture 守門（MaterialYouThemeTest，
-            // 2026-09-15 補），但沒有 Robolectric、也沒有實機驗證——實際桌布數字、以及選出的 keyAccent
-            // 對 background 是否達 3.0，都未經驗證（見本檔 class KDoc 與 devlog 的誠實揭露）。
+            // 2026-09-15 補），但沒有 Robolectric、也沒有實機驗證——實際桌布的數字未經驗證。在那組色階 fixture 上，選出的
+            // keyAccent 對 background 是 light 1.62:1／dark 2.88:1，**低於 3.0**（見下方 I1 段與 devlog 總表）。
             val accentCandidates =
                 listOf(
                         scheme.primaryContainer,
@@ -154,6 +155,10 @@ private constructor(override val id: String, val styleSheet: StyleSheet) : Keybo
             // background 1.66:1），排除後 candidateHighlight 落到 tertiaryContainer（對 background
             // 只剩 1.26:1，比排除前更差）；dark 下落到 secondaryContainer（1.84:1，正是 B22 註解裡
             // `BuiltInThemes.kt` 記載「只有 1.84:1，不及 3:1」的同一個色值/數字，被動態路徑撿回來）。
+            // （2026-10-12 更正：這一段的數字是拿 M3 baseline 色票算的，dark 的 surface 用了 `#1C1B1F`
+            // （tone 10）；material3 1.3.1 的動態配色 dark surface 是 neutralVariant6，比它更暗，所以
+            // dark 實際是 container 對 background 約 1.99、inversePrimary 約 2.88（見下方 fixture 實跑），
+            // 不是 1.84／2.66。「與 BuiltInThemes 的 1.84 是同一個數字」只是那個色票假設下的巧合。）
             // 根因：excluded 是硬性排除，不管排除之後剩下的候選有多差都不會回頭；而三個 container
             // 候選彼此 tone 相近，只要 keyAccent 選中 inversePrimary，第二次呼叫幾乎必然落進這個分離
             // 度差的 container 群，不是罕見路徑。

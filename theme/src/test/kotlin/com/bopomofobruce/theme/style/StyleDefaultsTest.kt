@@ -51,7 +51,7 @@ class StyleDefaultsTest {
                 candidateRowHeightDp = 40f,
             ),
             StandardDimens.default,
-            "三個內建主題共用的尺寸基準變了",
+            "內建主題共用的尺寸基準變了",
         )
     }
 }

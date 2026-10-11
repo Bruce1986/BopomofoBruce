@@ -35,7 +35,10 @@ data class StyleSheet(
     }
 }
 
-/** 三個內建主題與 [MaterialYouTheme][com.bopomofobruce.theme.MaterialYouTheme] 共用的預設尺寸基準。 */
+/**
+ * `LightTheme`／`DarkTheme` 共用的預設尺寸基準；[MaterialYouTheme][com.bopomofobruce.theme.MaterialYouTheme]
+ * 經由退化主題的 `copy` 沿用同一份。
+ */
 object StandardDimens {
     val default: KeyboardDimens =
         KeyboardDimens(keyHeightDp = 48f, rowGapDp = 6f, keyGapDp = 4f, candidateRowHeightDp = 40f)
