@@ -235,9 +235,9 @@ class MaterialYouThemeTest {
 
     /**
      * 守 `keyAccent` 的 `separationReferences` 真的含 `keyFill`。原本那組 fixture 裡，對 background 分離度最好的角色
-     * 同時也是對 keyFill 最好的，少傳 `keyFill` 選出來的顏色一樣。這裡每個模式只改一格：把該模式的 `surfaceVariant` （light 是
+     * 同時也是對 keyFill 最好的，少傳 `keyFill` 選出來的顏色一樣。這裡每個模式改兩格。第一格：把該模式的 `surfaceVariant` （light 是
      * `system_neutral2_100`、dark 是 `_700`）設成與該模式的 `inversePrimary` 同色，讓「只看 background 最好」的那個角色 對
-     * keyFill 的對比剛好是 1.0。**這是為了分辨參數而造的色階，不是任何真實桌布。**
+     * keyFill 的對比剛好是 1.0。第二格（`secondary`）用來守文字門檻，見下方行內註解。 **這是為了分辨參數而造的色階，不是任何真實桌布。**
      */
     @Test
     fun `keyAccent is scored against keyFill too and neither accent relaxes the text threshold`() {
@@ -253,8 +253,10 @@ class MaterialYouThemeTest {
                     TONAL_PALETTES[4].toMutableList().also {
                         if (darkMode) it[9] = 0xFF6750A4u else it[3] = 0xFFD0BCFFu
                     }
-                // `secondary`（light 是 accent2_600、dark 是 accent2_200）換成對 keyText 約 4.0 的灰：沒過 4.5、
-                // 分離度卻比所有達標的角色都好——呼叫處把文字門檻放寬時，它會被選中。
+                // `secondary`（light 是 accent2_600、dark 是 accent2_200）換成對 keyText 約 4.0 的灰：沒過 4.5，
+                // 呼叫處把文字門檻放寬時它就進得了候選。light 下它的分離度比所有達標的角色都好，
+                // 門檻一放寬就會被選中（實測轉紅的是 light）。dark 下它對 keyFill 只有 1.26，`keyAccent` 不會選它；
+                // dark 這一側抓不抓得到門檻放寬，沒有單獨驗過。
                 palettes[1] =
                     TONAL_PALETTES[1].toMutableList().also {
                         if (darkMode) it[4] = 0xFF6E6E6Eu else it[8] = 0xFF7A7A7Au

@@ -390,6 +390,10 @@
   container 候選彼此 tone 相同，所以只要 `keyAccent` 選中 `inversePrimary`，第二次呼叫幾乎必然落進
   container 群——這是 baseline 下的預設結果，不是罕見路徑。
 
+  > **2026-10-12 更正**：下面這個方案解掉的是**撞色**，沒有解掉本節標題說的「分離度倒退」。以測試色階 fixture 實跑，
+  > 現行寫法的 `candidateHighlight` 對 background 是 light 1.23:1／dark 1.99:1，light 下與 H1 的硬性排除選到同一色。
+  > 詳見上方第九輪 G3 的範圍更正與 `W1-B-theme-20260908-shift-round1.md` 歷班第 13 輪。
+
   **已採用審查者建議的第二個方案**：完全不用 `excluded`，改成 `candidateHighlight` 呼叫時傳
   `separationReferences = listOf(background, keyAccent)`——讓「與 keyAccent 分得開」變成與
   background 同級的評分項而非硬約束。這同時解掉「只排除完全相同 UInt、視覺上幾乎相同的顏色排不掉」

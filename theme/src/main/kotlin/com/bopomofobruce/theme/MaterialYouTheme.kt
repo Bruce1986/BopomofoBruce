@@ -168,7 +168,8 @@ private constructor(override val id: String, val styleSheet: StyleSheet) : Keybo
             // 通過文字門檻，結果就與硬性排除幾乎相同——light 仍選中 tertiaryContainer（對 background
             // 1.23:1，與舊的 excluded 寫法選到同一色）；dark 選中 tertiaryContainer（1.99:1，舊寫法是
             // secondaryContainer 1.99:1）。兩者都低於不避撞色時的 inversePrimary（1.62／2.88），
-            // 也都不及固定色盤守的 3.0。新舊寫法唯一有差的情境是「只有 keyAccent 一個候選通過文字
+            // 也都不及固定色盤守的 3.0。新舊寫法選到的顏色可以不同（dark 就是），但在這組色階下對
+            // background 的分離度沒有差別。真正讓新寫法勝出的情境是「只有 keyAccent 一個候選通過文字
             // 門檻」：舊寫法會掉進 fallback 分支選到不過文字門檻的顏色，新寫法會回傳 keyAccent 自己
             // （撞色，但文字可讀）——`AccentColorSelectionTest` 的 `does not sacrifice separation
             // from background just to dodge a collision with keyAccent` 守的就是這一點，不是上面

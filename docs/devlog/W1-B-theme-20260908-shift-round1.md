@@ -644,9 +644,22 @@ Codex 與產品碼視角皆零 finding（產品碼視角只做靜態讀碼，沒
 | `opacity in 0f..1f` 改寫成 `!(opacity < 0f \|\| opacity > 1f)`（放行 NaN） | 綠 | `rejects non-finite opacity` |
 | `init` 的 `require` 多收 `scheme == "data"`（不動常數） | 綠 | `rejects schemes outside the allowlist that coil or the platform could resolve` |
 
-  「補之前」是 reviewer 在沙箱逐一單獨跑的結果；「補之後」由 parent 在另一個沙箱分三批重跑（第 2、3 列的
-  `accentCandidates` 縮減只有 reviewer 跑過，parent 沒重跑），五條新測試每條都實際紅過。
+  「補之前」是 reviewer 在沙箱逐一單獨跑的結果；「補之後」由 parent 在另一個沙箱分三批重跑（表格第 2 列的
+  `accentCandidates` 縮減只有 reviewer 跑過，parent 沒重跑；其餘各列 parent 都跑了），五條新測試每條都實際紅過。
   新 fixture 是為了分辨參數而造的色階（把 `surfaceVariant` 設成與 `inversePrimary` 同色、`secondary` 設成對 keyText 約 4.0 的灰），
   不代表任何實際桌布。
 
 **已評估、未補**：`id.isNotBlank()` 改成只放行 tab／換行、`fontWeight` 中段挖洞——刻意造的近等價突變，端點都有守。
+
+# 手動 GGR fix-loop 2026-10-12 第 5 輪（歷班第 14 輪）
+
+視角：文件全文＋輸出誠實性（只審本次 fix-loop 自己寫下的四筆 commit）、執行成本＋第 13 輪新測試複審。
+產品行為 0 改動，85 tests / 0 failures，`ktfmtCheck` 綠。執行成本與新測試複審零 finding（8 個突變全數被抓到，含上一輪 parent 沒重跑的
+`accentCandidates` 縮減；未突變連跑三次穩定）。
+
+- 🟡 **第 13 輪自己寫的五處敘述又不準**，全部是更正句：
+  - `MaterialYouTheme.kt`「新舊寫法唯一有差的情境是…」被同段前一句推翻（dark 下新舊寫法選到不同色，只是對 background 數字相同）。
+  - `pickAccentColor` 的 `@param` 把 1.66／2.66（tone 推算）與 1.23／1.99（測試 fixture）說成「同一組」；fixture 下撞色寫法是 1.62／2.88。
+  - 新 fixture 測試的 KDoc 寫「每個模式只改一格」，實際改兩格；行內註解「分離度比所有達標的角色都好」只在 light 成立。
+  - 本檔第 13 輪「第 2、3 列…只有 reviewer 跑過」指錯列，實際只有第 2 列。
+  - `feat-w1b-theme.md` 第十二輪 I1 一節仍把「併入 `separationReferences`」寫成解法、沒有指向新的更正。

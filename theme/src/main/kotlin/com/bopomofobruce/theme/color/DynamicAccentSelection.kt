@@ -85,9 +85,9 @@ internal fun contrastRatio(a: UInt, b: UInt): Double {
  *   **`candidateHighlight` 傳 `listOf(background, keyAccent)`——把已選定的 `keyAccent` 一併列為參照色，
  *   正是本函式避免兩個用途撞色的方式**（`keyAccent` 也在候選清單內，它對自己的對比度恆為 1.0，因此會被 壓到最低分而讓出位置；見上方 I1 段落）。**不要**只傳
  *   `listOf(background)`——那是 H1 修正前的舊寫法， 在 M3 baseline 的 tone 分布下兩次呼叫會雙雙選中 `inversePrimary`，light 對
- *   background 僅 1.66:1、 dark 2.66:1，皆不及本模組自訂的 WCAG 1.4.11 門檻。 **併入 `keyAccent` 只保證不撞色，不保證分離度**：同一組
- *   baseline 色階下，現行寫法選出的 `candidateHighlight` 對 background 是 light 1.23:1、dark 1.99:1（2026-10-12
- *   以測試 fixture 實跑），比撞色時更低。
+ *   background 僅 1.66:1、 dark 2.66:1，皆不及本模組自訂的 WCAG 1.4.11 門檻。 **併入 `keyAccent` 只保證不撞色，不保證分離度**：以
+ *   `MaterialYouThemeTest` 的色階 fixture 實跑（2026-10-12；與前面 1.66／2.66 那組推算不是同一份資料），撞色的舊寫法是 light
+ *   1.62:1、dark 2.88:1，現行寫法選出的 `candidateHighlight` 對 background 是 light 1.23:1、dark 1.99:1，比撞色時更低。
  * @param textThreshold WCAG AA 一般文字門檻，預設 4.5。
  * @param excluded 要排除的顏色集合（例如另一個用途已經選中的顏色，避免撞色）。若排除後候選清單變空， 見上方
  *   KDoc「退化語意」——會忽略這個排除限制。預設空集合，等同不排除任何顏色。
