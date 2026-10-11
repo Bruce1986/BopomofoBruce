@@ -64,6 +64,9 @@ private constructor(override val id: String, val styleSheet: StyleSheet) : Keybo
          *
          * 呼叫端契約：本模組**不監聽**桌布變更或系統深色模式切換，也不提供快取失效機制。IME 顯示期間若這兩者改變， 呼叫端（W2-B 接線處）必須自己偵測並重新呼叫本函式。
          * `ThemePreviews` 裡的 `remember { from(...) }` 不帶 key，是 Preview 只渲染一次才成立的寫法，**不要照抄進 IME**。
+         *
+         * 動態路徑不保證對比：所有候選角色對 `keyText` 都不到 4.5 時，`keyAccent`／`candidateHighlight` 會是「文字對比最高、 但仍低於
+         * 4.5」的那個色（見 `pickAccentColor` 的第 3 點），本函式不會以任何方式通知呼叫端。
          */
         fun from(context: Context, darkMode: Boolean): MaterialYouTheme =
             from(context, darkMode, sdkIntProvider())
@@ -158,13 +161,19 @@ private constructor(override val id: String, val styleSheet: StyleSheet) : Keybo
             // 已改：不再用 excluded 硬性過濾，改成把 keyAccent 併入 separationReferences——讓「與
             // keyAccent 分得開」變成跟「與 background 分得開」同級的評分項，而不是二元的
             // 排除／不排除。這同時解掉「excluded 只比對完全相同的 UInt，視覺上幾乎相同但不是同一個
-            // UInt 的顏色排不掉」的問題（見 pickAccentColor 的 KDoc）。若排除後只剩 keyAccent
-            // 自己一個候選通過文字門檻（見 DynamicAccentSelection.kt 的 AccentColorSelectionTest
-            // 案例），candidateHighlight 會等於 keyAccent（撞色），但這是候選清單本身別無選擇下最好
-            // 的結果，不是本函式為了避開撞色硬推去一個分離度更差的顏色——已用
-            // `AccentColorSelectionTest` 的 `does not sacrifice separation from background just to
-            // dodge a collision with keyAccent` 測試證明：舊的 excluded 呼叫方式在這個候選集合下會選到分離度
-            // 明顯更差的顏色，新的呼叫方式不會。
+            // UInt 的顏色排不掉」的問題（見 pickAccentColor 的 KDoc）。
+            //
+            // **這個改法沒有解掉上面 I1 描述的倒退**（2026-10-12 以 MaterialYouThemeTest 的色階
+            // fixture 實跑，非實機）：keyAccent 自己在評分裡恆為 1.0（最低分），所以只要還有別的候選
+            // 通過文字門檻，結果就與硬性排除幾乎相同——light 仍選中 tertiaryContainer（對 background
+            // 1.23:1，與舊的 excluded 寫法選到同一色）；dark 選中 tertiaryContainer（1.99:1，舊寫法是
+            // secondaryContainer 1.99:1）。兩者都低於不避撞色時的 inversePrimary（1.62／2.88），
+            // 也都不及固定色盤守的 3.0。新舊寫法唯一有差的情境是「只有 keyAccent 一個候選通過文字
+            // 門檻」：舊寫法會掉進 fallback 分支選到不過文字門檻的顏色，新寫法會回傳 keyAccent 自己
+            // （撞色，但文字可讀）——`AccentColorSelectionTest` 的 `does not sacrifice separation
+            // from background just to dodge a collision with keyAccent` 守的就是這一點，不是上面
+            // 那個 M3 baseline 情境。動態路徑 candidateHighlight 對 background 的分離度因此**未解決**，
+            // 與 keyAccent 對 background 同列待 W2-B 實機驗證時處理。
             val candidateHighlight =
                 pickAccentColor(
                     candidates = highlightCandidates,

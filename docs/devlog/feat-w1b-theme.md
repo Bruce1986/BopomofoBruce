@@ -269,6 +269,13 @@
   > `keyAccent` 最後選中 `inversePrimary`，對 background 只有 light 1.66:1／dark 2.66:1，仍低於
   > 固定色盤 `LightTheme keyAccent` 守門用的 3.0。這一項**未解決**，也沒有測試守這個 3.0 門檻
   > （JVM 可以依 resource id 餵色階，但那是 fixture、不是實際桌布），留給 W2-B 實機驗證時處理。
+  >
+  > **2026-10-12 再補一項**：`candidateHighlight` 同樣**未解決**，而且比 `keyAccent` 更低。以
+  > `MaterialYouThemeTest` 的色階 fixture 經正式入口實跑（非實機）：light 選中 `tertiaryContainer`，對 background
+  > 1.23:1；dark 選中 `tertiaryContainer`，1.99:1。第十二輪 I1 把 `keyAccent` 併入 `separationReferences`
+  > 解掉的是撞色，**不是**它自己描述的「分離度倒退」——light 下新舊寫法選到同一色。8 個候選角色裡過得了文字門檻的
+  > 只有三個 container 與 `inversePrimary`，沒有一個能同時對 background 達 3:1；要解得改候選來源或改契約，
+  > 屬設計裁決，留給 owner／W2-B。
 
   **已修，不是「做不到」**：新增 `theme/src/main/kotlin/com/bopomofobruce/theme/color/DynamicAccentSelection.kt`，
   公開純函式 `pickAccentColor(candidates, textPartner, separationReferences, textThreshold = 4.5)`：

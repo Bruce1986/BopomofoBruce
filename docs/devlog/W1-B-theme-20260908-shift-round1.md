@@ -594,8 +594,8 @@ Codex 與產品碼視角皆零 finding（產品碼視角只做靜態讀碼，沒
 
 **仍存活、未補（已評估）**：
 - `keyAccent` 的 `separationReferences` 只剩 `listOf(background)`：現有色階 fixture 下選出的顏色相同，分不出來；
-  要守得換一組 fixture，本輪沒做。
-- 動態路徑覆寫 `shapes.keyCornerRadiusDp`：「動態路徑只換 colors，其餘沿用退化主題」沒有守門。
+  要守得換一組 fixture，本輪沒做。（歷班第 13 輪已補，見檔尾。）
+- 動態路徑覆寫 `shapes.keyCornerRadiusDp`：「動態路徑只換 colors，其餘沿用退化主題」沒有守門。（歷班第 13 輪已補。）
 - Dark `keyFill` 設成與 `background` 相同：規格與 KDoc 都沒要求兩者分離，不算缺口。
 - `>= textThreshold` → `>`、`highlightCandidates` 前三項換順序：只在恰好等於門檻／完全同分時有差，現有資料下屬等價突變。
 
@@ -610,3 +610,43 @@ Codex 與產品碼視角皆零 finding（產品碼視角只做靜態讀碼，沒
   「只有它過文字門檻」，不是分離度排名；三處敘述已更正。
 - 🟡 DEVPLAN W1-B 寫「Compose `Brush` 套用」，實作沒有用 `Brush`，而 devlog 只寫了實際用什麼。
   已在 `feat-w1b-theme.md`「交付」段補記這項偏離，是否為硬性要求留給 owner。
+
+# 手動 GGR fix-loop 2026-10-12 第 3 輪（歷班第 12 輪）
+
+視角：資安／隱私＋跨環境、可執行性（在沙箱照文件實際建置、寫下游用法、重現三個 devlog 記載的突變）。
+兩個視角都零 finding，沒有任何檔案變動。可執行性視角重現的三個突變（gamma 2.4→2.2、scheme 比對加 `.lowercase()`、還原 I1）
+紅綠與本檔記載一致。
+
+# 手動 GGR fix-loop 2026-10-12 第 4 輪（歷班第 13 輪；Opus tracer）
+
+視角：正確性／錯誤處理（約 170 個對抗式輸入實跑）、反方論證＋測試品質（17 個突變）。產品行為 **0 改動**（只動 KDoc／註解）；
+測試 80 → **85** 條 / 0 failures，`ktfmtCheck` 綠。
+
+- 🟠 **動態路徑的 `candidateHighlight` 對 background 幾乎沒有分離度，而註解一直寫成已處理**。以本檔測試的色階 fixture
+  經正式入口實跑（非實機）：light 選中 `tertiaryContainer`，對 background 1.23:1；dark 選中 `tertiaryContainer`，1.99:1。
+  第十二輪 I1（把 `keyAccent` 併入 `separationReferences`）解掉的是撞色，不是它自己描述的「分離度倒退」——`keyAccent`
+  在評分裡對自己恆為 1.0，只要還有別的候選過文字門檻，結果就與硬性排除幾乎相同（light 下新舊寫法選到同一色）。
+  過得了文字門檻的只有三個 container 與 `inversePrimary`，沒有一個同時對 background 達 3:1。**行為未改**（要改候選來源或契約，
+  屬設計裁決，留給 owner／W2-B）；`MaterialYouTheme.kt` 的 I1 註解、`pickAccentColor` 的 `@param`、`feat-w1b-theme.md`
+  的範圍更正段已改成與實況相符。注意第 10 輪補的 `the dynamic path picks the best separated role…` 斷言的是
+  「候選裡分離度最大」，這個結果在它眼中是綠的。
+- 🟡 `pickAccentColor` KDoc 說 fallback 時「呼叫端可以自行用 `contrastRatio` 判斷」——`contrastRatio` 是 `internal`，
+  模組外用不到，模組內唯一的呼叫端也沒檢查；`MaterialYouTheme.from` 的 KDoc 完全沒提這個失敗模式。兩處已據實改寫。
+- 🟠 **第 10 輪補的守門自己還有洞**，補 5 條後重跑：
+
+| 突變 | 補之前（80 條） | 補之後紅的測試 |
+| --- | --- | --- |
+| `keyAccent` 的 `separationReferences` 少傳 `keyFill` | 綠 | `keyAccent is scored against keyFill too and neither accent relaxes the text threshold` |
+| `accentCandidates` 縮成只剩 `inversePrimary` | 綠 | 同上 |
+| `keyAccent`／`candidateHighlight` 呼叫處加 `textThreshold = 3.0` | 綠 | 同上 |
+| 動態路徑另外覆寫 `shapes` | 綠 | `the dynamic path replaces only id and colors of the fallback styleSheet` |
+| `pickAccentColor` 預設門檻 4.5 → 4.4 | 綠 | `a candidate just below the text threshold cannot win on separation` |
+| `opacity in 0f..1f` 改寫成 `!(opacity < 0f \|\| opacity > 1f)`（放行 NaN） | 綠 | `rejects non-finite opacity` |
+| `init` 的 `require` 多收 `scheme == "data"`（不動常數） | 綠 | `rejects schemes outside the allowlist that coil or the platform could resolve` |
+
+  「補之前」是 reviewer 在沙箱逐一單獨跑的結果；「補之後」由 parent 在另一個沙箱分三批重跑（第 2、3 列的
+  `accentCandidates` 縮減只有 reviewer 跑過，parent 沒重跑），五條新測試每條都實際紅過。
+  新 fixture 是為了分辨參數而造的色階（把 `surfaceVariant` 設成與 `inversePrimary` 同色、`secondary` 設成對 keyText 約 4.0 的灰），
+  不代表任何實際桌布。
+
+**已評估、未補**：`id.isNotBlank()` 改成只放行 tab／換行、`fontWeight` 中段挖洞——刻意造的近等價突變，端點都有守。

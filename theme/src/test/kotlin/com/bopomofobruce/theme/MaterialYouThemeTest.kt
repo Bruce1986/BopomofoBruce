@@ -169,7 +169,8 @@ class MaterialYouThemeTest {
      * 這條的界線：
      * - 候選角色清單是照著 `MaterialYouTheme` 抄的；產品碼**多加**一個角色時，只有它剛好被選中才會紅。
      * - 對比度用的是正式的 `contrastRatio`，公式本身由 `ContrastFormulaKnownValuesTest` 把關。
-     * - 這組 fixture 分不出 `keyAccent` 的 `separationReferences` 少傳 `keyFill`（實測該突變仍全綠）。
+     * - 這組 fixture 分不出 `keyAccent` 的 `separationReferences` 少傳 `keyFill`、候選清單縮到只剩 `inversePrimary`、
+     *   呼叫處把文字門檻放寬到 3.0（實測三者在這條都全綠）；那三項由下一條用另一組色階守。
      */
     @Test
     fun `the dynamic path picks the best separated role among those that carry the text`() {
@@ -232,9 +233,110 @@ class MaterialYouThemeTest {
         }
     }
 
-    private fun contextWithSystemPalettes(): Context {
+    /**
+     * 守 `keyAccent` 的 `separationReferences` 真的含 `keyFill`。原本那組 fixture 裡，對 background 分離度最好的角色
+     * 同時也是對 keyFill 最好的，少傳 `keyFill` 選出來的顏色一樣。這裡每個模式只改一格：把該模式的 `surfaceVariant` （light 是
+     * `system_neutral2_100`、dark 是 `_700`）設成與該模式的 `inversePrimary` 同色，讓「只看 background 最好」的那個角色 對
+     * keyFill 的對比剛好是 1.0。**這是為了分辨參數而造的色階，不是任何真實桌布。**
+     */
+    @Test
+    fun `keyAccent is scored against keyFill too and neither accent relaxes the text threshold`() {
+        val original = MaterialYouTheme.sdkIntProvider
+        try {
+            MaterialYouTheme.sdkIntProvider = { Build.VERSION_CODES.S }
+            for (darkMode in listOf(false, true)) {
+                val mode = if (darkMode) "dark" else "light"
+                // 兩個模式要各用一組：`_100` 同時是 dark 的 onSurface、`_700` 同時是 light 的 onSurfaceVariant，
+                // 一起改會連另一個模式的文字色都換掉。
+                val palettes = TONAL_PALETTES.toMutableList()
+                palettes[4] =
+                    TONAL_PALETTES[4].toMutableList().also {
+                        if (darkMode) it[9] = 0xFF6750A4u else it[3] = 0xFFD0BCFFu
+                    }
+                // `secondary`（light 是 accent2_600、dark 是 accent2_200）換成對 keyText 約 4.0 的灰：沒過 4.5、
+                // 分離度卻比所有達標的角色都好——呼叫處把文字門檻放寬時，它會被選中。
+                palettes[1] =
+                    TONAL_PALETTES[1].toMutableList().also {
+                        if (darkMode) it[4] = 0xFF6E6E6Eu else it[8] = 0xFF7A7A7Au
+                    }
+                val palettedContext = contextWithSystemPalettes(palettes)
+                val scheme =
+                    if (darkMode) dynamicDarkColorScheme(palettedContext)
+                    else dynamicLightColorScheme(palettedContext)
+                val colors = MaterialYouTheme.from(palettedContext, darkMode).colors
+                val carriesText =
+                    listOf(
+                            scheme.primaryContainer,
+                            scheme.tertiaryContainer,
+                            scheme.secondaryContainer,
+                            scheme.primary,
+                            scheme.tertiary,
+                            scheme.secondary,
+                            scheme.inversePrimary,
+                            scheme.onSurfaceVariant,
+                        )
+                        .map { it.toKeyboardUInt() }
+                        .filter { contrastRatio(it, colors.keyText) >= 4.5 }
+                val bestAgainstBackgroundOnly =
+                    carriesText.maxByOrNull { contrastRatio(it, colors.background) }
+                        ?: error("$mode fixture 前置條件：至少一個角色對 keyText 達 4.5")
+                assertEquals(
+                    1.0,
+                    contrastRatio(bestAgainstBackgroundOnly, colors.keyFill),
+                    1e-9,
+                    "$mode fixture 前置條件：只看 background 最好的角色必須與 keyFill 同色",
+                )
+
+                fun accentSeparation(color: UInt) =
+                    minOf(
+                        contrastRatio(color, colors.keyFill),
+                        contrastRatio(color, colors.background),
+                    )
+                val nearMiss = contrastRatio(scheme.secondary.toKeyboardUInt(), colors.keyText)
+                assertTrue(
+                    nearMiss > 3.5 && nearMiss < 4.5,
+                    "$mode fixture 前置條件：secondary 對 keyText 是 $nearMiss",
+                )
+                assertTrue(colors.keyAccent in carriesText, "$mode keyAccent 對 keyText 未達 4.5")
+                assertTrue(
+                    colors.candidateHighlight in carriesText,
+                    "$mode candidateHighlight 對 keyText 未達 4.5",
+                )
+                assertNotEquals(
+                    bestAgainstBackgroundOnly,
+                    colors.keyAccent,
+                    "$mode keyAccent 選了與 keyFill 同色的角色——separationReferences 少了 keyFill？",
+                )
+                assertEquals(
+                    carriesText.maxOf(::accentSeparation),
+                    accentSeparation(colors.keyAccent),
+                    1e-9,
+                    "$mode keyAccent 不是對 keyFill 與 background 兩者最弱一邊最好的那個",
+                )
+            }
+        } finally {
+            MaterialYouTheme.sdkIntProvider = original
+        }
+    }
+
+    /** 動態路徑只換 `id` 與 `colors`；dimens／shapes／typography 必須原樣沿用退化主題的 styleSheet。 */
+    @Test
+    fun `the dynamic path replaces only id and colors of the fallback styleSheet`() {
+        for (darkMode in listOf(false, true)) {
+            val fallback = if (darkMode) DarkTheme.styleSheet else LightTheme.styleSheet
+            val theme = MaterialYouTheme.from(context, darkMode, sdkInt = Build.VERSION_CODES.S)
+
+            assertNotEquals(fallback.colors, theme.colors, "前置條件：這次呼叫要真的走進動態路徑")
+            assertEquals(
+                fallback.copy(id = MaterialYouTheme.ID, colors = theme.colors),
+                theme.styleSheet,
+            )
+        }
+    }
+
+    private fun contextWithSystemPalettes(palettes: List<List<UInt>> = TONAL_PALETTES): Context {
         val idToColor = HashMap<Int, Int>()
-        for ((ids, tones) in SYSTEM_PALETTE_IDS.zip(TONAL_PALETTES)) {
+        for ((ids, tones) in SYSTEM_PALETTE_IDS.zip(palettes)) {
             ids.zip(tones).forEach { (id, argb) -> idToColor[id] = argb.toInt() }
         }
         val resources = mockk<Resources>()

@@ -158,6 +158,24 @@ class PhotoBackgroundTest {
         }
     }
 
+    /**
+     * `opacity in 0f..1f` 對 NaN 是 false；改寫成 `!(opacity < 0f || opacity > 1f)` 這類等價外觀的寫法就會放行 NaN。
+     */
+    @Test
+    fun `rejects non-finite opacity`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            PhotoBackground(uri = "content://x", opacity = Float.NaN)
+        }
+    }
+
+    /** 白名單常數那條只釘 [PhotoBackground.LOCAL_URI_SCHEMES] 的內容；這條釘 `init` 真的只認那個集合。 */
+    @Test
+    fun `rejects schemes outside the allowlist that coil or the platform could resolve`() {
+        for (uri in listOf("data:image/png;base64,AAAA", "blob:x", "ftp://example.com/a.png")) {
+            assertThrows(IllegalArgumentException::class.java, { PhotoBackground(uri = uri) }, uri)
+        }
+    }
+
     /** KDoc 寫的範圍是 `0f（完全透明）..1f`；先前只測了兩個拒絕端，`opacity > 0f` 這種突變不會紅。 */
     @Test
     fun `accepts both ends of the opacity range`() {
@@ -167,7 +185,7 @@ class PhotoBackgroundTest {
 
     /**
      * 白名單整組釘死。上面的拒絕案例只列得出「已經想到要擋的」scheme（http／https／file），多收一個沒列到的 （實測：加進 `"data"`）不會紅。這是 ADR-0005
-     * 純本地的邊界，要放寬就該連這條一起改、留下紀錄。
+     * 純本地的邊界，要放寬就該連這條一起改、留下紀錄。這條只釘常數的內容；`init` 是否只認這個集合，由下面拒絕 `data:`／`blob:`／`ftp:` 那條守。
      */
     @Test
     fun `the local scheme allowlist is exactly content and android resource`() {

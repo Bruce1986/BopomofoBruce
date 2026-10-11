@@ -214,6 +214,25 @@ class AccentColorSelectionTest {
     }
 
     /**
+     * 文字門檻從下方釘住：`justBelow` 對 keyText 4.4475（差 0.05 沒過 AA）、分離度 2.50；`passing` 7.22、分離度 1.54。 門檻被放寬到
+     * 4.4475 以下時，`justBelow` 會靠分離度勝出。
+     */
+    @Test
+    fun `a candidate just below the text threshold cannot win on separation`() {
+        val justBelow = 0x666666u
+        val passing = 0x4F378Bu
+
+        val picked =
+            pickAccentColor(
+                candidates = listOf(justBelow, passing),
+                textPartner = keyText,
+                separationReferences = listOf(keyFill, background),
+            )
+
+        assertEquals(passing, picked)
+    }
+
+    /**
      * KDoc 寫明兩個清單都不可為空。第二個案例刻意挑「沒有候選通過文字門檻」的輸入：那條 fallback 分支不會去讀 `separationReferences`，少了
      * `require` 就會靜靜回傳一個值，而不是丟例外。
      */

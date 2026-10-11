@@ -53,8 +53,9 @@ internal fun contrastRatio(a: UInt, b: UInt): Double {
  * 1. 保留 `contrastRatio(candidate, textPartner) >= textThreshold` 的候選（文字可讀是硬下限， 候選色要能承載
  *    `keyText`/`candidateText`）。
  * 2. 若有候選通過，取「與 [separationReferences] 的最小分離度」最大的那個——讓最弱的那一邊也盡量好， 而不是只顧其中一邊。
- * 3. 若沒有候選通過文字門檻（理論上可能發生：例如某個桌布讓所有候選角色的 tone 都落在中段），退回 「文字對比度最高」的候選，**不偽造一個假裝達標的結果**——呼叫端可以自行用
- *    [contrastRatio] 判斷 退回值是否可用、要不要提示使用者色彩不足。
+ * 3. 若沒有候選通過文字門檻（理論上可能發生：例如某個桌布讓所有候選角色的 tone 都落在中段），退回
+ *    「文字對比度最高」的候選，**不偽造一個假裝達標的結果**。回傳值本身看不出走的是哪一條；要知道得自己再算一次對比。[contrastRatio] 是 `internal`，
+ *    模組外的呼叫端得自備 WCAG 對比計算；模組內唯一的呼叫端 `MaterialYouTheme` 目前**沒有**做這個檢查。
  *
  * 同分（含 fallback 分支同分）時保留 [candidates] 中排序在前的那個，讓呼叫端能用候選清單的順序表達 「這個角色比較符合語意」的偏好（例如
  * `primaryContainer` 排在 `onSurfaceVariant` 前面）。
@@ -84,7 +85,9 @@ internal fun contrastRatio(a: UInt, b: UInt): Double {
  *   **`candidateHighlight` 傳 `listOf(background, keyAccent)`——把已選定的 `keyAccent` 一併列為參照色，
  *   正是本函式避免兩個用途撞色的方式**（`keyAccent` 也在候選清單內，它對自己的對比度恆為 1.0，因此會被 壓到最低分而讓出位置；見上方 I1 段落）。**不要**只傳
  *   `listOf(background)`——那是 H1 修正前的舊寫法， 在 M3 baseline 的 tone 分布下兩次呼叫會雙雙選中 `inversePrimary`，light 對
- *   background 僅 1.66:1、 dark 2.66:1，皆不及本模組自訂的 WCAG 1.4.11 門檻。
+ *   background 僅 1.66:1、 dark 2.66:1，皆不及本模組自訂的 WCAG 1.4.11 門檻。 **併入 `keyAccent` 只保證不撞色，不保證分離度**：同一組
+ *   baseline 色階下，現行寫法選出的 `candidateHighlight` 對 background 是 light 1.23:1、dark 1.99:1（2026-10-12
+ *   以測試 fixture 實跑），比撞色時更低。
  * @param textThreshold WCAG AA 一般文字門檻，預設 4.5。
  * @param excluded 要排除的顏色集合（例如另一個用途已經選中的顏色，避免撞色）。若排除後候選清單變空， 見上方
  *   KDoc「退化語意」——會忽略這個排除限制。預設空集合，等同不排除任何顏色。
