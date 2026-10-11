@@ -25,10 +25,10 @@ data class KeyboardShapes(
 
     companion object {
         /**
-         * 三個圓角欄位共用的上限。這是防呆上限，不是美術規範：只擋掉「dp 值有限、乘上螢幕密度後 px 變成無限大」的輸入—— 那種值過得了 `isFinite()`，卻會讓
-         * `RoundedCornerShape` 在畫的時候丟 `IllegalArgumentException`（2026-10-12 實測：`2e38f` 在密度 2.625
-         * 下如此）， 而且是在解碼成功之後才丟，解析主題 JSON 的 catch 接不到。數值待 owner 複核；**要調請在主題 JSON 開始被存下來之前調**，
-         * 之後調低會讓已存的資料解不出來。
+         * 三個圓角欄位共用的上限。這是防呆上限，不是美術規範：超過它的值一律拒絕（即使 px 仍然有限）， 目的是擋掉「dp 值有限、乘上螢幕密度後 px 變成無限大」的輸入——
+         * 那種值過得了 `isFinite()`，卻會讓 `RoundedCornerShape` 在畫的時候丟 `IllegalArgumentException`（2026-10-12
+         * 實測：`2e38f` 在密度 2.625 下如此）， 而且是在解碼成功之後才丟，解析主題 JSON 的 catch 接不到。數值待 owner 複核；**要調請在主題 JSON
+         * 開始被存下來之前調**， 之後調低會讓已存的資料解不出來。
          */
         const val MAX_CORNER_RADIUS_DP: Float = 1000f
 

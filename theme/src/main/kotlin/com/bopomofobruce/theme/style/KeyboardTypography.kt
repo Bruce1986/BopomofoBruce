@@ -30,7 +30,7 @@ data class KeyboardTypography(
 
     companion object {
         /**
-         * 三個字級欄位共用的上限。防呆上限，不是排版規範：理由與 [KeyboardShapes.MAX_CORNER_RADIUS_DP] 相同——有限的 sp
+         * 三個字級欄位共用的上限。防呆上限，不是排版規範，超過它的值一律拒絕；理由與 [KeyboardShapes.MAX_CORNER_RADIUS_DP] 相同——有限的 sp
          * 乘上密度與字型縮放後可能變成無限大的 px（實測 `2e38f.sp.toPx()` 得 `Infinity`；無限大字級進到文字排版後會怎樣，純 JVM 驗不了）。數值待
          * owner 複核， 要調請在主題 JSON 開始被存下來之前調。
          */
