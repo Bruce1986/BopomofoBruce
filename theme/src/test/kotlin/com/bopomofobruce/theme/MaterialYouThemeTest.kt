@@ -260,9 +260,8 @@ class MaterialYouThemeTest {
                 // `secondary`（light 是 accent2_600、dark 是 accent2_200）換成對 keyText 約 4.0 的灰：沒過 4.5，
                 // 呼叫處把文字門檻放寬時它就進得了候選。light 下它的分離度比所有達標的角色都好，
                 // 門檻一放寬就會被選中（實測轉紅的是 light）。dark 下它對 keyFill 只有 1.26，`keyAccent` 不會選它；
-                // **dark 的 `keyAccent` 放寬門檻這條抓不到**（2026-10-12 實測：只在 dark 把 keyAccent 的門檻放寬到
-                // 3.0，全套仍綠）。
-                // `candidateHighlight` 在兩個模式下單獨放寬都會紅。測試名的「neither accent」對 dark 的 keyAccent 說過頭了。
+                // **這條抓不到「只在 dark 把 `keyAccent` 的門檻放寬」**，也抓不到任何放寬到 4.0 以上的突變（near-miss 離 4.5 太遠）；
+                // 那些由 `neither accent call site lowers the text threshold below the default` 守。
                 palettes[1] =
                     TONAL_PALETTES[1].toMutableList().also {
                         if (darkMode) it[4] = 0xFF6E6E6Eu else it[8] = 0xFF7A7A7Au
@@ -320,6 +319,98 @@ class MaterialYouThemeTest {
                     accentSeparation(colors.keyAccent),
                     1e-9,
                     "$mode keyAccent 不是對 keyFill 與 background 兩者最弱一邊最好的那個",
+                )
+            }
+        } finally {
+            MaterialYouTheme.sdkIntProvider = original
+        }
+    }
+
+    /**
+     * 守 `keyAccent` 與 `candidateHighlight` 呼叫 `pickAccentColor` 時**沒有另外傳一個比預設 4.5 低的文字門檻**，兩個模式都守。
+     * 上一條的 near-miss 角色對 `keyText` 約 4.0，dark 的那個對 keyFill 只有 1.26，所以（2026-10-12 實測）只在 dark 把
+     * `keyAccent` 的門檻放寬到 3.0、或把 `candidateHighlight` 放寬到 4.0、或在 light 把 `keyAccent` 放寬到
+     * 4.2，上一條都仍全綠；這條補上這些缺口。
+     *
+     * 做法：用**未動過**的 [TONAL_PALETTES]，只把 `secondary`（light 是 `accent2_600`、dark 是
+     * `accent2_200`）換成一個中灰， 對 `keyText` 的對比刻意落在 4.4–4.5 之間（差一點點沒過 AA），對 keyFill／background
+     * 的最小分離度則大於所有達標角色。 於是只要呼叫處把門檻放寬到這個對比以下，灰色就會勝出、斷言轉紅。
+     *
+     * **界線**：這條抓得到的門檻放寬區間是「低於該灰對 keyText 的對比」（light 約 4.47、dark 約 4.45）到 4.5 以下；放寬到 4.45–4.5 之間
+     * 仍分不出來（那個區間由 `pickAccentColor` 預設值的單元測試釘住，不是呼叫處）。**這組灰色只為分辨參數而造，不代表任何實際桌布。**
+     */
+    @Test
+    fun `neither accent call site lowers the text threshold below the default`() {
+        val original = MaterialYouTheme.sdkIntProvider
+        try {
+            MaterialYouTheme.sdkIntProvider = { Build.VERSION_CODES.S }
+            for (darkMode in listOf(false, true)) {
+                val mode = if (darkMode) "dark" else "light"
+                val palettes = TONAL_PALETTES.toMutableList()
+                palettes[1] =
+                    TONAL_PALETTES[1].toMutableList().also {
+                        if (darkMode) it[4] = 0xFF666666u else it[8] = 0xFF828282u
+                    }
+                // dark 另把 `inversePrimary`（`accent1_600`）換成更暗的紫：它是 dark 下 keyAccent 的得主，換暗之後
+                // 灰色與它的對比拉開，`candidateHighlight`（參照 background 與 keyAccent）放寬門檻時灰色才勝得出。
+                if (darkMode) {
+                    palettes[0] = TONAL_PALETTES[0].toMutableList().also { it[8] = 0xFF2A1B55u }
+                }
+                val palettedContext = contextWithSystemPalettes(palettes)
+                val scheme =
+                    if (darkMode) dynamicDarkColorScheme(palettedContext)
+                    else dynamicLightColorScheme(palettedContext)
+                val colors = MaterialYouTheme.from(palettedContext, darkMode).colors
+                val roles =
+                    listOf(
+                            scheme.primaryContainer,
+                            scheme.tertiaryContainer,
+                            scheme.secondaryContainer,
+                            scheme.primary,
+                            scheme.tertiary,
+                            scheme.secondary,
+                            scheme.inversePrimary,
+                            scheme.onSurfaceVariant,
+                        )
+                        .map { it.toKeyboardUInt() }
+                val nearMissColor = scheme.secondary.toKeyboardUInt()
+                val carriesText = roles.filter { contrastRatio(it, colors.keyText) >= 4.5 }
+                val nearMiss = contrastRatio(nearMissColor, colors.keyText)
+                assertTrue(
+                    nearMiss >= 4.4 && nearMiss < 4.5,
+                    "$mode fixture 前置條件：灰色對 keyText 是 $nearMiss",
+                )
+                assertTrue(carriesText.isNotEmpty(), "$mode fixture 前置條件：至少一個角色對 keyText 達 4.5")
+
+                fun accentSeparation(color: UInt) =
+                    minOf(
+                        contrastRatio(color, colors.keyFill),
+                        contrastRatio(color, colors.background),
+                    )
+                assertTrue(
+                    accentSeparation(nearMissColor) > carriesText.maxOf(::accentSeparation),
+                    "$mode fixture 前置條件：灰色的分離度必須大於所有達標角色，否則門檻放寬時它也選不上",
+                )
+                assertTrue(colors.keyAccent in carriesText, "$mode keyAccent 對 keyText 未達 4.5")
+                assertNotEquals(nearMissColor, colors.keyAccent, "$mode keyAccent 選了沒過 4.5 的灰色")
+
+                fun highlightSeparation(color: UInt) =
+                    minOf(
+                        contrastRatio(color, colors.background),
+                        contrastRatio(color, colors.keyAccent),
+                    )
+                assertTrue(
+                    highlightSeparation(nearMissColor) > carriesText.maxOf(::highlightSeparation),
+                    "$mode fixture 前置條件：灰色對 background 與 keyAccent 的最小分離度必須大於所有達標角色",
+                )
+                assertTrue(
+                    colors.candidateHighlight in carriesText,
+                    "$mode candidateHighlight 對 keyText 未達 4.5",
+                )
+                assertNotEquals(
+                    nearMissColor,
+                    colors.candidateHighlight,
+                    "$mode candidateHighlight 選了沒過 4.5 的灰色",
                 )
             }
         } finally {

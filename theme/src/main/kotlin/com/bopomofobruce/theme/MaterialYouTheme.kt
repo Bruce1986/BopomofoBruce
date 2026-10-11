@@ -103,9 +103,10 @@ private constructor(override val id: String, val styleSheet: StyleSheet) : Keybo
             // G3（codex 獨立審查 + 第八輪 Opus tracer 的推理）：B22 把 keyAccent 寫死映到
             // scheme.primaryContainer、candidateHighlight 寫死映到 scheme.secondaryContainer，跟
             // BuiltInThemes 修掉的缺陷同源——M3 的 *Container 與 surface 是固定 tone 目標（light 下
-            // surface≈98/container≈90，dark 下 6/30——API 31–33 走的 dynamicDarkColorScheme31 取
-            // neutralVariant6（material3 1.3.1 反組譯；這裡原本寫 10）。API 34 以上走另一條路徑，surface 直接讀
-            // 系統資源 system_surface_dark，是哪個 tone 沒有查證），桌布只換色相與彩度、不換 tone，所以這個映射
+            // surface≈98/container≈90，dark 下 6/30；dark 的 6 這裡原本寫 10），桌布只換色相與彩度、不換 tone
+            // （**這些 tone 與「不換 tone」都是 API 31–33 的結論**：material3 1.3.1 反組譯，SDK_INT < 34 走
+            // dynamicLight／DarkColorScheme31、由色階算出各角色。API 34 以上 light 與 dark 都改讀系統資源
+            // system_surface_light／system_surface_dark 等，那條路徑上的 tone 沒有查證），所以這個映射
             // 在任何桌布下都只有約 1–2:1 的自身分離度。改成用 pickAccentColor 從多個候選角色中選：
             // 保留文字達 AA 4.5 的候選，其中挑與 keyFill/background（keyAccent）或 background
             // （candidateHighlight）分離度最大的一個。這個選色函式本身是純數學，已用假造的色彩組合在
@@ -161,7 +162,7 @@ private constructor(override val id: String, val styleSheet: StyleSheet) : Keybo
             // dark 是 container 對 background 約 1.99、inversePrimary 約 2.88（見下方 fixture 實跑），
             // 不是 1.84／2.66。選到的色值確實與 BuiltInThemes 那個 `#4A4458` 相同，只是背景不同、
             // 數字不是 1.84。light 的 1.66 也是對 baseline 色票 `#FFFBFE`（約 tone 99）算的，tone 98 下是 1.62。
-            // API 34 以上的 surface 來自系統資源，這些數字在那條路徑上都沒有驗證。）
+            // API 34 以上 light 與 dark 的各角色都來自系統資源，這些數字在那條路徑上都沒有驗證。）
             // 根因：excluded 是硬性排除，不管排除之後剩下的候選有多差都不會回頭；而三個 container
             // 候選彼此 tone 相近，只要 keyAccent 選中 inversePrimary，第二次呼叫幾乎必然落進這個分離
             // 度差的 container 群，不是罕見路徑。
