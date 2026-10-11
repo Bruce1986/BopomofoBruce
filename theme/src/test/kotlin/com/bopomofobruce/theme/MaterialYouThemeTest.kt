@@ -5,11 +5,13 @@ import android.content.res.Resources
 import android.os.Build
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
+import com.bopomofobruce.theme.color.contrastRatio
 import com.bopomofobruce.theme.color.toKeyboardUInt
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
@@ -150,6 +152,79 @@ class MaterialYouThemeTest {
                     colors.keyAccent,
                     colors.candidateHighlight,
                     "$mode：candidateHighlight 與 keyAccent 撞成同一色（H1）——功能鍵底色與選中候選分不出來",
+                )
+            }
+        } finally {
+            MaterialYouTheme.sdkIntProvider = original
+        }
+    }
+
+    /**
+     * `>= 31` 路徑**傳給 `pickAccentColor` 的參數**守門。上一條只斷言兩個強調色「不相等」，所以 （2026-10-11 突變實測，70 條全綠）把
+     * `keyAccent` 或 `candidateHighlight` 的 `textPartner` 改成 `background`、或從候選裡拿掉
+     * `inversePrimary`，都沒有反應。
+     *
+     * 斷言的是規格性質，不是重跑一次 `pickAccentColor`：選中的色必須是「對 `keyText` 達 4.5」的候選之一，而且它的 最小分離度等於這些候選裡的最大值。
+     *
+     * 這條的界線：
+     * - 候選角色清單是照著 `MaterialYouTheme` 抄的；產品碼**多加**一個角色時，只有它剛好被選中才會紅。
+     * - 對比度用的是正式的 `contrastRatio`，公式本身由 `ContrastFormulaKnownValuesTest` 把關。
+     * - 這組 fixture 分不出 `keyAccent` 的 `separationReferences` 少傳 `keyFill`（實測該突變仍全綠）。
+     */
+    @Test
+    fun `the dynamic path picks the best separated role among those that carry the text`() {
+        val palettedContext = contextWithSystemPalettes()
+        val original = MaterialYouTheme.sdkIntProvider
+        try {
+            MaterialYouTheme.sdkIntProvider = { Build.VERSION_CODES.S }
+            for (darkMode in listOf(false, true)) {
+                val mode = if (darkMode) "dark" else "light"
+                val scheme =
+                    if (darkMode) dynamicDarkColorScheme(palettedContext)
+                    else dynamicLightColorScheme(palettedContext)
+                val colors = MaterialYouTheme.from(palettedContext, darkMode).colors
+                val roles =
+                    listOf(
+                            scheme.primaryContainer,
+                            scheme.tertiaryContainer,
+                            scheme.secondaryContainer,
+                            scheme.primary,
+                            scheme.tertiary,
+                            scheme.secondary,
+                            scheme.inversePrimary,
+                            scheme.onSurfaceVariant,
+                        )
+                        .map { it.toKeyboardUInt() }
+                val carriesText = roles.filter { contrastRatio(it, colors.keyText) >= 4.5 }
+                assertTrue(carriesText.isNotEmpty(), "$mode fixture 前置條件：至少一個角色對 keyText 達 4.5")
+
+                fun accentSeparation(color: UInt) =
+                    minOf(
+                        contrastRatio(color, colors.keyFill),
+                        contrastRatio(color, colors.background),
+                    )
+                assertTrue(colors.keyAccent in carriesText, "$mode keyAccent 對 keyText 未達 4.5")
+                assertEquals(
+                    carriesText.maxOf(::accentSeparation),
+                    accentSeparation(colors.keyAccent),
+                    1e-9,
+                    "$mode keyAccent 不是分離度最好的那個",
+                )
+
+                fun highlightSeparation(color: UInt) =
+                    minOf(
+                        contrastRatio(color, colors.background),
+                        contrastRatio(color, colors.keyAccent),
+                    )
+                assertTrue(
+                    colors.candidateHighlight in carriesText,
+                    "$mode candidateHighlight 對 keyText 未達 4.5",
+                )
+                assertEquals(
+                    carriesText.maxOf(::highlightSeparation),
+                    highlightSeparation(colors.candidateHighlight),
+                    1e-9,
+                    "$mode candidateHighlight 不是分離度最好的那個",
                 )
             }
         } finally {

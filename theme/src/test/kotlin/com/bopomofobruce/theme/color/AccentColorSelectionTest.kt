@@ -1,6 +1,7 @@
 package com.bopomofobruce.theme.color
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 
 /**
@@ -209,5 +210,27 @@ class AccentColorSelectionTest {
             )
 
         assertEquals(keyAccentColor, pickedWithNewSeparationReferenceStyle)
+    }
+
+    /**
+     * KDoc 寫明兩個清單都不可為空。第二個案例刻意挑「沒有候選通過文字門檻」的輸入：那條 fallback 分支不會去讀 `separationReferences`，少了
+     * `require` 就會靜靜回傳一個值，而不是丟例外。
+     */
+    @Test
+    fun `rejects empty candidates and empty separation references`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            pickAccentColor(
+                candidates = emptyList(),
+                textPartner = 0xFF000000u,
+                separationReferences = listOf(0xFFFFFFFFu),
+            )
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            pickAccentColor(
+                candidates = listOf(0xFF888888u),
+                textPartner = 0xFF888888u,
+                separationReferences = emptyList(),
+            )
+        }
     }
 }

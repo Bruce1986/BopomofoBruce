@@ -157,4 +157,20 @@ class PhotoBackgroundTest {
             PhotoBackground(uri = "content://x", opacity = -0.1f)
         }
     }
+
+    /** KDoc 寫的範圍是 `0f（完全透明）..1f`；先前只測了兩個拒絕端，`opacity > 0f` 這種突變不會紅。 */
+    @Test
+    fun `accepts both ends of the opacity range`() {
+        assertEquals(0f, PhotoBackground(uri = "content://x", opacity = 0f).opacity)
+        assertEquals(1f, PhotoBackground(uri = "content://x", opacity = 1f).opacity)
+    }
+
+    /**
+     * 白名單整組釘死。上面的拒絕案例只列得出「已經想到要擋的」scheme（http／https／file），多收一個沒列到的 （實測：加進 `"data"`）不會紅。這是 ADR-0005
+     * 純本地的邊界，要放寬就該連這條一起改、留下紀錄。
+     */
+    @Test
+    fun `the local scheme allowlist is exactly content and android resource`() {
+        assertEquals(setOf("content", "android.resource"), PhotoBackground.LOCAL_URI_SCHEMES)
+    }
 }

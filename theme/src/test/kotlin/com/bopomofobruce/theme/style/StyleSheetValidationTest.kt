@@ -2,8 +2,10 @@ package com.bopomofobruce.theme.style
 
 import com.bopomofobruce.common.KeyboardColors
 import com.bopomofobruce.common.KeyboardDimens
+import com.bopomofobruce.theme.LightTheme
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
@@ -152,5 +154,43 @@ class StyleSheetValidationTest {
             "expected a bare IllegalArgumentException that `catch (e: SerializationException)` " +
                 "would NOT catch, but got ${thrown::class.qualifiedName}",
         )
+    }
+
+    // 以下四條補的是「接受端點」與「同型欄位漏掉的那一個」（2026-10-11 突變實測，補之前 70 條全綠）：
+    // `isNotBlank`→`isNotEmpty`、拿掉 panel 的 `>= 0f`、keyCorner `>= 0f`→`> 0f`、
+    // fontWeight `1..1000`→`1..999`／`2..1000` 都沒有任何一條會紅。
+
+    @Test
+    fun `StyleSheet rejects whitespace-only id`() {
+        val base = LightTheme.styleSheet
+        assertThrows(IllegalArgumentException::class.java) {
+            StyleSheet(id = "   ", colors = base.colors, dimens = base.dimens)
+        }
+    }
+
+    @Test
+    fun `KeyboardShapes rejects negative panel corner radius`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            KeyboardShapes(panelCornerRadiusDp = -1f)
+        }
+    }
+
+    @Test
+    fun `KeyboardShapes accepts zero for every corner radius`() {
+        val square =
+            KeyboardShapes(
+                keyCornerRadiusDp = 0f,
+                candidateRowCornerRadiusDp = 0f,
+                panelCornerRadiusDp = 0f,
+            )
+        assertEquals(0f, square.keyCornerRadiusDp)
+        assertEquals(0f, square.candidateRowCornerRadiusDp)
+        assertEquals(0f, square.panelCornerRadiusDp)
+    }
+
+    @Test
+    fun `KeyboardTypography accepts both ends of the documented weight range`() {
+        assertEquals(1, KeyboardTypography(fontWeight = 1).fontWeight)
+        assertEquals(1000, KeyboardTypography(fontWeight = 1000).fontWeight)
     }
 }

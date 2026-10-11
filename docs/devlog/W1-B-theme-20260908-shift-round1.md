@@ -563,3 +563,38 @@ tracer 列了 4 組「預期存活」的突變，**parent 實跑全部存活**�
   `file`、`pickAccentColor` 改挑最差分離度（6 條紅）、dark 也走 light scheme。與上一輪自報的突變矩陣一致（獨立重跑）。
 - 🟡 **跨檔「最新一輪」指標過期**：`feat-w1b-theme.md` 兩處仍寫「目前最新：2026-08-11 第十四輪」，但該檔後面還有第十五、
   十七輪，而 08-11 之後的輪次（含 70 條的現況）都記在本檔。兩處改成指向本檔最後一節，並寫明那份檔只記到第十七輪。
+
+# 手動 GGR fix-loop 2026-10-10～11 第 1 輪（歷班第 10 輪；with Codex）
+
+三個視角（產品碼正確性／錯誤處理、測試品質突變、文件全文＋接手性）＋ Codex。產品碼 **0 改動**；
+測試 70 → **80** 條（`:theme:testDebugUnitTest --rerun-tasks`，讀 XML：tests=80、failures=0），`ktfmtCheck` 綠。
+Codex 與產品碼視角皆零 finding（產品碼視角只做靜態讀碼，沒有實跑）。
+
+- 🟡 **文件全文：六處過期敘述**（已於 `df7ab0d` 落地）：兩條測試 KDoc 仍寫著 devlog 早已撤回的鑑別力宣稱
+  （「+0.05 偏移突變」「自比抓得到取反」）、一處引用已改名的測試、一處「已證明會紅」的數字與色碼對不上、
+  一處把 H1 修正前的 `listOf(background)` 說成現行契約、本檔檔頭沒說明涵蓋範圍。
+- 🟠 **測試品質：23 個新挑的突變，初跑 19 個存活**（70 條全綠）。共同型態是「拒絕端有測、接受端點沒測」
+  與「主題對主題比、鎖不住絕對值」。補 10 條後重跑：
+
+| 突變 | 補之前 | 補之後紅的測試 |
+| --- | --- | --- |
+| 拿掉 `pickAccentColor` 的 `require(candidates.isNotEmpty())`／`require(separationReferences.isNotEmpty())` | 綠 | `rejects empty candidates and empty separation references` |
+| `StyleSheet` 的 `id.isNotBlank()` → `isNotEmpty()` | 綠 | `StyleSheet rejects whitespace-only id` |
+| 拿掉 `panelCornerRadiusDp >= 0f` | 綠 | `KeyboardShapes rejects negative panel corner radius` |
+| `keyCornerRadiusDp >= 0f` → `> 0f` | 綠 | `KeyboardShapes accepts zero for every corner radius` |
+| `fontWeight in 1..1000` → `1..999`／`2..1000` | 綠 | `KeyboardTypography accepts both ends of the documented weight range` |
+| `opacity` 不接受 `0f` | 綠 | `accepts both ends of the opacity range` |
+| scheme 白名單多收 `"data"` | 綠 | `the local scheme allowlist is exactly content and android resource` |
+| 內建主題 `styleSheet.id` 與 `theme.id` 對不上；兩個主題的 dimens 一起改掉 | 綠 | `built-in themes use the standard dimens and a styleSheet carrying their own id` |
+| Light `background` 的 alpha 改成 `0x00` | 綠 | `built-in theme colors are fully opaque` |
+| 動態路徑：`keyAccent`／`candidateHighlight` 的 `textPartner` 改成 `background`；候選拿掉 `inversePrimary` | 綠 | `the dynamic path picks the best separated role among those that carry the text` |
+
+  「補之前」是 reviewer 在沙箱逐一單獨跑的結果；「補之後」另由 parent 在獨立沙箱分三批重跑，每一條新測試都實際紅過，
+  且每批紅的只有新測試（舊的 70 條沒有任何一條對這些突變有反應）。
+
+**仍存活、未補（已評估）**：
+- `keyAccent` 的 `separationReferences` 只剩 `listOf(background)`：現有色階 fixture 下選出的顏色相同，分不出來；
+  要守得換一組 fixture，本輪沒做。
+- 動態路徑覆寫 `shapes.keyCornerRadiusDp`：「動態路徑只換 colors，其餘沿用退化主題」沒有守門。
+- Dark `keyFill` 設成與 `background` 相同：規格與 KDoc 都沒要求兩者分離，不算缺口。
+- `>= textThreshold` → `>`、`highlightCandidates` 前三項換順序：只在恰好等於門檻／完全同分時有差，現有資料下屬等價突變。

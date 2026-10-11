@@ -1,5 +1,6 @@
 package com.bopomofobruce.theme
 
+import com.bopomofobruce.theme.style.StandardDimens
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Test
@@ -43,5 +44,38 @@ class BuiltInThemesTest {
         assertEquals(LightTheme.styleSheet.dimens, LightTheme.dimens)
         assertEquals(DarkTheme.styleSheet.colors, DarkTheme.colors)
         assertEquals(DarkTheme.styleSheet.dimens, DarkTheme.dimens)
+    }
+
+    /**
+     * 上面兩條都是「主題對主題」「主題對自己的 styleSheet」，鎖不住絕對值：兩個主題一起改成別的尺寸、或 `styleSheet.id` 跟 `theme.id`
+     * 對不上，都不會紅（2026-10-11 突變實測）。`StyleDefaultsTest` 釘的是 [StandardDimens.default]
+     * 的數值，這條補上「內建主題真的用它」。
+     */
+    @Test
+    fun `built-in themes use the standard dimens and a styleSheet carrying their own id`() {
+        assertEquals(LightTheme.id, LightTheme.styleSheet.id, "light styleSheet.id")
+        assertEquals(DarkTheme.id, DarkTheme.styleSheet.id, "dark styleSheet.id")
+        assertEquals(StandardDimens.default, LightTheme.dimens, "light dimens")
+        assertEquals(StandardDimens.default, DarkTheme.dimens, "dark dimens")
+    }
+
+    /** 對比度公式不看 alpha（見 `ContrastFormulaKnownValuesTest`），所以某個色被改成透明時，12 條對比守門全綠。 */
+    @Test
+    fun `built-in theme colors are fully opaque`() {
+        for (theme in listOf(LightTheme, DarkTheme)) {
+            val colors = theme.colors
+            val byName =
+                mapOf(
+                    "background" to colors.background,
+                    "keyFill" to colors.keyFill,
+                    "keyText" to colors.keyText,
+                    "keyAccent" to colors.keyAccent,
+                    "candidateText" to colors.candidateText,
+                    "candidateHighlight" to colors.candidateHighlight,
+                )
+            for ((name, value) in byName) {
+                assertEquals(0xFFu, value shr 24, "${theme.id}.$name alpha")
+            }
+        }
     }
 }
