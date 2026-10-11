@@ -81,10 +81,10 @@ class AccentColorSelectionTest {
     }
 
     /**
-     * `candidateHighlight` 依契約只需要對 `background` 有分離度，`keyFill` 不在考量範圍內；這裡用
-     * 合成色值（不綁在任何真實主題上，純粹驗證機制）確認 [pickAccentColor] 只看呼叫端傳入的
-     * `separationReferences`，不會偷用其他色。`refA`（亮）與 `refB`（暗）刻意取得很開，讓「靠近亮 端的候選」與「靠近暗端但仍過文字門檻的候選」在兩個
-     * reference 上排名互換。
+     * 這條只驗 [pickAccentColor] 的機制，不代表任何一個角色實際該傳哪些參照色（`candidateHighlight` 現行傳的是 `listOf(background,
+     * keyAccent)`，見 `MaterialYouTheme`；只傳 `background` 是 H1 修正前的舊寫法）。這裡用 合成色值（不綁在任何真實主題上，純粹驗證機制）確認
+     * [pickAccentColor] 只看呼叫端傳入的 `separationReferences`，不會偷用其他色。`refA`（亮）與 `refB`（暗）刻意取得很開，讓「靠近亮
+     * 端的候選」與「靠近暗端但仍過文字門檻的候選」在兩個 reference 上排名互換。
      */
     @Test
     fun `separation is scored only against the references the caller passes in`() {
@@ -173,8 +173,8 @@ class AccentColorSelectionTest {
      * 撞成同一個值）而選到分離度更差的顏色。
      *
      * **已證明會紅**：把下面「新呼叫方式」暫時改成舊呼叫方式（`excluded = setOf(keyAccentColor)`， `separationReferences =
-     * listOf(background)`），重跑本測試， `org.opentest4j.AssertionFailedError: expected: <8721210> but
-     * was: <14156436>` FAILED （`8721210` = `keyAccentColor` 0x18143A，`14156436` =
+     * listOf(background)`），重跑本測試， `org.opentest4j.AssertionFailedError: expected: <1578042> but
+     * was: <14158996>` FAILED （`1578042` = `keyAccentColor` 0x18143A，`14158996` =
      * `weakerFailingCandidate` 0xD80C94， 證明舊呼叫方式選到分離度更差的候選）；改回新呼叫方式後綠。
      */
     @Test

@@ -16,8 +16,8 @@ import org.junit.jupiter.api.Test
  * 與線性分支那兩個。它們證明的是「兩份實作彼此一致」 （抓得到謄寫／typo 類錯誤），**不是**「這條公式忠實反映 WCAG 官方定義」。不要把其中任何一組
  * 說成比另一組更權威；真正的差別只有「有沒有外部公認出處」，而目前**只有黑白 21:1 有**。
  *
- * 那「實作本身就抄錯了會被永久釘死」怎麼辦？靠**分段函式在門檻處必須連續**這個內在條件—— 它不需要任何外部出處就能稽核（推導見 `the linear segment...` 那條測試的
- * KDoc）。
+ * 那「實作本身就抄錯了會被永久釘死」怎麼辦？靠**分段函式在門檻處必須連續**這個內在條件—— 它不需要任何外部出處就能稽核（推導見 `the gamma threshold boundary
+ * is pinned from both sides` 那條測試的 KDoc）。
  *
  * 下面幾組刻意涵蓋不同的錯誤型態（各自的鑑別力已用獨立實作交叉驗算過）：
  * - 黑白 = 21:1 是 WCAG 對比度的數學上界，也是本組**唯一有外部公認出處**的數字。但它 **並非「不依賴實作」**：它依賴 `+0.05`
@@ -62,7 +62,10 @@ class ContrastFormulaKnownValuesTest {
         assertTrue(ratio >= 4.5, "這個灰本來就該剛好達 AA，卻是 $ratio")
     }
 
-    /** 同色對同色恆為 1.0——lighter/darker 取反或除法寫反都會在這裡爆掉。 */
+    /**
+     * 同色對同色恆為 1.0——只防 `la == lb` 這個退化點產出未定義值（例如 `+0.05` 偏移被拿掉時黑色自比變 NaN）。 它**抓不到** lighter/darker
+     * 取反或除法方向寫反（理由與實測見 class KDoc 最後一條），那兩種由跨色測試把關。
+     */
     @Test
     fun `a colour against itself is exactly 1 to 1`() {
         for (colour in listOf(0xFF000000u, 0xFFFFFFFFu, 0xFF855196u, 0xFF1C1B1Fu)) {

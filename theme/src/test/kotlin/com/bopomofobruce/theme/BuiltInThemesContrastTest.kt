@@ -41,8 +41,10 @@ class BuiltInThemesContrastTest {
     //
     // 早一版這裡私有重抄了一份 `relativeLuminance` / `contrastRatio`，與正式實作逐字元相同，
     // 於是這 12 條門檻**驗的是測試自己抄的那份公式，不是產品程式碼**。突變實測（2026-09-08）：
-    // 把正式 `relativeLuminance` 的 gamma 由 2.4 改成 2.2、或把 `contrastRatio` 的 +0.05 偏移
-    // 拿掉——動態取色那側的 `AccentColorSelectionTest` 各紅 1 條，而本檔 12 條**全數維持綠燈**。
+    // 把正式 `relativeLuminance` 的 gamma 由 2.4 改成 2.2——動態取色那側的 `AccentColorSelectionTest`
+    // 紅 1 條，而本檔 12 條**全數維持綠燈**。（早先這裡還並列「拿掉 `contrastRatio` 的 +0.05 偏移」當證據，
+    // 那不成立：這 12 條都是 `ratio >= 門檻` 的下限檢查，拿掉偏移只會讓比值變大，修正前後都不會紅。
+    // 見 docs/devlog/W1-B-theme-20260908-shift-round1.md 第 2 輪 §A。）
     // `DynamicAccentSelection.kt` 的 KDoc 早就寫著這份重複的存在、目的是「避免第三份手抄公式」，
     // 只是沒做完；現在做完了。
 

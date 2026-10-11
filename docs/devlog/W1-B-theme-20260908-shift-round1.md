@@ -1,5 +1,8 @@
 # W1-B theme — 排程深審班 round 1（2026-09-08）
 
+> **本檔涵蓋範圍比檔名大**：從 2026-09-08 的 round 1 起，後續各班都接在檔尾追加（一個 `#` 一輪）。
+> 各節裡的測試條數是該輪當時的快照；**現況以最後一節為準**。
+
 自動 PR 深審 routine 對 #9 跑的一輪：兩個並行 reviewer 視角（色彩／對比數學正確性、測試守門
 有效性＋突變）＋ parent 自審。**所有結論都在本機實跑驗證過**
 （`ANDROID_HOME=/opt/homebrew/share/android-commandlinetools ./gradlew :theme:testDebugUnitTest
