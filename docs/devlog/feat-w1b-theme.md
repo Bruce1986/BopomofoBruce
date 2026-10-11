@@ -214,6 +214,10 @@
   理由：候選字看不清楚沒有替代方案，而「這一個被選中」`:ime` 還能用邊框／底線／字重表達。
   兩個選項與切換方式都寫在 `BuiltInThemes.kt` 註解裡，owner 若要反過來以 1.4.11 為硬門檻，
   改色值 + 對調兩條 Dark 門檻即可。
+  > **2026-09-08 已被推翻**：owner 改裁 `candidateText = #FFFFFF`、`candidateHighlight = #6B6B6B`
+  > （見 `W1-B-theme-20260908-shift-round1.md`「Owner 裁決後的落地」3B）。這裡的 `#656471`／`#6F6A76` 二選一、
+  > 以及「切換方式寫在 `BuiltInThemes.kt` 註解」都已不存在，不要照這一段重做。
+
   （過程註記：本輪一度有兩個 session 並行動到同一個 worktree，`#656471` 曾被覆寫回
   `#6F6A76`；已比對還原，最終狀態如上。）
 

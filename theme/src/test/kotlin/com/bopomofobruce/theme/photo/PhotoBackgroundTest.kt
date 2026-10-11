@@ -5,6 +5,7 @@ import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class PhotoBackgroundTest {
@@ -112,6 +113,31 @@ class PhotoBackgroundTest {
             assertThrows(IllegalArgumentException::class.java) { PhotoBackground(uri = secret) }
 
         assert(!error.message.orEmpty().contains("alice")) { "例外訊息帶出了完整 uri：${error.message}" }
+    }
+
+    /**
+     * 上一條的 uri 有 scheme，冒號前只有 `https`。沒有 scheme 的裸路徑只要含冒號，冒號前就是路徑本身—— 修正前訊息會印出
+     * `'/storage/emulated/0/Pictures/secret 10'`（2026-10-12 實測）。
+     */
+    @Test
+    fun `rejection message does not echo a path that merely contains a colon`() {
+        val error =
+            assertThrows(IllegalArgumentException::class.java) {
+                PhotoBackground(uri = "/storage/emulated/0/Pictures/secret 10:30.jpg")
+            }
+
+        assertFalse(error.message.orEmpty().contains("secret"), "例外訊息帶出了路徑：${error.message}")
+        assertFalse(error.message.orEmpty().contains("Pictures"), "例外訊息帶出了路徑：${error.message}")
+    }
+
+    @Test
+    fun `rejection message still names a well-formed scheme`() {
+        val error =
+            assertThrows(IllegalArgumentException::class.java) {
+                PhotoBackground(uri = "https://example.com/a.png")
+            }
+
+        assertTrue(error.message.orEmpty().contains("'https'"), "訊息應指出被拒的 scheme：${error.message}")
     }
 
     @Test

@@ -25,7 +25,10 @@ import kotlinx.serialization.UseSerializers
  *   **反序列化的呼叫端契約**（與 `StyleSheet` 的 O2 同一件事，但 [PhotoBackground] 不在 `StyleSheet` 裡、那段涵蓋不到）： `init` 的
  *   `require` 在 decode 時丟的是**裸的** `IllegalArgumentException`，不是 `SerializationException`—— 只接
  *   `SerializationException`（例如 DataStore Serializer 常見寫法）會漏接、讓設定讀取直接炸掉。 另外，**收緊
- *   [LOCAL_URI_SCHEMES] 會讓已經存下的資料解不出來**，要附遷移或讀取端退回「沒有背景」的容錯。
+ *   [LOCAL_URI_SCHEMES] 會讓已經存下的資料解不出來**，要附遷移或讀取端退回「沒有背景」的容錯。 **記錄解碼失敗時不要記例外的
+ *   message／`toString()`，也不要把 throwable 交給 `Log`**：kotlinx 的 `JsonDecodingException` 訊息會內嵌 `JSON
+ *   input: …` 原文，[uri] 合法、別的欄位壞掉時，整個 uri 就在裡面（2026-10-12 實測）。本型別自己的 `require` 訊息不帶 uri，但那只管得到
+ *   `init` 這一條路；解碼失敗的 log 請只記例外的類別名稱。
  * - [blurRadiusDp]：高斯模糊半徑，`0f` 代表不模糊，上限 [MAX_BLUR_RADIUS_DP]（避免呼叫端傳入
  *   離譜大的值——模糊層邊界外擴、在部分渲染路徑上可能造成明顯效能與畫面裁切問題）。
  * - [opacity]：疊加不透明度，`0f`（完全透明）..`1f`（完全不透明）。
@@ -48,7 +51,10 @@ data class PhotoBackground(
         // `CONTENT://…` 過了這裡也載不出來，只會變成一張悄悄消失的背景。
         val scheme = uri.substringBefore(':', missingDelimiterValue = "")
         require(scheme in LOCAL_URI_SCHEMES) {
-            "PhotoBackground uri must use a local scheme $LOCAL_URI_SCHEMES, but was '$scheme'"
+            // 冒號前那一段不一定是 scheme：沒有 scheme 的裸路徑只要含冒號（`/…/IMG 10:30.jpg`），
+            // 冒號前就是路徑本身。長得不像 scheme 的就不印出來。
+            val shown = if (SCHEME_SHAPE.matches(scheme)) "'$scheme'" else "not a uri scheme"
+            "PhotoBackground uri must use a local scheme $LOCAL_URI_SCHEMES, but was $shown"
         }
         require(blurRadiusDp in 0f..MAX_BLUR_RADIUS_DP) {
             "blurRadiusDp must be within 0f..$MAX_BLUR_RADIUS_DP, but was $blurRadiusDp"
@@ -69,5 +75,8 @@ data class PhotoBackground(
          * 底下）一起加回來。
          */
         val LOCAL_URI_SCHEMES: Set<String> = setOf("content", "android.resource")
+
+        /** RFC 3986 的 scheme 形狀，另加長度上限；只用來決定拒絕訊息要不要把冒號前那一段印出來。 */
+        private val SCHEME_SHAPE = Regex("[A-Za-z][A-Za-z0-9+.-]{0,31}")
     }
 }

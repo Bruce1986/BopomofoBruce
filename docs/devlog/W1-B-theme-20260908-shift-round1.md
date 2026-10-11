@@ -1,7 +1,59 @@
 # W1-B theme — 排程深審班 round 1（2026-09-08）
 
 > **本檔涵蓋範圍比檔名大**：從 2026-09-08 的 round 1 起，後續各班都接在檔尾追加（一個 `#` 一輪）。
-> 各節裡的測試條數是該輪當時的快照；**現況以最後一節為準**。
+> 各節裡的測試條數是該輪當時的快照；**現況以最後一節為準**。未解決與待裁決事項另有一張總表，就在下面。
+
+## 輪次稱呼對照（引用時請寫出是哪一份檔的哪一輪）
+
+| 稱呼 | 所在檔案與節標題 | 日期 |
+| --- | --- | --- |
+| 第七～十七輪（中文數字） | `feat-w1b-theme.md` 各節 | 2026-08-10～11 |
+| round 1、第 2～4 輪（歷班第 1～4 輪） | 本檔開頭到 `# 第 4 輪` | 2026-09-08 |
+| 歷班第 5～8 輪 | 本檔 `# 排程深審 2026-09-15 第 1～4 輪` | 2026-09-15 |
+| 歷班第 9 輪 | 本檔 `# 排程深審 2026-09-22 第 1 輪` | 2026-09-22 |
+| 歷班第 10 輪起 | 本檔 `# 手動 GGR fix-loop … 第 N 輪` | 2026-10-10 起 |
+
+`feat-w1b-theme.md` 的「第十二輪」（I1）與本檔的「歷班第 12 輪」是不同的兩輪。程式碼註解裡只寫中文數字輪次的
+（第十一輪、第十二輪、第十四輪…），指的都是 `feat-w1b-theme.md`。
+
+## 未解決／待 owner 裁決總表（2026-10-12 彙整）
+
+這一節是索引：每項一行，細節與證據在指到的位置；兩邊不一致時以詳述處為準，並回頭修這裡。後續各輪若新增或解掉項目，請改這張表。
+
+**A. 設計裁決（行為未改，等 owner 決定）**
+
+1. DEVPLAN W1-B 寫「Compose `Brush` 套用」，實作沒有用 `Brush`；是否為硬性要求——`feat-w1b-theme.md`「交付」段。
+2. 動態路徑 `candidateHighlight` 對 background 只有 light 1.23:1／dark 1.99:1（測試色階 fixture 實跑，非實機），固定色盤守的是 3.0；
+   過得了文字門檻的候選角色沒有一個同時對 background 達 3:1，要解得改候選來源或改契約——本檔歷班第 13 輪、`MaterialYouTheme.kt` 的 I1 註解。
+3. 動態路徑 `keyAccent` 對 background：tone 推算 light 1.66:1／dark 2.66:1，fixture 實跑 1.62:1／2.88:1（皆非實機），無守門——
+   `feat-w1b-theme.md` 第九輪 G3 的範圍更正。
+4. 動態路徑在所有候選都不過文字門檻時，回傳「文字對比最高但仍低於 4.5」的色，不通知呼叫端——`MaterialYouTheme.from` 與 `pickAccentColor` 的 KDoc。
+5. Dark 的 `keyAccent` 對 background 2.9485，未達 3.0，門檻維持 2.9；解法與代價——本檔「3B」節的「只修好了一半」。
+6. `KeyboardColors` 缺 on-accent／on-candidate-highlight 欄位（`:common` 已凍結，屬 W2 契約）——本檔「TODO（已登記，本次未做）」、`BuiltInThemes.kt` 註解。
+7. `SrcAtop` 的 tint alpha 為 `0xFF` 時會完全蓋掉底圖（刻意，`init` 不限制），W2-C 設定頁要自己限制——`PhotoBackground.kt` KDoc。
+
+**B. 契約與邊界**
+
+8. `PhotoBackground` 只驗 scheme、不驗 authority：`android.resource://其他套件名/…` 會通過白名單。Coil 2.6 的 `ResourceUriFetcher`
+   在 authority 不是本套件時會經 `PackageManager.getResourcesForApplication` 去讀（2026-10-12 反組譯所見，未實機驗證）。
+   讀到的是別的 app 的 APK 資源、只拿來當圖片畫，沒有外送路徑；要不要限定本套件由 owner 決定。**這一項在本表之前沒有任何記載。**
+9. `KeyboardColors` 不驗證任何欄位（含 alpha 為 0 的透明色）——`StyleSheet.kt` KDoc、本檔歷班第 11 輪。
+10. 反序列化時 `init` 丟的是裸的 `IllegalArgumentException`、不是 `SerializationException`（`StyleSheet` 與 `PhotoBackground` 皆然）；
+    收緊 scheme 白名單會讓已存資料解不出來——兩處 KDoc。`PhotoBackground` 那條 `assertFalse(thrown is SerializationException)` 的反向驗證沒跑（本檔歷班第 8 輪）。
+11. 白名單刻意不收 `file`；W2-C 若改成複製進 app 儲存區再用 `file://`，要連路徑範圍限制一起加——`PhotoBackground.kt` KDoc。
+12. 「Photo Picker 的 URI 不支援 `takePersistableUriPermission`」未查證，W2-C 選圖前要確認——`PhotoBackground.kt` KDoc。
+
+**C. 驗證缺口**
+
+13. 實機 200 ms 未量測；四個 `@Preview` 未實際 render；動態色在實際桌布下的數字未驗證。
+14. 實機 androidTest（覆蓋 `>= 31` 動態取色）：可行性已查、未執行，要 owner 同意在手機安裝測試 APK——本檔「2D」節。
+15. `AccentColorSelectionTest` 原本的 7 條裡有 3 條在「永遠回傳第一個候選」突變下全綠——本檔「留給 owner」第 3 項；之後各輪沒有專門回頭處理這一條。
+16. 已評估、仍存活的突變——本檔歷班第 10 輪「仍存活、未補」與第 13 輪「已評估、未補」。
+
+**D. 屬 W2 範圍（本 PR 不做）**
+
+17. `StyleSheet` → `KeyboardTheme` adapter、`ThemeSwatch` 改 public、`:common` 的 `KeyboardTheme` 標 `@Stable`、`isDynamic`／`degraded`、
+    匯出 `ThemeJson`／`schemaVersion`——`feat-w1b-theme.md`「被判為範圍外、未做（登記給 W2）」。
 
 自動 PR 深審 routine 對 #9 跑的一輪：兩個並行 reviewer 視角（色彩／對比數學正確性、測試守門
 有效性＋突變）＋ parent 自審。**所有結論都在本機實跑驗證過**
@@ -89,6 +141,9 @@ reviewer 推翻了我原本的假設（「2.9 是為了讓現值通過而調鬆�
   不含程式碼，所以「合併結果」的測試結論與本分支相同。
 
 ## 留給 owner（本班未動）
+
+> 這一節是 2026-09-08 當時的快照。第 1 項已由後面「Owner 裁決後的落地」的 2C 處理（`sdkIntProvider` 測試縫，沒有引入 Robolectric）；
+> 第 2 項已由 3B 處理（`candidateText` 改 `#FFFFFF`、`candidateHighlight` 改 `#6B6B6B`）。現況請看檔首的總表。
 
 1. 🔴 **正式入口 `MaterialYouTheme.from(context, darkMode)` 零測試覆蓋**。唯二呼叫點是兩個
    **從未實際 render 過**的 `@Preview`。突變實測：把它改成寫死 `from(context, darkMode, 30)`
@@ -252,7 +307,7 @@ round 2 寫「移除偏移在數學上只會讓比值變大，對所有 `L1 ≥ 
 
 ---
 
-# 第 4 輪（最後一輪：Opus tracer 全案最終掃描）
+# 第 4 輪（2026-09-08 當班的最後一輪：Opus tracer 全案最終掃描）
 
 **第 3 輪的四項修正實測全部成立**：M1–M4 各自只紅新測試 ⇒「修正前全套 60 條零反應」屬實；
 兩個錨點的分工歸屬四項全中；`max`/`min` 對調時自比那條確實是綠的、拿掉偏移時確實是 NaN
@@ -663,3 +718,25 @@ Codex 與產品碼視角皆零 finding（產品碼視角只做靜態讀碼，沒
   - 新 fixture 測試的 KDoc 寫「每個模式只改一格」，實際改兩格；行內註解「分離度比所有達標的角色都好」只在 light 成立。
   - 本檔第 13 輪「第 2、3 列…只有 reviewer 跑過」指錯列，實際只有第 2 列。
   - `feat-w1b-theme.md` 第十二輪 I1 一節仍把「併入 `separationReferences`」寫成解法、沒有指向新的更正。
+
+# 手動 GGR fix-loop 2026-10-12 第 6 輪（歷班第 15 輪）
+
+視角：接手性、錯誤處理／失敗模式（失敗點逐一列表；反序列化 4 組 `Json` 設定 × 約 90 種壞輸入實跑）。
+**產品碼改了一處**（只影響例外訊息文字）；測試 85 → **87** 條 / 0 failures，`ktfmtCheck`、`lintDebug` 綠。
+
+- 🟠 **`PhotoBackground` 的拒絕訊息會帶出路徑片段**。訊息印的是 `uri.substringBefore(':')`，註解說「只帶 scheme」；
+  但沒有 scheme 的裸路徑只要含冒號，冒號前就是路徑本身：`/storage/emulated/0/Pictures/secret 10:30.jpg` 的訊息是
+  `…but was '/storage/emulated/0/Pictures/secret 10'`。既有的 `rejection message does not leak the full uri` 用的是
+  `https://…`，鎖不到。改成冒號前那一段長得像 scheme（RFC 3986 形狀、最長 32 字元）才印，否則印 `not a uri scheme`。
+  突變：還原成一律印出 → `rejection message does not echo a path that merely contains a colon` 紅；改成一律不印 →
+  `rejection message still names a well-formed scheme` 紅（各自單獨跑，87 條裡只紅那一條）。
+- 🟡 **解碼失敗的例外訊息會帶出整個 uri，而 KDoc 的呼叫端契約沒提**：kotlinx 的 `JsonDecodingException` 訊息內嵌
+  `JSON input: …` 原文，uri 合法、別的欄位壞掉時 uri 就在裡面。這不是本模組丟的訊息，改不了；`PhotoBackground` 的
+  KDoc 補上「記錄解碼失敗時只記例外類別名稱」。
+- 🟡 **接手性**：未解決與待裁決事項散在約 15 處、沒有單一入口——在本檔檔首加了總表（17 項）與輪次稱呼對照；
+  2026-09-08 的「留給 owner」一節與 `feat-w1b-theme.md` 第八輪「定案為文字優先」補上已被處理／推翻的標記；
+  `BuiltInThemesContrastTest` 一處「第 2 輪 §A」的引用在本檔有三個標題對得上，改成寫出完整節名。
+- 反序列化實跑的結論：實際丟出的例外只有 `JsonDecodingException`、`SerializationException`、`MissingFieldException`
+  與裸的 `IllegalArgumentException` 四種，全是 IAE 子類，照 KDoc 寫的 catch 接得住；20 萬層巢狀沒有 `StackOverflowError`。
+
+**PR 描述已大幅過期**（條數、「連續兩輪零 finding」、深色候選色的舊方案），不在 repo 內、本輪未動，待 owner 同意後更新。
