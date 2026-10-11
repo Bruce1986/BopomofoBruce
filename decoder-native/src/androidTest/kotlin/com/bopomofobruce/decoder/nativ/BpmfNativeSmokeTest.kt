@@ -244,4 +244,73 @@ class BpmfNativeSmokeTest {
             BpmfTestBridge.nativeTestFree(handle)
         }
     }
+
+    @Test
+    fun bpmfInput_withIncompleteOrUnknownSyllable_returnsZeroCandidates() {
+        // Two ways a buffer that is not made of complete, known syllables used to produce
+        // misleading candidates, both of which bpmf.h now promises zero for.
+        //
+        // A syllable with no dictionary entry ("ㄖㄨ", "ㄅㄧㄤˋ" below) is discarded by libchewing
+        // without a trace, so before the fix the candidate window opened on the neighbouring
+        // syllable instead (host build against this dictionary: "ㄋㄧˇㄖㄨ" -> the 32 candidates
+        // of ㄋㄧˇ). "ㄋㄧˇㄖㄨˊ" is the same keystrokes one tone mark later and must still work.
+        //
+        // A trailing lone initial (the "ㄏ" of "ㄋㄧˇㄏ" — what a caller feeding a live buffer
+        // sends while the user is mid-syllable) or a bare tone mark is not dropped by libchewing:
+        // it stays in the pre-edit buffer as a literal symbol, and before the fix bpmf_input()
+        // returned that bopomofo letter as the one and only candidate (host build against this
+        // dictionary: "ㄋㄧˇㄏ" -> ["ㄏ"]). bpmf.h promises zero candidates when nothing but raw
+        // symbols is on offer.
+        //
+        // "ㄑ" is the other side of the same check: the dictionary lists the symbol itself next
+        // to a Han character for that tone-1 syllable (host build: ["ㄑ", "胠"]), so the list
+        // must come back whole — a check that zeroed every list containing a raw symbol would
+        // take 胠 away. The last call checks the handle still works after the zero returns.
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val dataPath = getDataPath(context)
+
+        val handle = BpmfTestBridge.nativeTestInit(dataPath)
+        assertNotEquals(0L, handle)
+        try {
+            val zeroInputs = listOf("ㄋㄧˇㄏ", "ㄏ", "ˇ", "ㄋㄧˇˇ", "ㄋㄧˇㄖㄨ", "ㄅㄧㄤˋㄋㄧˇ", "ㄋㄧˇㄖㄨ ㄏㄠˇ")
+            for (input in zeroInputs) {
+                val candidates = BpmfTestBridge.nativeTestInput(handle, input)
+                assertEquals(
+                    "expected zero candidates for \"$input\", got ${candidates.toList()}",
+                    0,
+                    candidates.size,
+                )
+            }
+
+            val ru = BpmfTestBridge.nativeTestInput(handle, "ㄋㄧˇㄖㄨˊ")
+            assertTrue(
+                "expected 如 among the candidates for ㄋㄧˇㄖㄨˊ, got ${ru.toList()}",
+                ru.contains("如"),
+            )
+
+            // Past libchewing's 39-symbol pre-edit limit the buffer stops growing as syllables
+            // arrive, which is the very signal the discarded-syllable check reads; the check
+            // must stand down there, not report every further syllable as discarded.
+            val long = BpmfTestBridge.nativeTestInput(handle, "ㄋㄧˇ".repeat(45))
+            assertTrue(
+                "expected 你 among the candidates for a 45-syllable buffer, got ${long.toList()}",
+                long.contains("你"),
+            )
+
+            val qi = BpmfTestBridge.nativeTestInput(handle, "ㄑ")
+            assertTrue(
+                "expected 胠 among the candidates for ㄑ, got ${qi.toList()}",
+                qi.contains("胠"),
+            )
+
+            val afterwards = BpmfTestBridge.nativeTestInput(handle, "ㄋㄧˇㄏㄠˇ")
+            assertTrue(
+                "expected 好 among the candidates after the zero returns, got " +
+                    afterwards.toList().toString(),
+                afterwards.contains("好"),
+            )
+        } finally {
+            BpmfTestBridge.nativeTestFree(handle)
+        }
+    }
 }

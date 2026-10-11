@@ -132,7 +132,45 @@ void* bpmf_init(const char* data_path);
  *
  * Returns 0 with *candidates_out set to "" (never NULL) if `handle` or
  * `zhuyin` is NULL, if `zhuyin` contains a character outside the mapping
- * table, or if libchewing produced no candidates.
+ * table, if libchewing produced no candidates, or in the two cases below
+ * where `zhuyin` is not a sequence of complete syllables the dictionary
+ * knows:
+ *
+ *   - Anywhere in the buffer, a syllable ended by a tone mark or by the
+ *     tone-1 space (explicit or the implied one at the end) has no
+ *     dictionary entry, e.g. the "ㄖㄨ" of "ㄋㄧˇㄖㄨ" or the "ㄅㄧㄤˋ" of
+ *     "ㄅㄧㄤˋㄋㄧˇ". libchewing discards such a syllable silently; without
+ *     this rule the candidates returned would be those of a neighbouring
+ *     syllable.
+ *   - Every candidate libchewing produced is a raw bopomofo/tone symbol
+ *     rather than a phrase: a trailing symbol that is not a dictionary
+ *     syllable by itself (the "ㄏ" of "ㄋㄧˇㄏ", or a bare tone mark) is kept
+ *     by libchewing as a literal symbol and offered back as the only
+ *     candidate.
+ *
+ * A caller feeding a live buffer will see 0 from these two rules for some
+ * mid-syllable states, but 0 is NOT a reliable "user is mid-syllable"
+ * signal: many single symbols are complete first-tone syllables in their
+ * own right, so a buffer ending in e.g. "ㄓ", "ㄕ" or "ㄧ" returns that
+ * syllable's candidates (之, 師, 一 ...).
+ *
+ * This is still NOT full validation of the buffer. Not detected, and the
+ * candidates returned are then those of the last syllable: a lone symbol
+ * kept as a literal earlier in the buffer ("ㄏ ㄋㄧˇ"); a doubled or leading
+ * tone mark mid-buffer ("ㄋㄧˇˇㄏㄠˇ"); and a discarded syllable once the
+ * buffer has reached the length limit described below (when the discarded
+ * syllable is the last one typed, "the last syllable" here means the one
+ * before it).
+ *
+ * Also not detected, and here the candidates may belong to a syllable that
+ * was never typed: anything not yet ended by a tone mark or a space is still
+ * one pending syllable to libchewing, and the next bopomofo character
+ * replaces the component of the same kind in it. A lone initial is simply
+ * overwritten ("ㄏㄋㄧˇ" is read as "ㄋㄧˇ"), but a first-tone syllable
+ * written without its separating space merges with what follows:
+ * "ㄍㄨㄥㄖㄣˊ" is read as "ㄖㄨㄣˊ", not as ㄍㄨㄥ + ㄖㄣˊ. A first-tone
+ * syllable that is not the last one in the buffer must be followed by the
+ * space.
  *
  * If `candidates_out` itself is NULL, returns 0 without dereferencing it —
  * there is nothing to write to, so the "*candidates_out == \"\"" guarantee

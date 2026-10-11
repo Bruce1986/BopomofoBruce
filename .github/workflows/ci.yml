@@ -84,10 +84,16 @@ jobs:
       # 的 ELF e_machine 要對得上（抓得到 32／64 位元放錯目錄），arm64 另外檢查
       # 16 KB page 對齊。它只讀 e_machine，分不出 32 位元 ARM 的各種 triple 變體
       # （armv7 與 thumbv7neon 都是 EM_ARM）；跨 ISA 的誤選通常在連結階段就會失敗。
+      #
+      # 同一步也斷言字典有被打包：assets/chewing/ 下的 word.dat、tsi.dat 都在，
+      # 且 sha256 等於 fetch_chewing_data.sh 釘住的值。fetchChewingData 是靠任務
+      # 名稱比對掛進 package*Assets 的（見 decoder-native/build.gradle.kts），接線
+      # 壞掉時 assembleDebug 照樣成功、只是 APK 裡沒有字典，bpmf_init() 到了裝置上
+      # 才回 NULL；runner 是乾淨 checkout，這裡是唯一看得到的地方。
       - name: Verify packaged libbpmf.so ABIs
         run: |
           python3 - <<'EOF'
-          import glob, struct, sys, zipfile
+          import glob, hashlib, re, struct, sys, zipfile
 
           # ELF e_machine values (ELF spec): 0x28 = ARM (32-bit), 0xB7 = AArch64.
           MACHINES = {0x28: "ARM", 0xB7: "AArch64"}
@@ -98,6 +104,9 @@ jobs:
               sys.exit("::error::no debug APK found under app/build/outputs/apk/debug/")
           apk = apks[0]
           print(f"APK: {apk}")
+
+          with open("decoder-native/scripts/fetch_chewing_data.sh", encoding="utf-8") as f:
+              script = f.read()
 
           failed = False
           with zipfile.ZipFile(apk) as z:
@@ -131,6 +140,23 @@ jobs:
                       if not aligns or min(aligns) < 0x4000:
                           print(f"::error::{entry} is not 16 KB page aligned (PT_LOAD p_align {[hex(a) for a in aligns]})")
                           failed = True
+              # 字典檔：期望的 sha256 直接讀下載腳本裡釘住的常數，不在這裡另抄一份。
+              for name, var in (("word.dat", "EXPECTED_WORD_DAT_SHA256"), ("tsi.dat", "EXPECTED_TSI_DAT_SHA256")):
+                  entry = f"assets/chewing/{name}"
+                  pinned = re.search(rf'^{var}="([0-9a-f]{{64}})"$', script, re.M)
+                  if pinned is None:
+                      print(f"::error::{var} not found in fetch_chewing_data.sh")
+                      failed = True
+                      continue
+                  if entry not in names:
+                      print(f"::error::{entry} is not packaged in {apk}")
+                      failed = True
+                      continue
+                  got_sha = hashlib.sha256(z.read(entry)).hexdigest()
+                  print(f"{entry} -> sha256 {got_sha}")
+                  if got_sha != pinned.group(1):
+                      print(f"::error::{entry} sha256 {got_sha} != pinned {pinned.group(1)}")
+                      failed = True
           sys.exit(1 if failed else 0)
           EOF
 

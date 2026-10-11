@@ -268,6 +268,33 @@ void* bpmf_init(const char* data_path) {
 }
 
 /*
+ * Sends one keystroke to libchewing and reports whether it made libchewing
+ * throw a syllable away. Returns 1 if a syllable was pending before the key,
+ * is no longer pending after it, and the pre-edit buffer did not grow — i.e.
+ * the key (a tone mark, or the tone-1 space) ended the syllable, libchewing
+ * found no dictionary entry for it and discarded it without a trace (see
+ * EnteringSyllable's KeyBehavior::Commit handling in the vendored
+ * src/editor/mod.rs: an empty lookup only clears the syllable buffer).
+ * Returns 0 otherwise.
+ *
+ * bpmf_input() must know this because a discarded syllable leaves nothing
+ * behind to notice afterwards: the candidate window simply opens on whatever
+ * came before it (verified on a host build: "ㄋㄧˇㄖㄨ" returned the 32
+ * candidates of ㄋㄧˇ).
+ *
+ * The check is skipped once the pre-edit buffer is at MAX_CHI_SYMBOL_LEN:
+ * from there on libchewing auto-commits the leading part as new syllables
+ * arrive, so the buffer length no longer says whether this one was kept.
+ */
+static int bpmf_send_key(ChewingContext* ctx, int key) {
+    int was_pending = (chewing_zuin_Check(ctx) == 0);
+    int len_before = chewing_buffer_Len(ctx);
+    chewing_handle_Default(ctx, key);
+    return was_pending && chewing_zuin_Check(ctx) != 0 && len_before < MAX_CHI_SYMBOL_LEN &&
+           chewing_buffer_Len(ctx) <= len_before;
+}
+
+/*
  * Forwards a space keystroke to libchewing IF AND ONLY IF there is currently
  * a non-empty pending phonetic (bopomofo) syllable buffer — gated on
  * chewing_zuin_Check(), which the header (capi/include/chewing.h) documents
@@ -301,10 +328,36 @@ void* bpmf_init(const char* data_path) {
  * the editor at all) once composition has already settled back into
  * `Entering` — exactly the separator behaviour the rest of this file
  * assumes.
+ *
+ * Returns what bpmf_send_key() returns for the space, or 0 if no space was
+ * sent.
  */
-static void bpmf_forward_space_if_pending(ChewingContext* ctx) {
+static int bpmf_forward_space_if_pending(ChewingContext* ctx) {
     if (chewing_zuin_Check(ctx) == 0) {
-        chewing_handle_Default(ctx, ' ');
+        return bpmf_send_key(ctx, ' ');
+    }
+    return 0;
+}
+
+/*
+ * True if `text` (UTF-8) is non-empty and made up entirely of characters from
+ * the bopomofo/tone mapping table above — i.e. it is a raw phonetic symbol,
+ * not a phrase. See the "nothing but raw symbols" check in bpmf_input().
+ */
+static int is_raw_bopomofo_only(const char* text) {
+    const char* cursor = text;
+    int seen_any = 0;
+    for (;;) {
+        size_t consumed = 0;
+        uint32_t codepoint = next_utf8_codepoint(cursor, &consumed);
+        if (consumed == 0) {
+            return seen_any;
+        }
+        cursor += consumed;
+        if (bopomofo_key_for(codepoint) < 0) {
+            return 0;
+        }
+        seen_any = 1;
     }
 }
 
@@ -344,7 +397,9 @@ size_t bpmf_input(void* opaque_handle, const char* zhuyin, char** candidates_out
         }
         cursor += consumed;
         if (codepoint == ' ') {
-            bpmf_forward_space_if_pending(ctx);
+            if (bpmf_forward_space_if_pending(ctx)) {
+                return 0; /* discarded syllable — see bpmf_send_key() */
+            }
             continue;
         }
         int key = bopomofo_key_for(codepoint);
@@ -359,7 +414,13 @@ size_t bpmf_input(void* opaque_handle, const char* zhuyin, char** candidates_out
             *candidates_out = (char*)kEmptyCandidates;
             return 0;
         }
-        chewing_handle_Default(ctx, key);
+        if (bpmf_send_key(ctx, key)) {
+            /* A syllable libchewing has no entry for (e.g. the "ㄅㄧㄤˋ" of
+             * "ㄋㄧˇㄅㄧㄤˋ") was just discarded. Fail closed for the whole
+             * buffer, same as an unmapped character: *candidates_out is
+             * already the static empty string. */
+            return 0;
+        }
     }
 
     /*
@@ -370,9 +431,12 @@ size_t bpmf_input(void* opaque_handle, const char* zhuyin, char** candidates_out
      * bpmf_forward_space_if_pending() for why this must stay gated the same
      * way as the mid-string case.
      */
-    bpmf_forward_space_if_pending(ctx);
+    if (bpmf_forward_space_if_pending(ctx)) {
+        return 0; /* discarded syllable — see bpmf_send_key() */
+    }
 
     size_t count = 0;
+    int has_phrase_candidate = 0;
     char* joined = strdup("");
     if (joined == NULL) {
         /* OOM: *candidates_out is already the static empty string set above. */
@@ -399,10 +463,39 @@ size_t bpmf_input(void* opaque_handle, const char* zhuyin, char** candidates_out
                 joined[old_len] = '\n';
             }
             memcpy(joined + old_len + sep_len, candidate, cand_len + 1);
+            if (!is_raw_bopomofo_only(candidate)) {
+                has_phrase_candidate = 1;
+            }
             chewing_free(candidate);
             count++;
         }
         chewing_cand_close(ctx);
+    }
+
+    /*
+     * Fail closed when the only thing on offer is the raw symbol itself. A
+     * lone initial (e.g. the trailing "ㄏ" of "ㄋㄧˇㄏ", which is what a caller
+     * feeding a live buffer sends while the user is mid-syllable) or a bare
+     * tone mark is not dropped by libchewing when the tone-1 space arrives: it
+     * goes into the pre-edit buffer as a literal symbol, the candidate window
+     * opens on that symbol, and the list is the bopomofo letter itself and
+     * nothing else (verified on a host build: "ㄋㄧˇㄏ" enumerated exactly one
+     * candidate, "ㄏ"). That is not a phrase candidate, so report 0 and let
+     * bpmf_commit() reject every index.
+     *
+     * (A syllable libchewing discards outright never gets this far — see
+     * bpmf_send_key().)
+     *
+     * The test is on the candidate list, not on the pre-edit buffer, and it
+     * is all-or-nothing on purpose. A few real tone-1 syllables have the
+     * symbol as a dictionary entry next to Han characters (host build: "ㄑ" ->
+     * ㄑ, 胠; "ㄟ" -> ㄟ, 欸); those lists are returned whole, unfiltered, so
+     * the indices bpmf_commit() forwards to libchewing stay the ones the
+     * caller was shown.
+     */
+    if (count > 0 && !has_phrase_candidate) {
+        free(joined);
+        return 0;
     }
 
     handle->last_candidates = joined;

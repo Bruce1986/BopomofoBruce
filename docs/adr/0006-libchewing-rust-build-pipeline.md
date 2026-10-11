@@ -25,7 +25,7 @@ owner 已就此裁示（見 devlog 2026-08-10 段）：**採用 v0.12.0（commit
 - 我們自己寫的一個薄 C wrapper（`decoder-native/cmake/src/bpmf_wrapper.c`，含 DaChen 鍵盤對照表 — 對照表直接照抄 vendored `src/editor/zhuyin_layout/standard.rs`，不是憑記憶重建）`#include` 上游的 `capi/include/chewing.h`，呼叫 `chewing_new3`/`chewing_handle_Default`/`chewing_cand_*`（`cand_open`/`cand_Enumerate`/`cand_String`/`cand_choose_by_index`/`cand_close`）/`chewing_delete` 等公開 C API，`target_link_libraries` 連結剛剛的 `chewing_capi` staticlib，一起編成單一 `libbpmf.so`。這條路線完全比照 upstream 自己的 `CMakeLists.txt`（`add_library(libchewing capi/src/chewing.c)` 接 `chewing_capi`），只是我們的 C 檔案換成 `bpmf_wrapper.c` 輸出 DEVPLAN 指定的 4 個簡化 API，而不是把全部 ~60 個 libchewing C API 都轉出去。
   **（2026-08-11 第十四輪 Opus 追蹤者 R1 更正，見 devlog）**：以上「而不是把全部 ~60 個
   libchewing C API 都轉出去」在本次更正之前只是**編譯層級**的事實（`bpmf_wrapper.c` 本身只呼叫
-  4 個函式），並不是**連結產物層級**的事實。`corrosion_import_crate()` 把整個 `chewing_capi`
+  十幾個 `chewing_*` 函式），並不是**連結產物層級**的事實。`corrosion_import_crate()` 把整個 `chewing_capi`
   staticlib（連同其依賴樹：regex/aho-corasick/gimli/miniz_oxide/jiff/std 等）連進
   `libbpmf.so`，在加上 `--version-script` 之前完全沒有符號可見度控制，實測 release
   arm64-v8a stripped 產物 `nm -D --defined-only` 匯出 **3527 個**動態符號，其中 **134 個**

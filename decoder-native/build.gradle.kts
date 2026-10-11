@@ -179,10 +179,13 @@ tasks
 // fetchChewingData wired in directly. This is redundant with the
 // Assets-matching block above (assemble*/connected*/install* all pull in
 // package*Assets transitively) but is kept as an explicit, self-documenting
-// safety net — `--dry-run` on `:decoder-native:connectedAndroidTest` is
-// asserted to include fetchChewingData in CI/manual checks, and this line
-// is what guarantees that independent of how AGP wires package*Assets in a
-// future version.
+// safety net: this line is what keeps fetchChewingData in those task graphs
+// independent of how AGP wires package*Assets in a future version. What CI
+// checks is the outcome, for assembleDebug only — the "Verify packaged
+// libbpmf.so ABIs" step in .github/workflows/ci.yml also fails if the debug
+// APK does not contain both dictionary files. The task graph
+// itself (`--dry-run` on `:decoder-native:connectedAndroidTest` listing
+// fetchChewingData) has only ever been checked by hand.
 tasks
     .matching {
         it.name == "assembleDebug" ||

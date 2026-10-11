@@ -8,6 +8,7 @@ import io.mockk.verify
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -169,11 +170,44 @@ class ChewingDataPathTest {
         //
         // Rather than hoping a race shows up, this observes the invariant the lock exists to
         // provide: at no point may two threads be inside the asset copy at the same time. The
-        // stream is deliberately slow, so if the lock is removed the second thread walks straight
-        // in while the first is still reading, and `concurrentReaders` climbs above 1.
+        // first thread to start reading holds still inside the copy until the outcome is decided
+        // one way or the other — either the second thread also starts reading (the lock is not
+        // holding, `overlapSeen` is set), or the second thread is seen parked on the monitor (the
+        // lock is holding). Nothing here depends on how fast the copy runs: an earlier version
+        // slept on every byte of a 4096-byte payload instead, which took over 8 s on an idle
+        // machine and ran past the 30 s await below on a loaded one, failing with the lock
+        // intact.
         val concurrentReaders = AtomicInteger(0)
         val overlapSeen = AtomicBoolean(false)
-        val payload = ByteArray(4096) { (it % 251).toByte() }
+        val workers = CopyOnWriteArrayList<Thread>()
+        val payload = ByteArray(16) { it.toByte() }
+
+        fun holdUntilOutcomeIsDecided() {
+            val self = Thread.currentThread()
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+            var blockedPolls = 0
+            while (!overlapSeen.get() && System.nanoTime() < deadline) {
+                val others = workers.filter { it !== self }
+                // The other worker has already finished. With the lock intact this is never
+                // reached: the second thread finds the final file in place and does not open the
+                // asset at all. It is reached only when the lock is not holding and the first
+                // reader stopped waiting (deadline, or a false BLOCKED streak) and completed
+                // before this thread started reading. Nobody is left to overlap with, so return
+                // rather than idle until the deadline.
+                if (others.all { it.state == Thread.State.TERMINATED }) {
+                    return
+                }
+                // Several consecutive BLOCKED observations, so a worker that is only passing
+                // through some unrelated monitor on its way in is not mistaken for one parked on
+                // extractionLock.
+                val otherIsParked = others.any { it.state == Thread.State.BLOCKED }
+                blockedPolls = if (otherIsParked) blockedPolls + 1 else 0
+                if (blockedPolls >= 20) {
+                    return
+                }
+                Thread.sleep(5)
+            }
+        }
 
         val assets = mockk<AssetManager>()
         every { assets.list("chewing") } returns arrayOf("word.dat")
@@ -189,10 +223,8 @@ class ChewingDataPathTest {
                             if (concurrentReaders.incrementAndGet() > 1) {
                                 overlapSeen.set(true)
                             }
+                            holdUntilOutcomeIsDecided()
                         }
-                        // Slow enough that a second unsynchronized thread is certain to arrive
-                        // while this one is still mid-copy; short enough not to drag out the suite.
-                        Thread.sleep(2)
                         return backing.read()
                     }
 
@@ -210,18 +242,18 @@ class ChewingDataPathTest {
         val done = CountDownLatch(2)
         val failure = AtomicReference<Throwable?>(null)
         repeat(2) {
-            Thread {
-                    try {
-                        start.await()
-                        extractChewingData(assets, targetDir)
-                    } catch (t: Throwable) {
-                        failure.compareAndSet(null, t)
-                    } finally {
-                        done.countDown()
-                    }
+            workers += Thread {
+                try {
+                    start.await()
+                    extractChewingData(assets, targetDir)
+                } catch (t: Throwable) {
+                    failure.compareAndSet(null, t)
+                } finally {
+                    done.countDown()
                 }
-                .start()
+            }
         }
+        workers.forEach { it.start() }
         start.countDown()
         assertTrue(done.await(30, TimeUnit.SECONDS), "both extraction threads must finish")
 
@@ -235,6 +267,25 @@ class ChewingDataPathTest {
             File(targetDir, "word.dat").readBytes(),
             "the published file must be exactly one complete copy of the asset",
         )
+    }
+
+    @Test
+    fun `extracts the files still missing when an earlier one is already in place`() {
+        // The state a process kill leaves behind when it lands between two files: word.dat has
+        // been renamed into place, tsi.dat has not been copied yet. The next call must skip the
+        // first and still go on to the second — stopping at the first file already present
+        // would leave the directory without tsi.dat for good, since nothing re-checks it later.
+        val assets =
+            fakeAssets(mapOf("word.dat" to byteArrayOf(1, 2, 3), "tsi.dat" to byteArrayOf(4, 5)))
+        val targetDir = File(tempDir, "cache-chewing")
+        targetDir.mkdirs()
+        File(targetDir, "word.dat").writeBytes(byteArrayOf(9, 9, 9, 9))
+
+        extractChewingData(assets, targetDir)
+
+        assertArrayEquals(byteArrayOf(4, 5), File(targetDir, "tsi.dat").readBytes())
+        assertArrayEquals(byteArrayOf(9, 9, 9, 9), File(targetDir, "word.dat").readBytes())
+        verify(exactly = 0) { assets.open("chewing/word.dat") }
     }
 
     @Test
@@ -359,11 +410,16 @@ class ChewingDataPathTest {
     }
 
     @Test
-    fun `a failed rename is not silently swallowed - it still throws and leaves no final file`() {
-        // Forces File.renameTo() to return false by making the target dir read-only right after
-        // the tmp copy is written (when the asset stream is closed). Relies on not running as
-        // root, which holds for local runs and GitHub-hosted runners.
+    fun `a failed rename is not silently swallowed - it throws, removes the tmp and publishes nothing`() {
+        // Forces File.renameTo() to return false by putting a non-empty directory at the final
+        // name right after the tmp copy is written (when the asset stream is closed, which is
+        // after the "final name already exists" check has run). Renaming a regular file onto a
+        // non-empty directory fails regardless of who runs the test; the earlier version of this
+        // test made the target dir read-only instead, which root ignores and which also made
+        // tmp.delete() fail, so the "the .tmp is deleted" half of the contract was unobservable.
         val targetDir = File(tempDir, "cache-chewing")
+        val blocker = File(targetDir, "word.dat")
+        val blockerMarker = File(blocker, "marker")
         val payload = byteArrayOf(1, 2, 3)
         val assets = mockk<AssetManager>()
         every { assets.list("chewing") } returns arrayOf("word.dat")
@@ -376,18 +432,25 @@ class ChewingDataPathTest {
 
                     override fun close() {
                         backing.close()
-                        targetDir.setWritable(false)
+                        blocker.mkdirs()
+                        blockerMarker.writeBytes(byteArrayOf(9))
                     }
                 }
             }
-        try {
-            assertThrows(IOException::class.java) { extractChewingData(assets, targetDir) }
-            assertFalse(
-                File(targetDir, "word.dat").exists(),
-                "a failed rename must not leave anything at the final name",
-            )
-        } finally {
-            targetDir.setWritable(true)
-        }
+
+        assertThrows(IOException::class.java) { extractChewingData(assets, targetDir) }
+
+        assertTrue(
+            blockerMarker.isFile,
+            "test setup: the blocking directory must have been created",
+        )
+        assertFalse(
+            blocker.isFile,
+            "a failed rename must not publish the payload at the final name",
+        )
+        assertFalse(
+            File(targetDir, "word.dat.tmp").exists(),
+            "a failed rename must delete its tmp file",
+        )
     }
 }
