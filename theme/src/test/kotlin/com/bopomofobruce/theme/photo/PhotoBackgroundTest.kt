@@ -232,7 +232,10 @@ class PhotoBackgroundTest {
         }
     }
 
-    /** 白名單常數那條只釘 [PhotoBackground.LOCAL_URI_SCHEMES] 的內容；這條釘 `init` 真的只認那個集合。 */
+    /**
+     * `the local scheme allowlist is exactly content and android resource` 只釘
+     * [PhotoBackground.LOCAL_URI_SCHEMES] 的內容；這條釘 `init` 真的只認那個集合。
+     */
     @Test
     fun `rejects schemes outside the allowlist that coil or the platform could resolve`() {
         for (uri in listOf("data:image/png;base64,AAAA", "blob:x", "ftp://example.com/a.png")) {
@@ -248,8 +251,9 @@ class PhotoBackgroundTest {
     }
 
     /**
-     * 白名單整組釘死。上面的拒絕案例只列得出「已經想到要擋的」scheme（http／https／file），多收一個沒列到的 （實測：加進 `"data"`）不會紅。這是 ADR-0005
-     * 純本地的邊界，要放寬就該連這條一起改、留下紀錄。這條只釘常數的內容；`init` 是否只認這個集合，由下面拒絕 `data:`／`blob:`／`ftp:` 那條守。
+     * 白名單整組釘死。拒絕案例只列得出「已經想到要擋的」scheme，常數裡多收一個沒列到的就不會紅（補這條之前的實測：加進 `"data"` 全綠； 現在這條與 `rejects
+     * schemes outside the allowlist that coil or the platform could resolve` 都會紅）。這是 ADR-0005
+     * 純本地的邊界，要放寬就該連這條一起改、留下紀錄。這條只釘常數的內容；`init` 是否只認這個集合，由剛才那條守。
      */
     @Test
     fun `the local scheme allowlist is exactly content and android resource`() {

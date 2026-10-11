@@ -27,7 +27,8 @@
 2. 動態路徑 `candidateHighlight` 對 background 只有 light 1.23:1／dark 1.99:1（測試色階 fixture 實跑，非實機），固定色盤守的是 3.0；
    過得了文字門檻的候選角色沒有一個同時對 background 達 3:1，要解得改候選來源或改契約——本檔歷班第 13 輪、`MaterialYouTheme.kt` 的 I1 註解。
 3. 動態路徑 `keyAccent` 對 background：fixture 實跑 light 1.62:1／dark 2.88:1（非實機），無守門。早期各輪寫的「1.66／2.66」是拿
-   M3 baseline 色票算的，dark surface 的 tone 假設錯了（用 10，material3 1.3.1 實際是 6），以 fixture 的數字為準——
+   M3 baseline 色票算的（dark surface 用了 tone 10、light 用了約 tone 99；API 31–33 的動態配色是 tone 6／98），以 fixture 的數字為準。
+   fixture 模擬的是 API 31–33 的路徑；API 34 以上 surface 讀系統資源，那條路徑上的數字沒有驗證——
    `feat-w1b-theme.md` 第九輪 G3 的範圍更正。
 4. 動態路徑在所有候選都不過文字門檻時，回傳「文字對比最高但仍低於 4.5」的色，不通知呼叫端——`MaterialYouTheme.from` 與 `pickAccentColor` 的 KDoc。
 5. Dark 的 `keyAccent` 對 background 2.9485，未達 3.0，門檻維持 2.9；解法與代價——本檔「3B」節的「只修好了一半」。
@@ -54,7 +55,8 @@
 15. （已解，2026-10-12 實跑）「`pickAccentColor` 永遠回傳第一個候選」這個突變，本檔「留給 owner」第 3 項記的是當時 7 條裡有 3 條全綠；
     現在整套有 7 條會紅（`AccentColorSelectionTest` 5 條、`MaterialYouThemeTest` 2 條）。原本那 3 條仍綠：同分取前者與單一候選本來就不該紅，
     `excludes an already-chosen color…` 是預期答案剛好排第一。
-16. 已評估、仍存活的突變——本檔歷班第 10 輪「仍存活、未補」與第 13 輪「已評估、未補」。
+16. 已評估、仍存活的突變——本檔歷班第 10 輪「仍存活、未補」、第 13 輪與第 17 輪「已評估、未補」；另有一個實測確認的缺口：
+    只在 dark 把 `keyAccent` 的文字門檻放寬，沒有測試會紅（歷班第 19 輪）。
 
 **D. 屬 W2 範圍（本 PR 不做）**
 
@@ -797,11 +799,38 @@ Light `keyFill` 改成 `#FEFEFE`（色值不設絕對快照是刻意的）；亮
 
 - 🟠 **dark 的 surface tone 假設錯了，連帶兩個推算數字不對**。`MaterialYouTheme.kt` 與 `DynamicAccentSelection.kt` 寫
   「dark 下 container≈30、surface≈10」；反組譯 material3 1.3.1 的 `dynamicDarkColorScheme31`，background／surface 取的是
-  `neutralVariant6`（light 是 `neutralVariant98`，沒問題）。早期各輪的「dark `inversePrimary` 對 background 2.66、container 1.84」
+  `neutralVariant6`（light 是 `neutralVariant98`）。早期各輪的「dark `inversePrimary` 對 background 2.66、container 1.84」
   是拿 M3 baseline 色票（dark surface `#1C1B1F`，tone 10）算的；tone 6 之下約為 2.88／1.99，正好就是色階 fixture 實跑的數字。
-  上一輪把兩組數字的落差解釋成「不是同一份資料」，沒說到原因。「動態路徑把 `BuiltInThemes` 的 1.84 撿回來」也只是那個色票假設下的巧合。
-  四處註解、`feat-w1b-theme.md` 的範圍更正段、檔首總表第 3 項已改。
+  上一輪把兩組數字的落差解釋成「不是同一份資料」，沒說到原因。四處註解、`feat-w1b-theme.md` 的範圍更正段、檔首總表第 3 項已改。
+  （這一條本身有三處說得不準，歷班第 19 輪更正，見下一節。）
 - 🟡 `pickAccentColor` 的 `@param` 寫「併入 `keyAccent` 只保證不撞色」——`keyAccent` 是唯一過文字門檻的候選時，回傳的就是它自己（撞色），
   同模組的呼叫處註解與測試都這樣寫。拿掉「保證」，補上但書。
 - 🟡 `MaterialYouTheme.kt` G3 註解仍寫「`keyAccent` 對 background 是否達 3.0 未經驗證」；fixture 上已知是 1.62／2.88，未驗證的只剩實際桌布。
-- 🟡 `StandardDimens` 的 KDoc 與 `StyleDefaultsTest` 的斷言訊息寫「三個內建主題」，內建的只有 Light／Dark 兩個。
+- 🟡 `StandardDimens` 的 KDoc 與 `StyleDefaultsTest` 的斷言訊息寫「三個內建主題與 MaterialYouTheme 共用」，把 MaterialYouTheme 重複算了一次
+  （專案用語裡內建主題就是 Light／Dark／MaterialYou 三個）；改成寫明 Light／Dark 直接引用、MaterialYou 經由退化主題的 `copy` 沿用。
+
+# 手動 GGR fix-loop 2026-10-12 第 10 輪（歷班第 19 輪）
+
+視角：複審上一輪的更正、測試碼 KDoc／註解／斷言訊息逐句讀完（10 個檔，18 個宣稱實跑）。
+產品行為 0 改動（只動 KDoc／註解），90 tests / 0 failures，`ktfmtCheck` 綠。
+
+- 🟡 **上一輪的更正有三處說得不準**：
+  - 「dark surface 是 tone 6」只對 **API 31–33**（`dynamicDarkColorScheme31`）成立。API 34 以上走 `dynamicDarkColorScheme34`，
+    background／surface 直接讀系統資源 `system_background_dark`／`system_surface_dark`，是哪個 tone 從 repo 查不出來。
+    色階 fixture 模擬的是 31–33 那條路徑；34 以上的數字都沒有驗證。各處敘述已補上範圍。
+  - 「light 不受影響」不對：light 的 1.66 也是對 baseline 色票 `#FFFBFE`（約 tone 99）算的，動態配色的 tone 98 之下是 1.62。
+  - 「內建的只有 Light／Dark 兩個」與專案用語不合（DEVPLAN 與 `feat-w1b-theme.md` 都把 MaterialYou 算在內）；原句的毛病是重複計算，上一節已改寫。
+    另外「與 `BuiltInThemes` 的 1.84 是同一個數字只是巧合」也不對：選到的色值 `#4A4458` 確實相同，是背景不同才讓數字不同。
+- 🟡 **測試碼的 13 處敘述**（都只改文字）：
+  - `ContrastFormulaKnownValuesTest`：黑白那條對「三個權重改掉」並非全綠（值改掉會紅，只有互相對調才綠）；class KDoc 的
+    「除了黑白之外全部是反算」與後補的權重測試矛盾；容差論證引用的 `pow` 值是另一條測試的；「JLS 規定 `pow` 誤差 ≤ 1 ulp」
+    出處寫錯（是 `java.lang.Math` 的 Javadoc，`BuiltInThemesContrastTest` 同一個錯）；R↔B 對調的紅燈條數是舊快照。
+  - `BuiltInThemesContrastTest`：把 `candidateHighlight` 的舊色 `#4A4458` 說成 `keyAccent` 的舊值（應是 `#4F378B`）；
+    「R−2、G−1」漏了 B−2（照字面改不會翻紅）；「與 `candidateHighlight` 同源地無法三全其美」停在已被推翻的狀態；
+    兩條 candidateText 測試的 KDoc 互相指對方、沒有人載明取捨。
+  - `AccentColorSelectionTest` 一句行內註解與斷言相反（`midCandidate` 對 refB 是較差的那個）。
+  - `MaterialYouThemeTest` class KDoc 只提兩層覆蓋，現在動態路徑有五條。
+  - `PhotoBackgroundTest` 白名單兩條測試的 KDoc 用「上面／下面」互指，方向寫反，且留著已失效的「加進 data 不會紅」。
+- 🟠 **一個實測確認的守門缺口（未補）**：`keyAccent is scored against keyFill too and neither accent relaxes the text threshold`
+  抓不到「只在 dark 把 `keyAccent` 的文字門檻放寬」（reviewer 實跑：全套仍綠）。light 的 `keyAccent`、兩個模式的
+  `candidateHighlight` 都抓得到。測試名對 dark 的 `keyAccent` 說過頭，已在行內註解寫明；要補得另造一組 dark 色階。

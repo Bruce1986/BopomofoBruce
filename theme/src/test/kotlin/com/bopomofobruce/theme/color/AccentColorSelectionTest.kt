@@ -93,7 +93,8 @@ class AccentColorSelectionTest {
         val refA = 0xF5F5F5u // 亮
         val refB = 0x141414u // 暗
         val brightCandidate = 0xF0F0F0u // text 18.4（通過），refA 1.05（差）、refB 16.17（好）
-        val midCandidate = 0x7C7C7Cu // text 5.03（通過），refA 3.83（好）、refB 4.41（好，優於 brightCandidate）
+        val midCandidate =
+            0x7C7C7Cu // text 5.03（通過），refA 3.83（好）、refB 4.41（比 brightCandidate 的 16.17 差）
 
         val pickedForRefAOnly =
             pickAccentColor(

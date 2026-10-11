@@ -283,7 +283,9 @@
   >
   > **同日另一項更正**：本檔各輪「M3 baseline tone 分布」的 dark 數字（`inversePrimary` 對 background 2.66、container 1.84）
   > 是拿 baseline 色票算的，dark surface 用了 `#1C1B1F`（tone 10）。material3 1.3.1 的 `dynamicDarkColorScheme31` 反組譯所見是
-  > `neutralVariant6`，比它暗，所以動態路徑 dark 實際約為 2.88／1.99（與色階 fixture 實跑一致）。light 的 surface 是 tone 98，不受影響。
+  > `neutralVariant6`，比它暗，所以動態路徑 dark 約為 2.88／1.99（與色階 fixture 實跑一致）。light 的 1.66 同樣是對 baseline 色票
+  > `#FFFBFE`（約 tone 99）算的，動態配色的 tone 98 之下是 1.62，落差小但來源相同。以上都只對 API 31–33 的路徑成立：API 34 以上
+  > 走 `dynamicDarkColorScheme34`，surface 直接讀系統資源 `system_surface_dark`，是哪個 tone 沒有查證。
 
   **已修，不是「做不到」**：新增 `theme/src/main/kotlin/com/bopomofobruce/theme/color/DynamicAccentSelection.kt`，
   公開純函式 `pickAccentColor(candidates, textPartner, separationReferences, textThreshold = 4.5)`：

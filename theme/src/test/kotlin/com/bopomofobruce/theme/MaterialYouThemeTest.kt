@@ -15,10 +15,11 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
- * `sdkInt < 31` 的退化分支驗到色盤內容（純 Kotlin 邏輯，不需要 Android runtime）。`>= 31` 分支有兩層：「正式入口會依 provider
- * 分流」（relaxed mock，stub 色盤），以及「角色映射與不撞色」（依 resource id 餵一組色階 fixture，見 `the dynamic path maps
- * scheme roles and keeps keyAccent and candidateHighlight apart`）。**真實桌布會產生什麼色值、對比度是否達標，仍未覆蓋**（這裡沒有
- * Robolectric、也沒有實機）— 見 devlog 與 [MaterialYouTheme] 上的 KDoc 說明。
+ * `sdkInt < 31` 的退化分支驗到色盤內容（純 Kotlin 邏輯，不需要 Android runtime）。`>= 31` 分支有幾層：「正式入口會依 provider 分流」與「預設
+ * provider 讀的是平台等級」（relaxed mock，stub 色盤）；「只換 id 與 colors」；以及依 resource id 餵色階 fixture 的三條——
+ * 角色映射與不撞色、選出的是過文字門檻者中分離度最好的、傳給 `pickAccentColor`
+ * 的參數（參照色、候選清單、文字門檻）。**真實桌布會產生什麼色值、對比度是否達標，仍未覆蓋**（這裡沒有 Robolectric、也沒有實機）— 見 devlog 與
+ * [MaterialYouTheme] 上的 KDoc 說明。
  */
 class MaterialYouThemeTest {
 
@@ -259,7 +260,9 @@ class MaterialYouThemeTest {
                 // `secondary`（light 是 accent2_600、dark 是 accent2_200）換成對 keyText 約 4.0 的灰：沒過 4.5，
                 // 呼叫處把文字門檻放寬時它就進得了候選。light 下它的分離度比所有達標的角色都好，
                 // 門檻一放寬就會被選中（實測轉紅的是 light）。dark 下它對 keyFill 只有 1.26，`keyAccent` 不會選它；
-                // dark 這一側抓不抓得到門檻放寬，沒有單獨驗過。
+                // **dark 的 `keyAccent` 放寬門檻這條抓不到**（2026-10-12 實測：只在 dark 把 keyAccent 的門檻放寬到
+                // 3.0，全套仍綠）。
+                // `candidateHighlight` 在兩個模式下單獨放寬都會紅。測試名的「neither accent」對 dark 的 keyAccent 說過頭了。
                 palettes[1] =
                     TONAL_PALETTES[1].toMutableList().also {
                         if (darkMode) it[4] = 0xFF6E6E6Eu else it[8] = 0xFF7A7A7Au

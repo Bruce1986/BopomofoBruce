@@ -21,12 +21,12 @@ import org.junit.jupiter.api.Test
  * - `DarkTheme` 的 `keyAccent` 對 `background` 現值 2.9485、門檻 2.9，**餘裕只有 0.0485**。 ⚠️
  *   **這一半還沒解決**：`keyAccent` 配的是 `keyText`（仍是 M3 的 #E6E1E5，本次未動）， 所以它的亮度上限仍是 0.1307、仍達不到 1.4.11 的
  *   3.0。若日後把 `keyText` 也提到純白， `keyAccent` 同樣會有解（例如 #767676：白字 4.54、對 background 3.77、對 keyFill
- *   3.16）。 在那之前這條維持 2.9。往背景 方向線性內插 2%（`#855196` → `#835094`，R−2、G−1）就會跌到 2.888 而翻紅。這不是裝飾門檻 （舊值
- *   `#4A4458` 的 1.84 確實會被它擋下），而是這個顏色空間在「文字 4.5 為硬下限」的約束下 本來就窄——現值幾乎正好落在理論上限。所以任何看起來無害的 RGB ±2
+ *   3.16）。 在那之前這條維持 2.9。往背景 方向線性內插 2%（`#855196` → `#835094`，R−2、G−1、B−2）就會跌到 2.888 而翻紅。這不是裝飾門檻 （第一版
+ *   `#4F378B` 的 1.84 確實會被它擋下），而是這個顏色空間在「文字 4.5 為硬下限」的約束下 本來就窄——現值幾乎正好落在理論上限。所以任何看起來無害的 RGB ±2
  *   美術微調都可能弄紅 CI。
  * - `DarkTheme` 的 `keyText/keyAccent` 是 **4.500011**，貼著 4.5 門檻到百萬分之幾。
  *   （`candidateText/candidateHighlight` 一度也是 4.500039，但 2026-09-08 改成白字＋#6B6B6B 之後已經是
- *   5.3292，不再貼邊。）`kotlin.math.pow` 底層是 `java.lang.Math.pow`， JLS **不保證**跨 JVM
+ *   5.3292，不再貼邊。）`kotlin.math.pow` 底層是 `java.lang.Math.pow`， 它的 API 規格（Javadoc）**不保證**跨 JVM
  *   廠商／版本／架構逐位元一致（`StrictMath` 才保證）。CI 固定的 ubuntu + Temurin 組合目前綠，但在別的 JDK 或架構上本機重跑若翻紅，**先確認是不是浮點差異
  *   而不是顏色真的退步**。
  *
@@ -97,8 +97,9 @@ class BuiltInThemesContrastTest {
     }
 
     /**
-     * 深色主題與 `candidateHighlight` 同源地無法三全其美：`keyText` 4.5 當硬下限時，`keyAccent` 對 `keyFill` 的分離度上限只有
-     * 2.47（窮舉紫色系求得）。門檻依實測最佳值設定，仍能擋住「有人把 強調色改回與按鍵同色階」的回歸（第一版 #4F378B 是 1.54 / 1.84，會被這兩條擋下）。
+     * 深色的 `keyAccent` 無法三全其美（`candidateHighlight` 原本也是，`candidateText` 改純白後已解開，見 class
+     * KDoc）：`keyText` 4.5 當硬下限時，`keyAccent` 對 `keyFill` 的分離度上限只有 2.47（窮舉紫色系求得）。門檻依實測最佳值設定，仍能擋住「有人把
+     * 強調色改回與按鍵同色階」的回歸（第一版 #4F378B 是 1.54 / 1.84，會被這兩條擋下）。
      */
     @Test
     fun `DarkTheme keyAccent stays at the documented best-effort separation`() {
@@ -125,7 +126,7 @@ class BuiltInThemesContrastTest {
         assertTrue(ratio >= 4.5, "expected >= 4.5, was $ratio")
     }
 
-    /** 高亮候選的字是主要內容，門檻是 WCAG AA 的 4.5（取捨說明見 [DarkTheme] 版本測試的 KDoc）。 */
+    /** 高亮候選的字是主要內容，門檻是 WCAG AA 的 4.5（取捨說明見本檔 class KDoc 與 [DarkTheme] 的註解）。 */
     @Test
     fun `LightTheme candidateText on candidateHighlight meets WCAG AA`() {
         val ratio =
@@ -133,7 +134,7 @@ class BuiltInThemesContrastTest {
         assertTrue(ratio >= 4.5, "expected >= 4.5, was $ratio")
     }
 
-    /** 高亮候選的字是主要內容，門檻是 WCAG AA 的 4.5（取捨說明見上一條測試的 KDoc）。 */
+    /** 高亮候選的字是主要內容，門檻是 WCAG AA 的 4.5（取捨說明見本檔 class KDoc 與 [DarkTheme] 的註解）。 */
     @Test
     fun `DarkTheme candidateText on candidateHighlight meets WCAG AA`() {
         val ratio =

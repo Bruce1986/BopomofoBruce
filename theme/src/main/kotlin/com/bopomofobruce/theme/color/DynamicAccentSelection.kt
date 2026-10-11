@@ -46,9 +46,10 @@ internal fun contrastRatio(a: UInt, b: UInt): Double {
  *
  * G3 背景：M3 的 `dynamicLightColorScheme` / `dynamicDarkColorScheme` 只依桌布換色相與彩度，**不換
  * tone**——`*Container` 角色的 tone 是固定目標（light 下 container≈90、surface≈98；dark 下
- * container≈30、surface≈6——material3 1.3.1 的 dark 取 neutralVariant6，這裡原本寫 10），跟 `surface`
- * 只差固定的色階距離。把 `keyAccent` 寫死映到 `scheme.primaryContainer`，等於在**任何**桌布下都重現 `BuiltInThemes`
- * 剛修掉的缺陷——文字達標、 但強調色自己對 `keyFill`/`background` 的分離度只有 1–2:1（container 與 surface 幾乎同 tone）。
+ * container≈30、surface≈6——API 31–33 的 dark 取 neutralVariant6（material3 1.3.1 反組譯；這裡原本寫 10），API 34
+ * 以上讀系統資源、tone 未查證），跟 `surface` 只差固定的色階距離。把 `keyAccent` 寫死映到
+ * `scheme.primaryContainer`，等於在**任何**桌布下都重現 `BuiltInThemes` 剛修掉的缺陷——文字達標、 但強調色自己對
+ * `keyFill`/`background` 的分離度只有 1–2:1（container 與 surface 幾乎同 tone）。
  * 這個函式不寫死映射到某一個角色，而是從呼叫端給的候選清單中挑：
  * 1. 保留 `contrastRatio(candidate, textPartner) >= textThreshold` 的候選（文字可讀是硬下限， 候選色要能承載
  *    `keyText`/`candidateText`）。
@@ -87,9 +88,10 @@ internal fun contrastRatio(a: UInt, b: UInt): Double {
  *   但只在**還有別的候選通過文字門檻**時才讓得出去——`keyAccent` 是唯一過門檻者時，回傳的就是它自己，照樣撞色、只是文字可讀）。**不要**只傳
  *   `listOf(background)`——那是 H1 修正前的舊寫法， 在 M3 baseline 的 tone 分布下兩次呼叫會雙雙選中 `inversePrimary`，light 對
  *   background 僅 1.66:1、 dark 2.66:1，皆不及本模組自訂的 WCAG 1.4.11 門檻。 **併入 `keyAccent` 不保證分離度**：以
- *   `MaterialYouThemeTest` 的色階 fixture 實跑（2026-10-12；前面 1.66／2.66 是拿 M3 baseline 色票算的，dark surface
- *   用了 tone 10， 而 material3 1.3.1 實際是 tone 6，所以 dark 那個數字偏低），撞色的舊寫法是 light 1.62:1、dark
- *   2.88:1，現行寫法選出的 `candidateHighlight` 對 background 是 light 1.23:1、dark 1.99:1，比撞色時更低。
+ *   `MaterialYouThemeTest` 的色階 fixture 實跑（2026-10-12；前面 1.66／2.66 是拿 M3 baseline 色票算的：dark surface
+ *   用了 tone 10，而 API 31–33 的 動態配色是 tone 6；light 用了約 tone 99 的 `#FFFBFE`，動態配色是 tone 98。fixture 模擬的是
+ *   API 31–33 那條路徑），撞色的舊寫法是 light 1.62:1、dark 2.88:1，現行寫法選出的 `candidateHighlight` 對 background 是
+ *   light 1.23:1、dark 1.99:1，比撞色時更低。
  * @param textThreshold WCAG AA 一般文字門檻，預設 4.5。
  * @param excluded 要排除的顏色集合（例如另一個用途已經選中的顏色，避免撞色）。若排除後候選清單變空， 見上方
  *   KDoc「退化語意」——會忽略這個排除限制。預設空集合，等同不排除任何顏色。
