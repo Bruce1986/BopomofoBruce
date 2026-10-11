@@ -128,6 +128,11 @@ class PhotoBackgroundTest {
 
         assertFalse(error.message.orEmpty().contains("secret"), "例外訊息帶出了路徑：${error.message}")
         assertFalse(error.message.orEmpty().contains("Pictures"), "例外訊息帶出了路徑：${error.message}")
+        // 只查兩個子字串擋不住「印出冒號前的前幾個字元」（實測：`scheme.take(8)` 會印 `/storage` 而上面兩條仍綠）。
+        assertTrue(
+            error.message.orEmpty().endsWith(", but was not a uri scheme"),
+            "例外訊息的結尾應為固定字串：${error.message}",
+        )
     }
 
     @Test

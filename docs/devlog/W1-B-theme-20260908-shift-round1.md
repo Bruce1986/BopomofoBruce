@@ -9,6 +9,7 @@
 | --- | --- | --- |
 | 第七～十七輪（中文數字） | `feat-w1b-theme.md` 各節 | 2026-08-10～11 |
 | round 1、第 2～4 輪（歷班第 1～4 輪） | 本檔開頭到 `# 第 4 輪` | 2026-09-08 |
+| 2C／3B／2D（不算一輪） | 本檔 `# Owner 裁決後的落地（2026-09-08）` | 2026-09-08 |
 | 歷班第 5～8 輪 | 本檔 `# 排程深審 2026-09-15 第 1～4 輪` | 2026-09-15 |
 | 歷班第 9 輪 | 本檔 `# 排程深審 2026-09-22 第 1 輪` | 2026-09-22 |
 | 歷班第 10 輪起 | 本檔 `# 手動 GGR fix-loop … 第 N 輪` | 2026-10-10 起 |
@@ -29,7 +30,8 @@
    `feat-w1b-theme.md` 第九輪 G3 的範圍更正。
 4. 動態路徑在所有候選都不過文字門檻時，回傳「文字對比最高但仍低於 4.5」的色，不通知呼叫端——`MaterialYouTheme.from` 與 `pickAccentColor` 的 KDoc。
 5. Dark 的 `keyAccent` 對 background 2.9485，未達 3.0，門檻維持 2.9；解法與代價——本檔「3B」節的「只修好了一半」。
-6. `KeyboardColors` 缺 on-accent／on-candidate-highlight 欄位（`:common` 已凍結，屬 W2 契約）——本檔「TODO（已登記，本次未做）」、`BuiltInThemes.kt` 註解。
+6. `KeyboardColors` 缺 on-accent／on-candidate-highlight 欄位（`:common` 已凍結，屬 W2 契約）——on-candidate-highlight 見本檔
+   「TODO（已登記，本次未做）」的 `onSecondaryContainer` 那項；on-accent 只記在 `BuiltInThemes.kt` 註解與 `feat-w1b-theme.md` 第七、八輪。
 7. `SrcAtop` 的 tint alpha 為 `0xFF` 時會完全蓋掉底圖（刻意，`init` 不限制），W2-C 設定頁要自己限制——`PhotoBackground.kt` KDoc。
 
 **B. 契約與邊界**
@@ -39,7 +41,8 @@
    讀到的是別的 app 的 APK 資源、只拿來當圖片畫，沒有外送路徑；要不要限定本套件由 owner 決定。**這一項在本表之前沒有任何記載。**
 9. `KeyboardColors` 不驗證任何欄位（含 alpha 為 0 的透明色）——`StyleSheet.kt` KDoc、本檔歷班第 11 輪。
 10. 反序列化時 `init` 丟的是裸的 `IllegalArgumentException`、不是 `SerializationException`（`StyleSheet` 與 `PhotoBackground` 皆然）；
-    收緊 scheme 白名單會讓已存資料解不出來——兩處 KDoc。`PhotoBackground` 那條 `assertFalse(thrown is SerializationException)` 的反向驗證沒跑（本檔歷班第 8 輪）。
+    收緊 scheme 白名單會讓已存資料解不出來——兩處 KDoc。`PhotoBackground` 那條 `assertFalse(thrown is SerializationException)` 的反向驗證在歷班第 8 輪沒跑，歷班第 16 輪由 reviewer 在沙箱補跑：
+    把 `init` 改丟 `SerializationException`，`decoding a theme json with a network uri is rejected` 會紅。
 11. 白名單刻意不收 `file`；W2-C 若改成複製進 app 儲存區再用 `file://`，要連路徑範圍限制一起加——`PhotoBackground.kt` KDoc。
 12. 「Photo Picker 的 URI 不支援 `takePersistableUriPermission`」未查證，W2-C 選圖前要確認——`PhotoBackground.kt` KDoc。
 
@@ -47,13 +50,17 @@
 
 13. 實機 200 ms 未量測；四個 `@Preview` 未實際 render；動態色在實際桌布下的數字未驗證。
 14. 實機 androidTest（覆蓋 `>= 31` 動態取色）：可行性已查、未執行，要 owner 同意在手機安裝測試 APK——本檔「2D」節。
-15. `AccentColorSelectionTest` 原本的 7 條裡有 3 條在「永遠回傳第一個候選」突變下全綠——本檔「留給 owner」第 3 項；之後各輪沒有專門回頭處理這一條。
+15. （已解，2026-10-12 實跑）「`pickAccentColor` 永遠回傳第一個候選」這個突變，本檔「留給 owner」第 3 項記的是當時 7 條裡有 3 條全綠；
+    現在整套有 7 條會紅（`AccentColorSelectionTest` 5 條、`MaterialYouThemeTest` 2 條）。原本那 3 條仍綠：同分取前者與單一候選本來就不該紅，
+    `excludes an already-chosen color…` 是預期答案剛好排第一。
 16. 已評估、仍存活的突變——本檔歷班第 10 輪「仍存活、未補」與第 13 輪「已評估、未補」。
 
 **D. 屬 W2 範圍（本 PR 不做）**
 
-17. `StyleSheet` → `KeyboardTheme` adapter、`ThemeSwatch` 改 public、`:common` 的 `KeyboardTheme` 標 `@Stable`、`isDynamic`／`degraded`、
-    匯出 `ThemeJson`／`schemaVersion`——`feat-w1b-theme.md`「被判為範圍外、未做（登記給 W2）」。
+17. `StyleSheet` → `KeyboardTheme` adapter、`ThemeSwatch` 改 public——`feat-w1b-theme.md`「被判為範圍外、未做（登記給 W2）」。
+    `:common` 的 `KeyboardTheme` 標 `@Stable`——`feat-w1b-theme.md` 的 B15 段、`MaterialYouTheme.kt` class KDoc。
+    `isDynamic`／`degraded`、匯出 `ThemeJson`／`schemaVersion`、`PhotoBackground` 併進 `StyleSheet`——兩份 devlog 都沒有獨立記載，
+    只列在 main 上的 `docs/HANDOVER-W1-fixloop-20260811.md` §4（審查時被判為 W2 範圍、不再重提的清單）。
 
 自動 PR 深審 routine 對 #9 跑的一輪：兩個並行 reviewer 視角（色彩／對比數學正確性、測試守門
 有效性＋突變）＋ parent 自審。**所有結論都在本機實跑驗證過**
@@ -740,3 +747,18 @@ Codex 與產品碼視角皆零 finding（產品碼視角只做靜態讀碼，沒
   與裸的 `IllegalArgumentException` 四種，全是 IAE 子類，照 KDoc 寫的 catch 接得住；20 萬層巢狀沒有 `StackOverflowError`。
 
 **PR 描述已大幅過期**（條數、「連續兩輪零 finding」、深色候選色的舊方案），不在 repo 內、本輪未動，待 owner 同意後更新。
+
+# 手動 GGR fix-loop 2026-10-12 第 7 輪（歷班第 16 輪）
+
+視角：輸出誠實性（逐項核對上一輪寫的總表與標記）、上一輪產品碼修正的回歸檢查。產品碼 0 改動，87 tests / 0 failures，`ktfmtCheck` 綠。
+
+- 🟡 **上一輪補的測試自己有洞**：`rejection message does not echo a path that merely contains a colon` 只查訊息不含
+  `secret`、`Pictures`；實作若印出冒號前的前 8 個字元（`/storage`），它仍綠（reviewer 實跑）。補上「訊息結尾為固定字串」的斷言，
+  同一個突變轉紅（reviewer 與 parent 各跑一次）。
+- 🟡 **總表三項寫錯**：D17 把只列在 `HANDOVER` 的三樣說成「devlog 已登記」；A6 指到的 TODO 節只有 on-candidate-highlight、
+  沒有 on-accent；C15 把「永遠回傳第一個候選」突變列為未解，實跑現在有 7 條會紅。三項已改；輪次對照表補上
+  「Owner 裁決後的落地」一列；B10 的反向驗證由 reviewer 補跑後更新。
+- 修正本身的回歸檢查沒有發現問題：全新 JVM 第一個動作就反序列化壞輸入，丟的是 IAE、不是初始化錯誤；全 repo 沒有東西依賴舊訊息格式。
+  **殘餘**：冒號前整段剛好符合 scheme 形狀的字串（最長 32 字元，例如 `alice-private.diary:page1`）仍會被印出，無法與真的 scheme 區分。
+- 操作備忘：沙箱若連 `.gradle/` 一起複製，configuration cache 會把建置導回原 worktree；用過 `--tests` 之後 cache 也會沿用篩選。
+  沙箱複製要排除 `.gradle/`，或加 `--no-configuration-cache`。
