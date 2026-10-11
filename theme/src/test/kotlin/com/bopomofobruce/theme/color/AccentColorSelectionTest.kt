@@ -160,8 +160,9 @@ class AccentColorSelectionTest {
      * B22 修掉的缺陷（見 [com.bopomofobruce.theme.MaterialYouTheme] 呼叫處註解的 M3 baseline 實算數字：light 下從
      * 1.66:1 倒退到 1.26:1，dark 下倒退到 B22 明講「不及 3:1」的 1.84:1 那個色值）。
      *
-     * 這裡用專門構造的候選集合重現同一種結構：`keyAccentColor` 是唯一通過文字門檻、且對 background
-     * 分離度最好（2.17:1）的候選；`weakerFailingCandidate`／`weakestFailingCandidate` 兩個都不過文字
+     * 這裡用專門構造的候選集合重現同一種結構：`keyAccentColor` 是唯一通過文字門檻、且對 background 分離度 2.17:1
+     * 的候選（不是三者中最高——`weakestFailingCandidate` 是
+     * 2.31:1，但它不過文字門檻）；`weakerFailingCandidate`／`weakestFailingCandidate` 兩個都不過文字
      * 門檻，但**越接近文字門檻的那個（`weakerFailingCandidate`）分離度反而越差**（1.69:1，比 `weakestFailingCandidate` 的
      * 2.31:1 還差）——這種「文字對比與背景分離度方向相反」的關係， 用 Python 對這三個色值重算過 WCAG 相對亮度與對比度確認存在（不是隨手編的巧合）。
      *
@@ -182,7 +183,7 @@ class AccentColorSelectionTest {
     fun `does not sacrifice separation from background just to dodge a collision with keyAccent`() {
         val keyAccentTextPartner = 0xF5F5F5u
         val backgroundRef = 0x683E82u
-        val keyAccentColor = 0x18143Au // text 16.05（通過），對 background 2.17:1（三者中最好）
+        val keyAccentColor = 0x18143Au // text 16.05（通過），對 background 2.17:1（三者中唯一過文字門檻的）
         val weakerFailingCandidate = 0xD80C94u // text 4.38（不通過，最接近門檻），對 background 1.69:1（三者中最差）
         val weakestFailingCandidate = 0xE06244u // text 3.21（不通過，離門檻更遠），對 background 2.31:1（比上面好）
 

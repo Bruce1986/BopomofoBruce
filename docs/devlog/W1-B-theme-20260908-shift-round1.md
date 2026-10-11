@@ -598,3 +598,15 @@ Codex 與產品碼視角皆零 finding（產品碼視角只做靜態讀碼，沒
 - 動態路徑覆寫 `shapes.keyCornerRadiusDp`：「動態路徑只換 colors，其餘沿用退化主題」沒有守門。
 - Dark `keyFill` 設成與 `background` 相同：規格與 KDoc 都沒要求兩者分離，不算缺口。
 - `>= textThreshold` → `>`、`highlightCandidates` 前三項換順序：只在恰好等於門檻／完全同分時有差，現有資料下屬等價突變。
+
+# 手動 GGR fix-loop 2026-10-11 第 2 輪（歷班第 11 輪）
+
+視角：輸出誠實性、規格對照＋契約。產品行為 0 改動（只動 KDoc／註解／devlog），80 tests / 0 failures，`ktfmtCheck` 綠。
+
+- 🟡 `StyleSheet` 的「呼叫端契約」KDoc 把 `KeyboardColors` 列進「在 `init` 用 `require` 驗證」的型別——它沒有 `init`，
+  六個欄位是裸 `UInt`。改成只列實際有驗證的三個，並寫明顏色（含 alpha）不驗。
+- 🟡 `does not sacrifice separation…` 的 KDoc、行內註解與 `feat-w1b-theme.md` 第十二輪都寫 `keyAccentColor`
+  「對 background 分離度最好」。重算：2.1667，而 `weakestFailingCandidate` 是 2.3077。測試鎖得住靠的是
+  「只有它過文字門檻」，不是分離度排名；三處敘述已更正。
+- 🟡 DEVPLAN W1-B 寫「Compose `Brush` 套用」，實作沒有用 `Brush`，而 devlog 只寫了實際用什麼。
+  已在 `feat-w1b-theme.md`「交付」段補記這項偏離，是否為硬性要求留給 owner。

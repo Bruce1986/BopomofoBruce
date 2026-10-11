@@ -22,7 +22,9 @@
   blurRadiusDp / opacity / tint）+ `PhotoBackgroundLayer`
   （`photo/PhotoBackgroundLayer.kt`）用 Coil `AsyncImage` 載入、
   `Modifier.blur()` + `.alpha()` + `ColorFilter.tint(..., BlendMode.SrcAtop)`
-  套用。
+  套用。**與 DEVPLAN 字面不同**：DEVPLAN W1-B 寫的是「用 Coil 載入、Compose `Brush` 套用」，本模組
+  沒有用到 `Brush`（模糊、透明度、色調三項各用上述 modifier／`ColorFilter`）。這個取捨當初沒有留下
+  紀錄，2026-10-11 規格對照時才補記；`Brush` 是否為硬性要求留給 owner 判斷。
 - Compose `@Preview`：`theme/.../preview/ThemePreviews.kt` 四個預覽
   （Light / Dark / Material You 退化路徑 `apiLevel = 30` / Material You 動態取色
   路徑 `apiLevel = 35`）共用一個 `ThemeSwatch` 假鍵盤列 render。**G2 後**：候選列
@@ -399,7 +401,8 @@
 
   **必加測試**：`theme/src/test/kotlin/com/bopomofobruce/theme/color/AccentColorSelectionTest.kt`
   新增 `does not sacrifice separation from background just to dodge a collision with keyAccent`。
-  構造三個候選：`keyAccentColor`（唯一過文字門檻、對 background 分離度最好 2.17:1）、
+  構造三個候選：`keyAccentColor`（唯一過文字門檻、對 background 2.17:1；2026-10-11 更正：原文寫「分離度最好」不成立，
+  `weakestFailingCandidate` 是 2.31:1，只是不過文字門檻）、
   `weakerFailingCandidate`（不過文字門檻但最接近門檻，分離度反而最差 1.69:1）、
   `weakestFailingCandidate`（不過文字門檻、離門檻更遠，分離度較好 2.31:1）——三個色值用 Python 重算過
   WCAG 相對亮度與對比度，不是隨手編的。測試內同時保留一條 sanity check：直接呼叫舊式
