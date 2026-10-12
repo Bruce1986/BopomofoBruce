@@ -51,6 +51,7 @@
 8a. 圓角與字級的防呆上限（`KeyboardShapes.MAX_CORNER_RADIUS_DP`、`KeyboardTypography.MAX_FONT_SIZE_SP`，目前都是 1000）是歷班第 21 輪
    加的，數值沒有設計依據；目的是擋掉會讓 px 變成無限大的輸入，做法是超過 1000 一律拒絕（px 仍有限的也拒）；請 owner 複核。主題 JSON 開始被存下來之後再調低，會讓已存的資料解不出來。
    上限只對「自己建構或從 JSON 解出來的」`KeyboardShapes`／`KeyboardTypography` 有意義；內建主題與 `MaterialYouTheme` 用的都是預設值。
+   一個會被這個數值擋掉的寫法：用 `9999` 之類的大數表示「全圓角」（膠囊形）。目前沒有任何資料這樣寫；鍵高 48 dp 時 24 以上就已經是全圓。
 
 **B. 契約與邊界**
 
@@ -1008,3 +1009,25 @@ Light `keyFill` 改成 `#FEFEFE`（色值不設絕對快照是刻意的）；亮
 - 🟡 **總表兩項沒跟上後面的輪次**：C16 沒有指到歷班第 25 輪另記的「已評估、未補」；C15 寫「現在整套有 7 條會紅」，那是歷班第 16 輪（87 條時）的實跑數字，
   之後新增的測試沒有重數——改成據實標明。另補一句前向說明（歷班第 25、26 輪說 preview KDoc「已改成條件句」，實際到第 27 輪才改完）。
 - 條數鏈逐 commit 實數（70→80→85→87→90→91→92→95）與各節一致；18 節的雙編號都成立；`feat-w1b-theme.md` 這次加的七個更正標記與本檔最新結論一致。
+
+# 手動 GGR fix-loop 2026-10-12 第 20 輪（歷班第 29 輪；Opus tracer＋Codex 第三次複檢）
+
+收尾輪。**零 finding，沒有動到 `theme/`**；Codex 對最終的 `theme/` diff 也是 No findings（三次都是）。
+
+- 推送前的機械檢查（沙箱由 HEAD 複製，照 `.github/workflows/ci.yml` 的寫法跑根專案 task，本機 JDK 21）：`assembleDebug`、`ktfmtCheck`、`lint`、
+  `testDebugUnitTest :common:test` 四步都是 EXIT 0；測試 XML 加總 `:theme` 95、`:keyboards` 49、`:common` 26，共 170 tests / 0 failures。
+  diff 只動 `theme/**` 與本目錄兩份 devlog；`git diff --check` 無輸出；新增行裡沒有 `println`、`TODO`、被停用的測試、探針或暫存路徑的殘留。
+  **JDK 17 沒有在本機實跑**，推上去之後以 CI 為準。
+- 最終狀態複審：產品碼逐檔讀完，沒有會在 review 擋下的東西；這次新增的 25 條測試逐條看過，隨機抽 6 條各做一個突變，每個都只紅目標那一條。
+- 上限 1000 的一個具體反例記入總表 8a：用 `9999` 表示全圓角的寫法會被拒。
+
+## 這次 fix-loop（歷班第 10～29 輪）的總結
+
+- 測試 70 → 95 條。產品碼的行為變更三處：`PhotoBackground` 的拒絕訊息不再帶出含冒號的裸路徑；圓角三欄與字級三欄加防呆上限 1000。其餘對 `theme/src/main` 的改動都是 KDoc 與註解。
+- 20 輪裡完全沒有 finding 的是第 3、15、20 輪（歷班第 12、24、29 輪）；**沒有達到「連續兩輪乾淨」**。後半各輪的 finding 幾乎都在敘述
+  （KDoc、註解、本檔），而且多次是前一輪的更正句自己又寫得不準——共同型態是把只在一個分支或一組資料上驗過的結論寫成全稱。
+- 跑過的視角：正確性、錯誤處理／失敗模式、資料模型／契約、規格對照、輸出誠實性、可執行性、接手性、資安／隱私、跨環境、執行成本、測試品質（突變）、文件全文、反方論證。
+  各自最後一次跑的結果：正確性（第 14 輪）、資安／跨環境（第 15 輪）、規格對照（第 17 輪）零 finding；其餘視角最後一次都還有 finding 並已處理。
+- 留給之後的事（不在本 PR 做）：`theme/src/main` 的註解行數與程式碼行數接近 1:1，其中 `pickAccentColor` 的 KDoc 與 `MaterialYouTheme` 呼叫處註解各疊了三、四層更正。
+  建議 merge 後另開一支只動註解的 PR，把沿革搬進 devlog、原始碼只留現況與原因。`MaterialYouThemeTest` 的色階測試綁在 material3 1.3.1 讀資源的方式上，
+  升 compose BOM 時若轉紅，先讀該檔 class KDoc。`sdkIntProvider` 是全域可變狀態，測試靠循序執行才安全，日後若開 JUnit 平行執行要先處理。
