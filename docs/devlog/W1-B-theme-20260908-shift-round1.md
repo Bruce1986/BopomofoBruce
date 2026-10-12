@@ -57,9 +57,10 @@
 8. `PhotoBackground` 只驗 scheme、不驗 authority：`android.resource://其他套件名/…` 會通過白名單。Coil 2.6 的 `ResourceUriFetcher`
    在 authority 不是本套件時會經 `PackageManager.getResourcesForApplication` 去讀（2026-10-12 反組譯所見，未實機驗證）。
    讀到的是別的 app 的 APK 資源、只拿來當圖片畫，沒有外送路徑；要不要限定本套件由 owner 決定。**這一項在本表之前沒有任何記載。**
-8b. `:common` 的 `KeyboardDimens` 四個欄位只擋負值與非有限值、沒有上限（contracts-v1 凍結，本 PR 不能動）。reviewer 實跑
-   `Constraints.fixedHeight(262143)` 會丟例外；極大的 `keyHeightDp` 經 `Modifier.height` 實際會怎樣，純 JVM 驗不了。
-   解析不受信任的主題 JSON 之後、交給 Compose 之前，呼叫端要自己夾住——歷班第 21 輪。
+8b. `:common` 的 `KeyboardDimens` 四個欄位只擋負值與非有限值、沒有上限（contracts-v1 凍結，本 PR 不能動）。太大時壞的是
+   Compose `Constraints` 的可表示範圍（沙箱實測約 262142 px 以上 `Constraints.fixedHeight` 丟 `IllegalArgumentException`；換成 dp 隨密度而變，
+   密度 4 下約 65535 dp），不是數值溢位。`Modifier.height` 會不會因此在版面配置時丟例外是由 bytecode 推論、沒有在裝置上跑過。
+   解析不受信任的主題 JSON 之後、交給 Compose 之前，呼叫端要自己把四個欄位夾住（實測夾到 1000 之後不再丟）——`StyleSheet.kt` KDoc、歷班第 21、27 輪。
 8c. `PhotoBackground` 的拒絕訊息不帶完整 uri，但冒號前整段剛好長得像 scheme 的字串（最長 32 字元，例如 `vacation-2024.jpg:1` 的
     `vacation-2024.jpg`）仍會被印出，無法與真的 scheme 區分——`PhotoBackground.kt` KDoc、歷班第 16 輪。
 9. `KeyboardColors` 不驗證任何欄位（含 alpha 為 0 的透明色）——`StyleSheet.kt` KDoc、本檔歷班第 11 輪。
@@ -71,7 +72,8 @@
 12b. 接手指引（內容都在 KDoc，這裡只指路）：W2-C 做選圖與相片背景之前先讀 `PhotoBackground.kt` 的 class KDoc 與 `PhotoBackgroundLayer.kt` 的
     KDoc——載入失敗時背景只是不畫、唯一訊號是一行 `Log.w`（只記 scheme 與例外類別名稱）；scheme 只收小寫；模糊在 API 30 以下不套用；
     持久授權與解碼失敗的 log 規則。W2-B 把主題接進 IME 之前先讀 `MaterialYouTheme.from` 的 KDoc——回傳的是呼叫當下的快照、不監聽桌布或深色模式變更、
-    不通知 fallback、本身不接例外。`from` 回傳的 dimens／shapes／typography 沿用內建主題的預設值，總表 8a、8b 的「要自己夾住」是針對從 JSON 解出來的 `StyleSheet`。
+    不通知 fallback、本身不接例外。`from` 回傳的 dimens／shapes／typography 沿用內建主題的預設值；總表 8b 的「要自己夾住」只針對從 JSON 解出來的 `StyleSheet.dimens`
+    （shapes／typography 在 `init` 已有上限，見 8a）。
 
 **C. 驗證缺口**
 
@@ -980,3 +982,18 @@ Light `keyFill` 改成 `#FEFEFE`（色值不設絕對快照是刻意的）；亮
 - 🟡 **上一筆的兩處**：歷班第 25 輪寫「共 10 處」，自己列出來的是 11 處，另有兩個改動沒列；`ThemePreviews.kt` 新寫的
   「`apiLevel = 35` 走的是 `SDK_INT >= 34` 的路徑」把沒驗過的一步（Layoutlib 的 `SDK_INT` 是否跟著 `apiLevel`）寫成了肯定句，改成條件句。
 - reviewer 補跑了歷班第 25 輪表格第 2 列（fallback 分支同分取後者），只紅對應的那條；其餘三列也各自重跑確認。
+
+# 手動 GGR fix-loop 2026-10-12 第 18 輪（歷班第 27 輪）
+
+視角：上一筆的複審、錯誤處理／失敗模式對現況重跑（扮演只照 KDoc 寫程式的呼叫端；`StyleSheet` 86 種、`PhotoBackground` 54 種壞輸入，各兩種 `Json` 設定）。
+產品行為 0 改動，95 tests / 0 failures，`ktfmtCheck` 綠。
+
+- 🟠 **`StyleSheet` KDoc 對 `KeyboardDimens` 過大的說明，機制寫錯、也沒有給可以照著夾的數字**。原文說「px 溢位」；實測沒有任何數值溢位
+  （`roundToPx()` 對 `1e38.dp` 回 `Int.MAX_VALUE`），丟例外的是 Compose `Constraints`（約 262142 px 以上），而且臨界的 dp 隨密度而變。
+  照「溢位」的字面去防 Int／Float 範圍的呼叫端，仍會在 `Constraints` 那一步出事。KDoc 改成點名四個欄位、寫出實測臨界值與「夾到 1000 之後不再丟」；總表 8b 同步。
+- 🟡 上一筆的三處：兩條 MaterialYou preview 的 KDoc 只有一段改成了條件句，同一段的第一句與另一條 preview 仍把 `apiLevel` 當成已確認會決定
+  `SDK_INT`——都改成「意圖是」；總表 12b 把 8a（建構時就拒絕）與 8b（要呼叫端夾）混成一件事；12b 說「內容都在 KDoc」，但「`from` 不接例外」KDoc 沒寫——補進 KDoc。
+- 照 KDoc 寫的 catch 接得住全部壞輸入（10 萬層巢狀、1 MB 的 id、各種數值邊界都試過）；`PhotoBackground` 所有失敗路徑的例外**類別名稱**都不含 uri；
+  KDoc 提到的 Android API 與旗標名稱在 android.jar 裡都存在；material3 讀色只用 `context.resources.getColor`，不讀 `Configuration`，application context 可用。
+- 未列為 finding 的觀察：上限加入前合法、加入後超限的資料，呼叫端接到的是帶欄位名的 `IllegalArgumentException`；`StyleSheet`／`KeyboardShapes` 的 KDoc 沒有像
+  `PhotoBackground` 那樣寫「讀取端該怎麼辦」。目前沒有任何已存資料。`:common` 的 `UIntHexSerializer` 的錯誤訊息不帶欄位名或 JSON 位置（凍結，不在本 PR）。

@@ -23,7 +23,11 @@ import kotlinx.serialization.Serializable
  * `IllegalArgumentException`（或接兩者共同的上層 `RuntimeException`）。
  *
  * **解碼成功不代表可以直接交給 Compose**：[KeyboardShapes] 與 [KeyboardTypography] 的尺寸欄位有防呆上限，但 [KeyboardDimens]
- * （`:common`，已凍結）只擋負值與非有限值、沒有上限；極大的值乘上螢幕密度後會讓 px 溢位。解析不受信任的主題 JSON 之後，呼叫端在包成 `Dp` 之前要自己夾住。
+ * （`:common`，已凍結）只擋負值與非有限值、沒有上限。它的四個欄位（`keyHeightDp`、`rowGapDp`、`keyGapDp`、`candidateRowHeightDp`）太大時，壞的不是數值溢位
+ * （`roundToPx()` 只會回一個很大的 Int），而是 Compose `Constraints` 表示不了：2026-10-12
+ * 沙箱實測，`Constraints.fixedHeight` 在約 262142 px 以上丟 `IllegalArgumentException`，換算成 dp 隨密度而變（密度 1 約
+ * 262142、2.625 約 99863、4 約 65535）。`Modifier.height` 會不會因此在版面配置時丟例外是由 bytecode 推論、沒有在裝置上跑過。解析不受信任的主題
+ * JSON 之後，呼叫端在包成 `Dp` 之前要自己把這四個欄位夾到合理範圍（實測夾到 1000 之後不再丟）。
  */
 @Serializable
 data class StyleSheet(

@@ -67,6 +67,9 @@ private constructor(override val id: String, val styleSheet: StyleSheet) : Keybo
          *
          * 動態路徑不保證對比：所有候選角色對 `keyText` 都不到 4.5 時，`keyAccent`／`candidateHighlight` 會是「文字對比最高、 但仍低於
          * 4.5」的那個色（見 `pickAccentColor` 的第 3 點），本函式不會以任何方式通知呼叫端。
+         *
+         * 本函式不接任何例外：`>= 31` 時 material3 的 `dynamicLightColorScheme`／`dynamicDarkColorScheme`
+         * 讀系統色資源若丟例外，會原樣傳給呼叫端。
          */
         fun from(context: Context, darkMode: Boolean): MaterialYouTheme =
             from(context, darkMode, sdkIntProvider())

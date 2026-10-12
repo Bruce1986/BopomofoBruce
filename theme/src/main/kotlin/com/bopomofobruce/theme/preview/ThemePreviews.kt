@@ -105,8 +105,10 @@ private fun DarkThemePreview() {
 }
 
 /**
- * 用 `@Preview(apiLevel = 30)` 明確釘住 API 30（<31）host，走 [MaterialYouTheme] 「讀不到動態色時退化為 Light
- * 色盤」的路徑；`apiLevel` 不釘的話由 tooling 自行決定實際跑在哪個等級，不能保證這個預覽展示的是 退化路徑。實際桌布取色（>=31 分支）仍須實機驗證，見 devlog。
+ * 用 `@Preview(apiLevel = 30)` 指定 API 30（<31）的 host，意圖是走 [MaterialYouTheme]「讀不到動態色時退化為 Light 色盤」的路徑；
+ * `apiLevel` 不指定的話由 tooling 自行決定跑在哪個等級。**這條 preview 也沒有在 Android Studio 實際開啟過**：分流看的是
+ * `Build.VERSION.SDK_INT`，Layoutlib 的 `SDK_INT` 是否跟著 `apiLevel` 走沒有驗證，所以「展示的是退化路徑」是預期、不是已確認的事。
+ * 實際桌布取色（>=31 分支）仍須實機驗證，見 devlog。
  */
 @Preview(name = "Material You (fallback)", showBackground = true, apiLevel = 30)
 @Composable
@@ -117,7 +119,7 @@ private fun MaterialYouThemeFallbackPreview() {
 }
 
 /**
- * 用 `@Preview(apiLevel = 35)` 釘住 >=31 的 host，走 [MaterialYouTheme]
+ * 用 `@Preview(apiLevel = 35)` 指定 >=31 的 host，意圖是走 [MaterialYouTheme]
  * 的動態取色分支（`dynamicLightColorScheme`）。
  *
  * **這條 preview 從未在 Android Studio 內實際開啟驗證過**，只確認過編譯通過。若 Layoutlib 的 `SDK_INT` 跟著 `apiLevel = 35`
