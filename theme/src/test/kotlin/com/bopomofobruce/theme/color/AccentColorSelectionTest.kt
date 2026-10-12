@@ -6,8 +6,8 @@ import org.junit.jupiter.api.Test
 
 /**
  * G3 守門：[pickAccentColor] 是純函式（不需要 Android runtime），所以可以用假造的色彩組合在 JVM 上驗證 `MaterialYouTheme`
- * 動態取色路徑的選色邏輯——即使 `dynamicLightColorScheme`/`dynamicDarkColorScheme` 本身仍然無法在這裡測（需要系統資源，見
- * [com.bopomofobruce.theme.MaterialYouTheme] 的 KDoc）。
+ * 動態取色路徑的選色邏輯。`dynamicLightColorScheme`／`dynamicDarkColorScheme` 的呼叫處另由 `MaterialYouThemeTest` 以
+ * resource id 色階 fixture 守（只涵蓋 material3 在 `SDK_INT < 34` 的路徑）；實際桌布的色值這兩處都驗不到。
  *
  * 色值取自 [com.bopomofobruce.theme.DarkTheme] 附近的真實數字，用 Python 重算過 WCAG 對比度（見 commit 說明），不是憑空編的。
  */
@@ -40,7 +40,8 @@ class AccentColorSelectionTest {
 
     /**
      * 極端桌布情境（G3 明確要求覆蓋）：所有候選色彩角色的 tone 都落在中段，沒有任何一個能同時滿足 文字 AA 4.5 與分離度——container 與 surface 同 tone
-     * 的最壞情況。函式必須退回「文字對比度最高」 的候選，而不是丟例外或悄悄回傳一個文字對比度不合格的值當作合格值。
+     * 的最壞情況。函式必須退回「文字對比度最高」 的候選、不丟例外。**回傳的仍是一個低於 4.5 的顏色，而且回傳值看不出走的是 fallback**（見 `pickAccentColor`
+     * KDoc 第 3 點；`MaterialYouTheme` 目前不檢查，已列入 devlog 總表）。這條只釘「選哪一個」，不代表結果達標。
      */
     @Test
     fun `falls back to the highest text contrast candidate when nothing passes the text threshold`() {
@@ -70,6 +71,25 @@ class AccentColorSelectionTest {
     fun `keeps the earlier candidate on an exact tie`() {
         val earlierCandidate = 0x11855196u // alpha=0x11，RGB 與 laterCandidate 相同
         val laterCandidate = 0x99855196u // alpha=0x99，RGB 與 earlierCandidate 相同 → 分離度分數精確相等
+
+        val picked =
+            pickAccentColor(
+                candidates = listOf(earlierCandidate, laterCandidate),
+                textPartner = keyText,
+                separationReferences = listOf(keyFill, background),
+            )
+
+        assertEquals(earlierCandidate, picked)
+    }
+
+    /**
+     * KDoc 寫的是「同分（含 fallback 分支同分）」。上一條兩個候選都過文字門檻，走的是分離度那條比較；fallback 分支的同分沒有人守 （2026-10-12 突變實測：只在
+     * fallback 分支改成取後者，92 條全綠）。這裡兩個候選都不過文字門檻（對 keyText 2.28）、RGB 相同只差 alpha。
+     */
+    @Test
+    fun `keeps the earlier candidate on an exact tie in the fallback branch too`() {
+        val earlierCandidate = 0x119E8FBFu
+        val laterCandidate = 0x999E8FBFu
 
         val picked =
             pickAccentColor(
@@ -115,9 +135,9 @@ class AccentColorSelectionTest {
 
     /**
      * H1（第十一輪審查）：`keyAccent` 與 `candidateHighlight` 用同一組候選清單（成員相同、只是排序 不同）各呼叫一次
-     * [pickAccentColor]，貼近真實 M3 baseline 時兩次都選中同一個顏色（撞色）。 `excluded`
-     * 參數讓第二次呼叫排除第一次已選中的顏色。這裡重用第一條測試的三個候選值： `distinctHue` 分離度最好、原本會被選中；把它排除後，剩下的兩個候選裡
-     * `containerLike` 分離度 比 `badCandidate` 好，應該被選中。
+     * [pickAccentColor]，貼近真實 M3 baseline 時兩次都選中同一個顏色（撞色）。 H1 當時加了 `excluded`
+     * 參數，讓第二次呼叫排除第一次已選中的顏色（**正式呼叫端在 I1 之後已不傳它**，這條只驗參數本身的機制）。這裡重用第一條測試的三個候選值： `distinctHue`
+     * 分離度最好、原本會被選中；把它排除後，剩下的兩個候選裡 `containerLike` 分離度 比 `badCandidate` 好，應該被選中。
      */
     @Test
     fun `excludes an already-chosen color and picks the next best candidate`() {
@@ -157,19 +177,43 @@ class AccentColorSelectionTest {
     }
 
     /**
+     * 上一條只有一個候選，「忽略排除、走原本規則」與「直接回第一個候選」答案相同（2026-10-12 突變實測：退化分支改成 `listOf(candidates.first())`，92
+     * 條全綠）。這裡三個候選全被排除，照原本規則該選的 `distinctHue` 排在第二個。
+     */
+    @Test
+    fun `ignoring the exclusion applies the normal rule instead of taking the first candidate`() {
+        val containerLike = 0x4F378Bu // text 7.22（通過），keyFill 1.54 / background 1.84
+        val distinctHue = 0x855196u // text 4.50（通過），keyFill 2.47 / background 2.95（分離度最好）
+        val badCandidate = 0x2E2B33u // text 10.78（通過），keyFill 1.03 / background 1.23
+        val all = listOf(containerLike, distinctHue, badCandidate)
+
+        val picked =
+            pickAccentColor(
+                candidates = all,
+                textPartner = keyText,
+                separationReferences = listOf(keyFill, background),
+                excluded = all.toSet(),
+            )
+
+        assertEquals(distinctHue, picked)
+    }
+
+    /**
      * I1（第十二輪審查）：H1 用 `excluded` 硬性把 `keyAccent` 已選中的顏色從候選清單移除、再重新評分—— 這個「先過濾、再評分」的順序本身會讓分離度倒退，重現
      * B22 修掉的缺陷（見 [com.bopomofobruce.theme.MaterialYouTheme] 呼叫處註解的 M3 baseline 實算數字：light 下從
      * 1.66:1 倒退到 1.26:1，dark 下倒退到 B22 明講「不及 3:1」的 1.84:1 那個色值）。
      *
-     * 這裡用專門構造的候選集合重現同一種結構：`keyAccentColor` 是唯一通過文字門檻、且對 background 分離度 2.17:1
+     * **這裡守的不是上面那個 M3 baseline 情境**：那個情境裡三個 container 都過文字門檻，改成併入 `separationReferences` 之後
+     * `candidateHighlight` 仍落在 container 上（色階 fixture 實跑是 light 1.23:1／dark 1.99:1），倒退沒有解掉，見
+     * `MaterialYouTheme` 呼叫處註解。這裡構造的是另一種情境：`keyAccentColor` 是唯一通過文字門檻、且對 background 分離度 2.17:1
      * 的候選（不是三者中最高——`weakestFailingCandidate` 是
      * 2.31:1，但它不過文字門檻）；`weakerFailingCandidate`／`weakestFailingCandidate` 兩個都不過文字
      * 門檻，但**越接近文字門檻的那個（`weakerFailingCandidate`）分離度反而越差**（1.69:1，比 `weakestFailingCandidate` 的
      * 2.31:1 還差）——這種「文字對比與背景分離度方向相反」的關係， 用 Python 對這三個色值重算過 WCAG 相對亮度與對比度確認存在（不是隨手編的巧合）。
      *
      * 舊呼叫方式（`excluded = setOf(keyAccentColor)`，`separationReferences = listOf(background)`， 對應 H1
-     * 修正前的 `dynamicColorsFor()`）：`keyAccentColor` 被排除後，剩下兩個候選都不過文字門檻， 退回「文字對比度最高」的 fallback 分支，選中
-     * `weakerFailingCandidate`——分離度只有 1.69:1， 明顯比 `keyAccentColor` 自己的 2.17:1 差。
+     * 修正後、I1 修正前的 `dynamicColorsFor()`）：`keyAccentColor` 被排除後，剩下兩個候選都不過文字門檻， 退回「文字對比度最高」的 fallback
+     * 分支，選中 `weakerFailingCandidate`——分離度只有 1.69:1， 明顯比 `keyAccentColor` 自己的 2.17:1 差。
      *
      * 新呼叫方式（I1 修正後：不排除，`separationReferences = listOf(background, keyAccentColor)`）： 三個候選都不排除，只有
      * `keyAccentColor` 過文字門檻，函式選中它自己（分離度 2.17:1）—— 沒有為了避開撞色（`candidateHighlight` 與 `keyAccent`
@@ -199,7 +243,7 @@ class AccentColorSelectionTest {
         assertEquals(
             weakerFailingCandidate,
             pickedWithOldExcludedStyle,
-            "sanity check：H1 修正前的舊呼叫方式應該選到分離度較差的 weakerFailingCandidate，" +
+            "sanity check：I1 修正前（H1 的硬性排除）的呼叫方式應該選到分離度較差的 weakerFailingCandidate，" +
                 "藉此證明下面的新呼叫方式確實選到不同、更好的結果",
         )
 

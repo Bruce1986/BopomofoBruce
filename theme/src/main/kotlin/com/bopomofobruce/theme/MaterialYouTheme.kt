@@ -152,8 +152,8 @@ private constructor(override val id: String, val styleSheet: StyleSheet) : Keybo
             // 的底色跟候選列選中游標的底色分不出來，正是 B22 註解要避免、繞一圈又回來的缺陷。
             //
             // I1（第十二輪審查）：H1 當時用 excluded = setOf(keyAccent) 硬性把 keyAccent 選中的顏色
-            // 從候選清單移除、再重新評分，結果**先過濾、再評分**這個順序本身會讓分離度倒退：用本檔
-            // KDoc 假設的 M3 baseline tone 分布實算，light 下 keyAccent 選中 inversePrimary（對
+            // 從候選清單移除、再重新評分，結果**先過濾、再評分**這個順序本身會讓分離度倒退：用 M3 baseline
+            // 色票實算（不是 API 31–33 動態配色的 tone，見下方 2026-10-12 更正），light 下 keyAccent 選中 inversePrimary（對
             // background 1.66:1），排除後 candidateHighlight 落到 tertiaryContainer（對 background
             // 只剩 1.26:1，比排除前更差）；dark 下落到 secondaryContainer（1.84:1，正是 B22 註解裡
             // `BuiltInThemes.kt` 記載「只有 1.84:1，不及 3:1」的同一個色值/數字，被動態路徑撿回來）。
@@ -170,7 +170,8 @@ private constructor(override val id: String, val styleSheet: StyleSheet) : Keybo
             // 已改：不再用 excluded 硬性過濾，改成把 keyAccent 併入 separationReferences——讓「與
             // keyAccent 分得開」變成跟「與 background 分得開」同級的評分項，而不是二元的
             // 排除／不排除。這同時解掉「excluded 只比對完全相同的 UInt，視覺上幾乎相同但不是同一個
-            // UInt 的顏色排不掉」的問題（見 pickAccentColor 的 KDoc）。
+            // UInt 的顏色排不掉」的問題（excluded 用 `it in excluded` 做精確比對，見 pickAccentColor 的實作；
+            // 這一點的討論在 feat-w1b-theme.md 第十二輪 I1）。
             //
             // **這個改法沒有解掉上面 I1 描述的倒退**（2026-10-12 以 MaterialYouThemeTest 的色階
             // fixture 實跑，非實機）：keyAccent 自己在評分裡恆為 1.0（最低分），所以只要還有別的候選

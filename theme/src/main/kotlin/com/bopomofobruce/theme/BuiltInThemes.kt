@@ -67,9 +67,10 @@ object DarkTheme : KeyboardTheme {
                     //
                     // B24：第一版改用 primaryContainer dark (#4F378B) 讓文字達 7.22:1，但把餘裕全
                     // 浪費掉——對 keyFill 只剩 1.54:1、對 background 1.84:1（原 primary 是 8.42 /
-                    // 10.05），按下去看不出按鍵變色。深色主題與 candidateHighlight 同源地無法三全其美
-                    // （文字 4.5 為下限時，對 keyFill 的分離度上限只有 2.47），所以**套用與
-                    // candidateHighlight 相同的規則**：文字 4.5 當硬下限，在此前提下最大化與周邊的
+                    // 10.05），按下去看不出按鍵變色。深色的 keyAccent 無法三全其美
+                    // （文字 4.5 為下限時，對 keyFill 的分離度上限只有 2.47）。candidateHighlight 原本也是
+                    // 同一個困境，把 candidateText 改成純白後已解開（見下方）；keyAccent 配的是 keyText
+                    // （仍是 #E6E1E5），所以還在。做法：文字 4.5 當硬下限，在此前提下最大化與周邊的
                     // 分離度。#855196 實測：keyText 4.50、對 keyFill 2.47、對 background 2.95——
                     // 兩項仍不及 1.4.11 的 3:1，但已是此契約下的最佳值（根因同為 KeyboardColors
                     // 缺 on-accent 色，已登記 W2 契約 follow-up）。守門門檻依實測值設定。
@@ -95,7 +96,9 @@ object DarkTheme : KeyboardTheme {
                     // （對 background 2.9485、餘裕 0.0485）的老問題。#6B6B6B 兩邊都有餘裕。
                     //
                     // 於是兩條門檻**都是真的 3.0 / 4.5**，不再需要「取捨」這個說法，
-                    // BuiltInThemesContrastTest 的 Dark 門檻也從 2.9 回到規範值 3.0。
+                    // BuiltInThemesContrastTest 的 Dark **候選高亮**門檻也從 2.9 回到規範值 3.0（keyAccent 對
+                    // background
+                    // 那條仍是 2.9）。
                     // W2 的 `onSecondaryContainer`（高亮候選專用文字色）仍然值得加——那能讓
                     // 非高亮候選留在 M3 的 #E6E1E5、只有高亮那一顆用白字——但已不再是達標的前提。
                     candidateHighlight = 0xFF6B6B6Bu,

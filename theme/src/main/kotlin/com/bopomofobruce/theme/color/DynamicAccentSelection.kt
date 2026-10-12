@@ -93,8 +93,8 @@ internal fun contrastRatio(a: UInt, b: UInt): Double {
  *   98。fixture 模擬的是 API 31–33 那條路徑），撞色的舊寫法是 light 1.62:1、dark 2.88:1，現行寫法選出的 `candidateHighlight` 對
  *   background 是 light 1.23:1、dark 1.99:1，比撞色時更低。
  * @param textThreshold WCAG AA 一般文字門檻，預設 4.5。
- * @param excluded 要排除的顏色集合（例如另一個用途已經選中的顏色，避免撞色）。若排除後候選清單變空， 見上方
- *   KDoc「退化語意」——會忽略這個排除限制。預設空集合，等同不排除任何顏色。
+ * @param excluded 硬性排除的顏色集合。**目前沒有任何正式呼叫端傳它**（`MaterialYouTheme` 避撞色改用 [separationReferences]，原因見上方
+ *   I1 段）；保留給需要「絕對不可與某色相同」語意的呼叫端。若排除後候選清單變空，見上方 KDoc「退化語意」——會忽略這個排除限制。預設空集合，等同不排除任何顏色。
  */
 fun pickAccentColor(
     candidates: List<UInt>,

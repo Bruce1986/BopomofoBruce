@@ -16,10 +16,10 @@ import org.junit.jupiter.api.Test
 
 /**
  * `sdkInt < 31` 的退化分支驗到色盤內容（純 Kotlin 邏輯，不需要 Android runtime）。`>= 31` 分支有幾層：「正式入口會依 provider 分流」與「預設
- * provider 讀的是平台等級」（relaxed mock，stub 色盤）；「只換 id 與 colors」；以及依 resource id 餵色階 fixture 的三條——
- * 角色映射與不撞色、選出的是過文字門檻者中分離度最好的、傳給 `pickAccentColor`
- * 的參數（參照色、候選清單、文字門檻）。**真實桌布會產生什麼色值、對比度是否達標，仍未覆蓋**（這裡沒有 Robolectric、也沒有實機）— 見 devlog 與
- * [MaterialYouTheme] 上的 KDoc 說明。
+ * provider 讀的是平台等級」（relaxed mock，stub 色盤）；「只換 id 與 colors」；以及依 resource id 餵色階 fixture 的四條——
+ * 角色映射與不撞色；選出的是過文字門檻者中分離度最好的；`keyAccent` 的參照色含 `keyFill`、候選清單沒被縮減；兩個呼叫處都沒有把文字門檻放寬到預設 4.5 以下（殘餘區間見該條
+ * KDoc）。**真實桌布會產生什麼色值、對比度是否達標，仍未覆蓋**（這裡沒有 Robolectric、也沒有實機）— 見 devlog 與 [MaterialYouTheme] 上的 KDoc
+ * 說明。
  */
 class MaterialYouThemeTest {
 

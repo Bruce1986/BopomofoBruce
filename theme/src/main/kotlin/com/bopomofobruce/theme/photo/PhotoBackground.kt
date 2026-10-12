@@ -27,8 +27,10 @@ import kotlinx.serialization.UseSerializers
  *   `SerializationException`（例如 DataStore Serializer 常見寫法）會漏接、讓設定讀取直接炸掉。 另外，**收緊
  *   [LOCAL_URI_SCHEMES] 會讓已經存下的資料解不出來**，要附遷移或讀取端退回「沒有背景」的容錯。 **記錄解碼失敗時不要記例外的
  *   message／`toString()`，也不要把 throwable 交給 `Log`**：kotlinx 的 `JsonDecodingException` 訊息會內嵌 `JSON
- *   input: …` 原文，[uri] 合法、別的欄位壞掉時，整個 uri 就在裡面（2026-10-12 實測）。本型別自己的 `require` 訊息不帶 uri，但那只管得到
- *   `init` 這一條路；解碼失敗的 log 請只記例外的類別名稱。
+ *   input: …` 原文，[uri] 合法、別的欄位壞掉時，整個 uri 就在裡面（2026-10-12 實測）。本型別自己的 `require` 訊息不帶完整
+ *   uri：只在冒號前那一段長得像 scheme（RFC 3986 形狀、最長 32 字元）時印出那一段。**沒有 scheme、但冒號前剛好是這個形狀的字串（例如
+ *   `vacation-2024.jpg:1` 的 `vacation-2024.jpg`）仍會被印出**，無法與真的 scheme 區分；而且這只管得到 `init` 這一條路；解碼失敗的
+ *   log 請只記例外的類別名稱。
  * - [blurRadiusDp]：高斯模糊半徑，`0f` 代表不模糊，上限 [MAX_BLUR_RADIUS_DP]（避免呼叫端傳入
  *   離譜大的值——模糊層邊界外擴、在部分渲染路徑上可能造成明顯效能與畫面裁切問題）。
  * - [opacity]：疊加不透明度，`0f`（完全透明）..`1f`（完全不透明）。
@@ -46,7 +48,7 @@ data class PhotoBackground(
 ) {
     init {
         require(uri.isNotBlank()) { "PhotoBackground uri must not be blank" }
-        // 訊息只帶 scheme、不帶完整 uri：它指向使用者相簿裡的特定圖片，不該跟著例外進 log／錯誤報告。
+        // 訊息不帶完整 uri，最多帶冒號前像 scheme 的那一段（上限 32 字元，見下方）：它指向使用者相簿裡的特定圖片，不該跟著例外進 log／錯誤報告。
         // 刻意分大小寫：Coil 2.6 的 ContentUriFetcher／ResourceUriFetcher 用精確字串比對小寫 scheme，
         // `CONTENT://…` 過了這裡也載不出來，只會變成一張悄悄消失的背景。
         val scheme = uri.substringBefore(':', missingDelimiterValue = "")

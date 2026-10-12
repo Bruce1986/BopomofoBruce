@@ -243,6 +243,26 @@ class PhotoBackgroundTest {
         }
     }
 
+    /**
+     * scheme 是「冒號前整段」的精確比對：白名單裡的字串只出現在開頭、或後面根本沒有冒號，都不算。先前的拒絕案例沒有一個以白名單字串開頭 （2026-10-12 突變實測，92
+     * 條全綠：`substringBefore(':')` 拿掉 `missingDelimiterValue = ""` 後裸字串 `content` 會通過； 改成
+     * `uri.startsWith(scheme)` 後 `contentx://…` 會通過）。
+     */
+    @Test
+    fun `scheme must match the allowlist exactly and be followed by a colon`() {
+        for (uri in
+            listOf(
+                "content",
+                "android.resource",
+                "content//media/external/images/42",
+                "contentx://media/external/images/42",
+                "content-http://example.com/a.png",
+                "android.resource2://com.bopomofobruce/drawable/bg",
+            )) {
+            assertThrows(IllegalArgumentException::class.java, { PhotoBackground(uri = uri) }, uri)
+        }
+    }
+
     /** KDoc 寫的範圍是 `0f（完全透明）..1f`；先前只測了兩個拒絕端，`opacity > 0f` 這種突變不會紅。 */
     @Test
     fun `accepts both ends of the opacity range`() {

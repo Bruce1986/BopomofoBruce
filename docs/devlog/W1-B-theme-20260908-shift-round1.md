@@ -48,6 +48,8 @@
 8b. `:common` 的 `KeyboardDimens` 四個欄位只擋負值與非有限值、沒有上限（contracts-v1 凍結，本 PR 不能動）。reviewer 實跑
    `Constraints.fixedHeight(262143)` 會丟例外；極大的 `keyHeightDp` 經 `Modifier.height` 實際會怎樣，純 JVM 驗不了。
    解析不受信任的主題 JSON 之後、交給 Compose 之前，呼叫端要自己夾住——歷班第 21 輪。
+8c. `PhotoBackground` 的拒絕訊息不帶完整 uri，但冒號前整段剛好長得像 scheme 的字串（最長 32 字元，例如 `vacation-2024.jpg:1` 的
+    `vacation-2024.jpg`）仍會被印出，無法與真的 scheme 區分——`PhotoBackground.kt` KDoc、歷班第 16 輪。
 9. `KeyboardColors` 不驗證任何欄位（含 alpha 為 0 的透明色）——`StyleSheet.kt` KDoc、本檔歷班第 11 輪。
 10. 反序列化時 `init` 丟的是裸的 `IllegalArgumentException`、不是 `SerializationException`（`StyleSheet` 與 `PhotoBackground` 皆然）；
     收緊 scheme 白名單會讓已存資料解不出來——兩處 KDoc。`PhotoBackground` 那條 `assertFalse(thrown is SerializationException)` 的反向驗證在歷班第 8 輪沒跑，歷班第 16 輪由 reviewer 在沙箱補跑：
@@ -754,7 +756,7 @@ Codex 與產品碼視角皆零 finding（產品碼視角只做靜態讀碼，沒
 - 🟡 **解碼失敗的例外訊息會帶出整個 uri，而 KDoc 的呼叫端契約沒提**：kotlinx 的 `JsonDecodingException` 訊息內嵌
   `JSON input: …` 原文，uri 合法、別的欄位壞掉時 uri 就在裡面。這不是本模組丟的訊息，改不了；`PhotoBackground` 的
   KDoc 補上「記錄解碼失敗時只記例外類別名稱」。
-- 🟡 **接手性**：未解決與待裁決事項散在約 15 處、沒有單一入口——在本檔檔首加了總表（當時 17 項；歷班第 21 輪加入 8a、8b 後是 19 項）與輪次稱呼對照；
+- 🟡 **接手性**：未解決與待裁決事項散在約 15 處、沒有單一入口——在本檔檔首加了總表（當時 17 項；歷班第 21 輪加入 8a、8b、第 25 輪加入 8c 後是 20 項）與輪次稱呼對照；
   2026-09-08 的「留給 owner」一節與 `feat-w1b-theme.md` 第八輪「定案為文字優先」補上已被處理／推翻的標記；
   `BuiltInThemesContrastTest` 一處「第 2 輪 §A」的引用在本檔有三個標題對得上，改成寫出完整節名。
 - 反序列化實跑的結論：實際丟出的例外只有 `JsonDecodingException`、`SerializationException`、`MissingFieldException`
@@ -917,3 +919,32 @@ Light `keyFill` 改成 `#FEFEFE`（色值不設絕對快照是刻意的）；亮
   `init` 的 `substringBefore(':')` 一致。
 - 跨環境：lint `No issues found`；這支 PR 對建置設定的變更只有 `theme/build.gradle.kts` 一行 mockk。**JDK 17 沒有在本機實跑**（本機是 JDK 21），
   推上去之後以 CI 為準。
+
+# 手動 GGR fix-loop 2026-10-12 第 16 輪（歷班第 25 輪；Opus tracer）
+
+視角：收尾前的突變掃描（47 個新突變）、現行敘述的全量交叉比對（不看 diff，以主題為單位）。
+產品行為 0 改動（只動 KDoc／註解）；測試 92 → **95** 條 / 0 failures，`ktfmtCheck` 綠。
+
+- 🟠 **突變掃描**：47 個裡殺掉 26、等價 6、規格沒要求或屬已登記界線 11、真缺口 4（歷班第 17 輪是 55 個裡約 17 個）。四個缺口補三條測試：
+
+| 突變 | 補之前（92 條） | 補之後紅的測試 |
+| --- | --- | --- |
+| 候選全被 `excluded` 排除時改成直接回第一個候選 | 綠 | `ignoring the exclusion applies the normal rule instead of taking the first candidate` |
+| fallback 分支（沒有候選過文字門檻）同分時改取後者 | 綠 | `keeps the earlier candidate on an exact tie in the fallback branch too` |
+| `substringBefore(':')` 拿掉 `missingDelimiterValue = ""`（裸字串 `content` 會通過） | 綠 | `scheme must match the allowlist exactly and be followed by a colon` |
+| scheme 改成前綴比對（`contentx://…` 會通過） | 綠 | 同上 |
+
+  各突變由 reviewer 逐一單獨跑；parent 另跑第 1、3、4 列，各只紅對應的新測試（第 2 列 parent 沒重跑）。
+  **已評估、未補**：候選清單多加或少掉一個在 fixture 上不會被選中的角色（已寫在該測試 KDoc 的界線）；`SCHEME_SHAPE` 的長度與首字元
+  （只影響拒絕訊息印不印）；`requireRadius`／`requireFontSize` 傳錯欄位名字串（只影響訊息；驗到別欄的值那種錯位則全數被抓）。
+  `keyText` 改讀 `onBackground`、`background` 改讀 `scheme.background` 在 fixture 上同值所以分不出來，是否對任何色階都同值沒有查證。
+- 🟡 **現行敘述交叉比對，十個主題裡六個有不一致（共 10 處，都只改文字）**：
+  - 撞色故事線：I1 那條測試的 KDoc 把 `excluded` 寫法稱為「H1 修正前」（它就是 H1 的修正），並說它「重現同一種結構」，讀起來像 I1 解掉了分離度倒退；
+    `excluded` 的 `@param` 仍拿已棄用的用法當範例，沒說現在沒有正式呼叫端；`MaterialYouTheme.kt` 兩處「見…KDoc」指過去找不到東西。
+  - 守門範圍：`AccentColorSelectionTest` class KDoc 說動態配色函式「無法在這裡測」，`MaterialYouThemeTest` 已有四條直接呼叫；
+    `StyleSheetValidationTest` 一段註解還在講產品碼已經沒有的 `isFinite()`；`MaterialYouThemeTest` class KDoc 寫三條、實際四條。
+  - 隱私承諾：`PhotoBackground` KDoc 寫「訊息不帶 uri」沒有但書——冒號前剛好像 scheme 的字串（最長 32 字元）仍會被印出。KDoc 補上並舉例，列入總表 8c。
+  - 深色色盤：`BuiltInThemes.kt` 仍寫 `keyAccent` 與 `candidateHighlight`「同源地無法三全其美」（後者已解開；測試檔那句歷班第 19 輪改了，這句漏掉）。
+  - API 路徑：動態 preview 釘 `apiLevel = 35`，KDoc 說它讀色階資源；34 以上讀的是系統角色資源，不是 fixture 模擬的那條路徑。
+  - fallback：一條測試 KDoc 說函式不會「悄悄回傳不合格的值」，與另外三處的現行說法相反。
+  - 其餘四個主題（防呆上限、輪次與日期引用、總表逐項、動態路徑數字）交叉比對後一致。

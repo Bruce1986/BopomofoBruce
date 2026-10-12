@@ -126,7 +126,7 @@ class BuiltInThemesContrastTest {
         assertTrue(ratio >= 4.5, "expected >= 4.5, was $ratio")
     }
 
-    /** 高亮候選的字是主要內容，門檻是 WCAG AA 的 4.5（取捨說明見本檔 class KDoc 與 [DarkTheme] 的註解）。 */
+    /** 高亮候選的字是主要內容，門檻是 WCAG AA 的 4.5（門檻的由來見本檔 class KDoc 與 [DarkTheme] 的註解）。 */
     @Test
     fun `LightTheme candidateText on candidateHighlight meets WCAG AA`() {
         val ratio =
@@ -134,7 +134,7 @@ class BuiltInThemesContrastTest {
         assertTrue(ratio >= 4.5, "expected >= 4.5, was $ratio")
     }
 
-    /** 高亮候選的字是主要內容，門檻是 WCAG AA 的 4.5（取捨說明見本檔 class KDoc 與 [DarkTheme] 的註解）。 */
+    /** 高亮候選的字是主要內容，門檻是 WCAG AA 的 4.5（門檻的由來見本檔 class KDoc 與 [DarkTheme] 的註解）。 */
     @Test
     fun `DarkTheme candidateText on candidateHighlight meets WCAG AA`() {
         val ratio =

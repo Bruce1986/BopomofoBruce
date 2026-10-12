@@ -68,8 +68,9 @@ class StyleSheetValidationTest {
         }
     }
 
-    // NaN 在前面的 `>= 0f`／`> 0f` 就已經是 false、走不到 isFinite()，所以上面那幾條 NaN 案例守不住
-    // isFinite()；真正只靠 isFinite() 擋下的是 +Infinity（2026-09-15 突變實測：刪掉六個欄位的 isFinite() 全套仍綠）。
+    // 這條補的是 +Infinity：前面幾條只餵 NaN 與負值。2026-09-15 補這條時六個欄位各有一個 `isFinite()`，逐一刪掉全套仍綠；
+    // 歷班第 21 輪起改成閉區間檢查（圓角 `0f..MAX_CORNER_RADIUS_DP`、字級 `> 0f && <= MAX_FONT_SIZE_SP`），產品碼裡已經沒有
+    // `isFinite()`，+Infinity 現在是被上限擋下的；這條與 `…cap every size field` 一起守上限。
     @Test
     fun `KeyboardShapes and KeyboardTypography reject positive infinity in every size field`() {
         val inf = Float.POSITIVE_INFINITY
@@ -158,7 +159,8 @@ class StyleSheetValidationTest {
 
     // 以下四條補的是「接受端點」與「同型欄位漏掉的那一個」（2026-10-11 突變實測，補之前 70 條全綠）：
     // `isNotBlank`→`isNotEmpty`、拿掉 panel 的 `>= 0f`、keyCorner `>= 0f`→`> 0f`、
-    // fontWeight `1..1000`→`1..999`／`2..1000` 都沒有任何一條會紅。
+    // fontWeight `1..1000`→`1..999`／`2..1000` 都沒有任何一條會紅。（圓角那兩個突變是當時 `>= 0f && isFinite()` 的寫法；
+    // 現行是閉區間，對應的突變是拿掉下界、或把下界改成不含 0。）
 
     @Test
     fun `StyleSheet rejects whitespace-only id`() {
