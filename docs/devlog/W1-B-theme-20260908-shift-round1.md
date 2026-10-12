@@ -3,6 +3,17 @@
 > **本檔涵蓋範圍比檔名大**：從 2026-09-08 的 round 1 起，後續各班都接在檔尾追加（一個 `#` 一輪）。
 > 各節裡的測試條數是該輪當時的快照；**現況以最後一節為準**。未解決與待裁決事項另有一張總表，就在下面。
 
+## 現況（請隨最後一節更新）
+
+- 測試條數以最後一節為準，寫這段時是 95 條、0 failures（`grep -rn '@Test' theme/src/test | wc -l` 可核對）。
+- 指令：`ANDROID_HOME=/opt/homebrew/share/android-commandlinetools ./gradlew :theme:testDebugUnitTest --rerun-tasks`
+  （`ANDROID_HOME` 是這台開發機的 SDK 位置，換機請改）。`:theme:ktfmtCheck` 與 `:theme:lintDebug` 各自另跑。
+  CI 跑的是根專案的 `assembleDebug`、`ktfmtCheck`、`lint`、`testDebugUnitTest :common:test`（`.github/workflows/ci.yml`，JDK 17）。
+- 三個陷阱：(1) 一律加 `--rerun-tasks`，並讀 `theme/build/test-results/testDebugUnitTest/*.xml` 的 `tests=`／`failures=`；只看 BUILD SUCCESSFUL
+  拿到的可能是 build cache 的舊結果（見下方 round 1 導言）。(2) 把 worktree 複製到別處做突變實驗時要排除 `.gradle/`，並加
+  `--no-configuration-cache`（見歷班第 16 輪的操作備忘）。(3) 開發機是 JDK 21、CI 是 JDK 17，JDK 17 沒有在本機實跑過（見歷班第 24 輪）。
+- 下面的總表沒有區分「merge 前要決定」與「可以之後再決定」，那是 owner 的判斷。
+
 ## 輪次稱呼對照（引用時請寫出是哪一份檔的哪一輪）
 
 | 稱呼 | 所在檔案與節標題 | 日期 |
@@ -39,6 +50,7 @@
 
 8a. 圓角與字級的防呆上限（`KeyboardShapes.MAX_CORNER_RADIUS_DP`、`KeyboardTypography.MAX_FONT_SIZE_SP`，目前都是 1000）是歷班第 21 輪
    加的，數值沒有設計依據；目的是擋掉會讓 px 變成無限大的輸入，做法是超過 1000 一律拒絕（px 仍有限的也拒）；請 owner 複核。主題 JSON 開始被存下來之後再調低，會讓已存的資料解不出來。
+   上限只對「自己建構或從 JSON 解出來的」`KeyboardShapes`／`KeyboardTypography` 有意義；內建主題與 `MaterialYouTheme` 用的都是預設值。
 
 **B. 契約與邊界**
 
@@ -56,6 +68,10 @@
     把 `init` 改丟 `SerializationException`，`decoding a theme json with a network uri is rejected` 會紅。
 11. 白名單刻意不收 `file`；W2-C 若改成複製進 app 儲存區再用 `file://`，要連路徑範圍限制一起加——`PhotoBackground.kt` KDoc。
 12. 「Photo Picker 的 URI 不支援 `takePersistableUriPermission`」未查證，W2-C 選圖前要確認——`PhotoBackground.kt` KDoc。
+12b. 接手指引（內容都在 KDoc，這裡只指路）：W2-C 做選圖與相片背景之前先讀 `PhotoBackground.kt` 的 class KDoc 與 `PhotoBackgroundLayer.kt` 的
+    KDoc——載入失敗時背景只是不畫、唯一訊號是一行 `Log.w`（只記 scheme 與例外類別名稱）；scheme 只收小寫；模糊在 API 30 以下不套用；
+    持久授權與解碼失敗的 log 規則。W2-B 把主題接進 IME 之前先讀 `MaterialYouTheme.from` 的 KDoc——回傳的是呼叫當下的快照、不監聽桌布或深色模式變更、
+    不通知 fallback、本身不接例外。`from` 回傳的 dimens／shapes／typography 沿用內建主題的預設值，總表 8a、8b 的「要自己夾住」是針對從 JSON 解出來的 `StyleSheet`。
 
 **C. 驗證缺口**
 
@@ -756,7 +772,7 @@ Codex 與產品碼視角皆零 finding（產品碼視角只做靜態讀碼，沒
 - 🟡 **解碼失敗的例外訊息會帶出整個 uri，而 KDoc 的呼叫端契約沒提**：kotlinx 的 `JsonDecodingException` 訊息內嵌
   `JSON input: …` 原文，uri 合法、別的欄位壞掉時 uri 就在裡面。這不是本模組丟的訊息，改不了；`PhotoBackground` 的
   KDoc 補上「記錄解碼失敗時只記例外類別名稱」。
-- 🟡 **接手性**：未解決與待裁決事項散在約 15 處、沒有單一入口——在本檔檔首加了總表（當時 17 項；歷班第 21 輪加入 8a、8b、第 25 輪加入 8c 後是 20 項）與輪次稱呼對照；
+- 🟡 **接手性**：未解決與待裁決事項散在約 15 處、沒有單一入口——在本檔檔首加了總表（當時 17 項；歷班第 21 輪加入 8a、8b，第 25 輪加入 8c，第 26 輪加入指路用的 12b）與輪次稱呼對照；
   2026-09-08 的「留給 owner」一節與 `feat-w1b-theme.md` 第八輪「定案為文字優先」補上已被處理／推翻的標記；
   `BuiltInThemesContrastTest` 一處「第 2 輪 §A」的引用在本檔有三個標題對得上，改成寫出完整節名。
 - 反序列化實跑的結論：實際丟出的例外只有 `JsonDecodingException`、`SerializationException`、`MissingFieldException`
@@ -938,13 +954,29 @@ Light `keyFill` 改成 `#FEFEFE`（色值不設絕對快照是刻意的）；亮
   **已評估、未補**：候選清單多加或少掉一個在 fixture 上不會被選中的角色（已寫在該測試 KDoc 的界線）；`SCHEME_SHAPE` 的長度與首字元
   （只影響拒絕訊息印不印）；`requireRadius`／`requireFontSize` 傳錯欄位名字串（只影響訊息；驗到別欄的值那種錯位則全數被抓）。
   `keyText` 改讀 `onBackground`、`background` 改讀 `scheme.background` 在 fixture 上同值所以分不出來，是否對任何色階都同值沒有查證。
-- 🟡 **現行敘述交叉比對，十個主題裡六個有不一致（共 10 處，都只改文字）**：
+- 🟡 **現行敘述交叉比對，十個主題裡六個有不一致（都只改文字；下面列的是 reviewer 回報的 10 條，其中一條含兩處）**：
   - 撞色故事線：I1 那條測試的 KDoc 把 `excluded` 寫法稱為「H1 修正前」（它就是 H1 的修正），並說它「重現同一種結構」，讀起來像 I1 解掉了分離度倒退；
     `excluded` 的 `@param` 仍拿已棄用的用法當範例，沒說現在沒有正式呼叫端；`MaterialYouTheme.kt` 兩處「見…KDoc」指過去找不到東西。
   - 守門範圍：`AccentColorSelectionTest` class KDoc 說動態配色函式「無法在這裡測」，`MaterialYouThemeTest` 已有四條直接呼叫；
     `StyleSheetValidationTest` 一段註解還在講產品碼已經沒有的 `isFinite()`；`MaterialYouThemeTest` class KDoc 寫三條、實際四條。
   - 隱私承諾：`PhotoBackground` KDoc 寫「訊息不帶 uri」沒有但書——冒號前剛好像 scheme 的字串（最長 32 字元）仍會被印出。KDoc 補上並舉例，列入總表 8c。
   - 深色色盤：`BuiltInThemes.kt` 仍寫 `keyAccent` 與 `candidateHighlight`「同源地無法三全其美」（後者已解開；測試檔那句歷班第 19 輪改了，這句漏掉）。
-  - API 路徑：動態 preview 釘 `apiLevel = 35`，KDoc 說它讀色階資源；34 以上讀的是系統角色資源，不是 fixture 模擬的那條路徑。
+  - API 路徑：動態 preview 釘 `apiLevel = 35`，KDoc 說它讀色階資源；material3 在 `SDK_INT >= 34` 讀的是系統角色資源，不是 fixture 模擬的那條路徑
+    （Layoutlib 的 `SDK_INT` 是否跟著 `apiLevel` 走沒有驗證，歷班第 26 輪把 KDoc 改成條件句）。
+  - 同一筆另外順手改了兩處沒列在上面的：`ContrastFormulaKnownValuesTest` 的「見下一條的但書」方向寫反；
+    `BuiltInThemesContrastTest` 兩條 KDoc 的「取捨說明見…」改成「門檻的由來見…」（深色候選高亮已經沒有取捨）。
   - fallback：一條測試 KDoc 說函式不會「悄悄回傳不合格的值」，與另外三處的現行說法相反。
   - 其餘四個主題（防呆上限、輪次與日期引用、總表逐項、動態路徑數字）交叉比對後一致。
+
+# 手動 GGR fix-loop 2026-10-12 第 17 輪（歷班第 26 輪）
+
+視角：上一筆改寫的複審、規格對照與接手性對現況重跑。產品行為 0 改動，95 tests / 0 failures，`ktfmtCheck` 綠。
+
+- 規格對照零 finding：DEVPLAN W1-B、REBUILD-PLAN、ADR、AGENTS／handbook 逐條對照現況，全部是符合或已登記的偏離；這次新增的行為
+  （防呆上限、拒絕訊息過濾、不收 `file`）與任何規格文字都不牴觸。
+- 🟡 **接手性（用五個實際問題考）**：只讀檔首索引與最後三節，「怎麼跑測試」答不完整（指令與 `ANDROID_HOME` 只在 round 1 導言）、
+  W2-B／W2-C 接手者必須自己處理的幾件事（載入失敗的表現、快照語意、`from` 不接例外）在索引區找不到路。檔首加「現況」一段與總表 12b（只指路、不複製內容）；
+  8a 補上上限只對自己建構或解碼得到的資料有意義。總表沒有區分哪些要在 merge 前決定——那是 owner 的判斷，已在「現況」段寫明。
+- 🟡 **上一筆的兩處**：歷班第 25 輪寫「共 10 處」，自己列出來的是 11 處，另有兩個改動沒列；`ThemePreviews.kt` 新寫的
+  「`apiLevel = 35` 走的是 `SDK_INT >= 34` 的路徑」把沒驗過的一步（Layoutlib 的 `SDK_INT` 是否跟著 `apiLevel`）寫成了肯定句，改成條件句。
+- reviewer 補跑了歷班第 25 輪表格第 2 列（fallback 分支同分取後者），只紅對應的那條；其餘三列也各自重跑確認。

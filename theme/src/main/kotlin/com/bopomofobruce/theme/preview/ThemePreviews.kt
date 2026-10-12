@@ -120,9 +120,10 @@ private fun MaterialYouThemeFallbackPreview() {
  * 用 `@Preview(apiLevel = 35)` 釘住 >=31 的 host，走 [MaterialYouTheme]
  * 的動態取色分支（`dynamicLightColorScheme`）。
  *
- * **這條 preview 從未在 Android Studio 內實際開啟驗證過**，只確認過編譯通過。`apiLevel = 35` 走的是 material3 在 `SDK_INT >=
- * 34` 的路徑：各角色直接讀 `android.R.color.system_primary_light`、`system_surface_light` 這類系統角色資源（material3
- * 1.3.1 反組譯），**不是** `MaterialYouThemeTest` 色階 fixture 模擬的 API 31–33 路徑（那條才讀
+ * **這條 preview 從未在 Android Studio 內實際開啟驗證過**，只確認過編譯通過。若 Layoutlib 的 `SDK_INT` 跟著 `apiLevel = 35`
+ * 走（**這一步是推論，沒有在 Studio 驗證**）， 走的會是 material3 在 `SDK_INT >= 34` 的路徑：各角色直接讀
+ * `android.R.color.system_primary_light`、`system_surface_light` 這類系統角色資源（material3 1.3.1
+ * 反組譯），**不是** `MaterialYouThemeTest` 色階 fixture 模擬的 API 31–33 路徑（那條才讀
  * `system_accentN_*`／`system_neutralN_*`）。 這些資源在實機上由系統依桌布在執行期提供；Layoutlib 是否模擬依 Studio／layoutlib
  * 版本而異。因此這條 preview 的結果可能是 「顏色與實機不同」，也可能是「直接 render 失敗」——兩種都沒有被排除。實際取色結果一律以實機為準。
  */
