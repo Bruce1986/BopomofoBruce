@@ -80,9 +80,9 @@
 13. 實機 200 ms 未量測；四個 `@Preview` 未實際 render；動態色在實際桌布下的數字未驗證。
 14. 實機 androidTest（覆蓋 `>= 31` 動態取色）：可行性已查、未執行，要 owner 同意在手機安裝測試 APK——本檔「2D」節。
 15. （已解，2026-10-12 實跑）「`pickAccentColor` 永遠回傳第一個候選」這個突變，本檔「留給 owner」第 3 項記的是當時 7 條裡有 3 條全綠；
-    現在整套有 7 條會紅（`AccentColorSelectionTest` 5 條、`MaterialYouThemeTest` 2 條）。原本那 3 條仍綠：同分取前者與單一候選本來就不該紅，
+    歷班第 16 輪（當時 87 條）實跑有 7 條會紅（`AccentColorSelectionTest` 5 條、`MaterialYouThemeTest` 2 條）；之後新增的測試沒有再重數。原本那 3 條仍綠：同分取前者與單一候選本來就不該紅，
     `excludes an already-chosen color…` 是預期答案剛好排第一。
-16. 已評估、仍存活的突變——本檔歷班第 10 輪「仍存活、未補」、歷班第 13 輪與第 17 輪「已評估、未補」。歷班第 19 輪記的缺口（只在 dark 把 `keyAccent` 的文字門檻放寬）
+16. 已評估、仍存活的突變——本檔歷班第 10 輪「仍存活、未補」、歷班第 13、17、25 輪各自的「已評估、未補」。歷班第 19 輪記的缺口（只在 dark 把 `keyAccent` 的文字門檻放寬）
     已在歷班第 20 輪補上；殘餘是呼叫處把門檻放寬到貼近 4.5 的一小段（只動 dark 時是 4.449 以上、只動 light 或兩邊一起時是 4.468 以上），仍沒有測試會紅。
 
 **D. 屬 W2 範圍（本 PR 不做）**
@@ -964,7 +964,7 @@ Light `keyFill` 改成 `#FEFEFE`（色值不設絕對快照是刻意的）；亮
   - 隱私承諾：`PhotoBackground` KDoc 寫「訊息不帶 uri」沒有但書——冒號前剛好像 scheme 的字串（最長 32 字元）仍會被印出。KDoc 補上並舉例，列入總表 8c。
   - 深色色盤：`BuiltInThemes.kt` 仍寫 `keyAccent` 與 `candidateHighlight`「同源地無法三全其美」（後者已解開；測試檔那句歷班第 19 輪改了，這句漏掉）。
   - API 路徑：動態 preview 釘 `apiLevel = 35`，KDoc 說它讀色階資源；material3 在 `SDK_INT >= 34` 讀的是系統角色資源，不是 fixture 模擬的那條路徑
-    （Layoutlib 的 `SDK_INT` 是否跟著 `apiLevel` 走沒有驗證，歷班第 26 輪把 KDoc 改成條件句）。
+    （Layoutlib 的 `SDK_INT` 是否跟著 `apiLevel` 走沒有驗證，歷班第 26 輪把 KDoc 的一段改成條件句，第 27 輪才把同段第一句與另一條 preview 一起改完）。
   - 同一筆另外順手改了兩處沒列在上面的：`ContrastFormulaKnownValuesTest` 的「見下一條的但書」方向寫反；
     `BuiltInThemesContrastTest` 兩條 KDoc 的「取捨說明見…」改成「門檻的由來見…」（深色候選高亮已經沒有取捨）。
   - fallback：一條測試 KDoc 說函式不會「悄悄回傳不合格的值」，與另外三處的現行說法相反。
@@ -985,7 +985,7 @@ Light `keyFill` 改成 `#FEFEFE`（色值不設絕對快照是刻意的）；亮
 
 # 手動 GGR fix-loop 2026-10-12 第 18 輪（歷班第 27 輪）
 
-視角：上一筆的複審、錯誤處理／失敗模式對現況重跑（扮演只照 KDoc 寫程式的呼叫端；`StyleSheet` 86 種、`PhotoBackground` 54 種壞輸入，各兩種 `Json` 設定）。
+視角：上一筆的複審、錯誤處理／失敗模式對現況重跑（扮演只照 KDoc 寫程式的呼叫端；`StyleSheet` 與 `PhotoBackground` 各數十種壞輸入、各兩種 `Json` 設定——確切數目 reviewer 的回報與它留下的探針對不上，這裡不寫）。
 產品行為 0 改動，95 tests / 0 failures，`ktfmtCheck` 綠。
 
 - 🟠 **`StyleSheet` KDoc 對 `KeyboardDimens` 過大的說明，機制寫錯、也沒有給可以照著夾的數字**。原文說「px 溢位」；實測沒有任何數值溢位
@@ -997,3 +997,14 @@ Light `keyFill` 改成 `#FEFEFE`（色值不設絕對快照是刻意的）；亮
   KDoc 提到的 Android API 與旗標名稱在 android.jar 裡都存在；material3 讀色只用 `context.resources.getColor`，不讀 `Configuration`，application context 可用。
 - 未列為 finding 的觀察：上限加入前合法、加入後超限的資料，呼叫端接到的是帶欄位名的 `IllegalArgumentException`；`StyleSheet`／`KeyboardShapes` 的 KDoc 沒有像
   `PhotoBackground` 那樣寫「讀取端該怎麼辦」。目前沒有任何已存資料。`:common` 的 `UIntHexSerializer` 的錯誤訊息不帶欄位名或 JSON 位置（凍結，不在本 PR）。
+
+# 手動 GGR fix-loop 2026-10-12 第 19 輪（歷班第 28 輪）
+
+視角：上一筆的複審（每個數字與機制都在沙箱重現）、本檔後半各節與檔首索引的一致性。產品行為 0 改動，沒有動到 `theme/`；95 tests / 0 failures。
+
+- 上一筆的複審零 finding。重現的重點：`Constraints.fixedHeight(262142)` 可、`262143` 丟；這個上限在版面寬度 8000 px 以下都不變
+  （寬 32767 時才降到 32766），所以對鍵盤的實際版面成立；三個密度的 dp 換算都對；夾到 1000 dp 在密度 1～4 下都不丟；
+  讓 `resources.getColor` 丟 `Resources.NotFoundException` 時，`from` 丟出的是同一個例外物件。
+- 🟡 **總表兩項沒跟上後面的輪次**：C16 沒有指到歷班第 25 輪另記的「已評估、未補」；C15 寫「現在整套有 7 條會紅」，那是歷班第 16 輪（87 條時）的實跑數字，
+  之後新增的測試沒有重數——改成據實標明。另補一句前向說明（歷班第 25、26 輪說 preview KDoc「已改成條件句」，實際到第 27 輪才改完）。
+- 條數鏈逐 commit 實數（70→80→85→87→90→91→92→95）與各節一致；18 節的雙編號都成立；`feat-w1b-theme.md` 這次加的七個更正標記與本檔最新結論一致。
