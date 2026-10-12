@@ -905,3 +905,15 @@ Light `keyFill` 改成 `#FEFEFE`（色值不設絕對快照是刻意的）；亮
   測試 KDoc 的「界線」段另外有一句把抓得到與抓不到的區間寫成同一段，並說殘餘「由預設值的單元測試釘住」——那條釘的是預設值，不是呼叫處。
   KDoc、總表 C16、歷班第 20 輪的「殘餘」三處已改成分模式的精確區間。
 - 🟡 **上限的 KDoc 寫「只擋掉 px 會變成無限大的輸入」**，實際是超過 1000 一律拒絕，px 仍有限的值（例如 5000）也拒。兩處 KDoc 與總表 8a 改成分開講目的與做法。
+
+# 手動 GGR fix-loop 2026-10-12 第 15 輪（歷班第 24 輪）
+
+視角：資安／隱私＋跨環境（以實跑重做）、上一筆 commit 的敘述複審。**兩個視角都零 finding，沒有任何程式碼或敘述變更**；92 tests / 0 failures。
+
+- 洩漏面：在 uri 埋特徵字串，對 `PhotoBackground` 的建構、`copy`、JSON 解碼各種失敗路徑檢查例外的 message、`toString()`、cause 鏈——
+  本模組自己丟的例外沒有任何一條含 uri；含 uri 的只有 kotlinx 的 `JsonDecodingException`（KDoc 已記）。模組內沒有任何地方把
+  `PhotoBackground` 物件本身內插進字串或交給 log。
+- Coil 2.6.0 反組譯：沒有任何 mapper 會把 `content`／`android.resource` 的 uri 改寫成 `file` 或 `http(s)`；`Uri.parse` 取 scheme 的方式與
+  `init` 的 `substringBefore(':')` 一致。
+- 跨環境：lint `No issues found`；這支 PR 對建置設定的變更只有 `theme/build.gradle.kts` 一行 mockk。**JDK 17 沒有在本機實跑**（本機是 JDK 21），
+  推上去之後以 CI 為準。
