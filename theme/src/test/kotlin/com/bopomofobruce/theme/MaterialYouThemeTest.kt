@@ -1,0 +1,629 @@
+package com.bopomofobruce.theme
+
+import android.content.Context
+import android.content.res.Resources
+import android.os.Build
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import com.bopomofobruce.theme.color.contrastRatio
+import com.bopomofobruce.theme.color.toKeyboardUInt
+import io.mockk.every
+import io.mockk.mockk
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
+
+/**
+ * `sdkInt < 31` 的退化分支驗到色盤內容（純 Kotlin 邏輯，不需要 Android runtime）。`>= 31` 分支有幾層：「正式入口會依 provider 分流」與「預設
+ * provider 讀的是平台等級」（relaxed mock，stub 色盤）；「只換 id 與 colors」；以及依 resource id 餵色階 fixture 的四條——
+ * 角色映射與不撞色；選出的是過文字門檻者中分離度最好的；`keyAccent` 的參照色含 `keyFill`、候選清單沒被縮減；兩個呼叫處都沒有把文字門檻放寬到預設 4.5 以下（殘餘區間見該條
+ * KDoc）。**真實桌布會產生什麼色值、對比度是否達標，仍未覆蓋**（這裡沒有 Robolectric、也沒有實機）— 見 devlog 與 [MaterialYouTheme] 上的 KDoc
+ * 說明。
+ */
+class MaterialYouThemeTest {
+
+    // <31 的分支不會呼叫 context 上任何方法；>=31 的分支經由 dynamicLightColorScheme 去讀 context，
+    // relaxed mock 讓它回 stub 值（全 0）而不是丟例外。要餵真正的色階用 contextWithSystemPalettes()。
+    private val context: Context = mockk(relaxed = true)
+
+    @Test
+    fun `id is always material-you regardless of fallback`() {
+        val lightFallback = MaterialYouTheme.from(context, darkMode = false, sdkInt = 30)
+        val darkFallback = MaterialYouTheme.from(context, darkMode = true, sdkInt = 30)
+
+        assertEquals(MaterialYouTheme.ID, lightFallback.id)
+        assertEquals(MaterialYouTheme.ID, darkFallback.id)
+        // 上面兩條比的是常數自己，常數的值改掉時照樣綠（2026-10-12 突變實測）。id 是「使用者選了哪個主題」的識別字串，
+        // 與 `BuiltInThemesTest` 釘 "light"／"dark" 同一個理由，字面值要釘住。
+        assertEquals("material-you", MaterialYouTheme.ID)
+    }
+
+    @Test
+    fun `below API 31 falls back to LightTheme colors for light mode`() {
+        val theme =
+            MaterialYouTheme.from(context, darkMode = false, sdkInt = Build.VERSION_CODES.S - 1)
+
+        assertEquals(LightTheme.colors, theme.colors)
+        assertEquals(LightTheme.dimens, theme.dimens)
+    }
+
+    @Test
+    fun `below API 31 falls back to DarkTheme colors for dark mode`() {
+        val theme =
+            MaterialYouTheme.from(context, darkMode = true, sdkInt = Build.VERSION_CODES.S - 1)
+
+        assertEquals(DarkTheme.colors, theme.colors)
+        assertEquals(DarkTheme.dimens, theme.dimens)
+    }
+
+    @Test
+    fun `two calls with the same inputs produce equal instances`() {
+        val first =
+            MaterialYouTheme.from(context, darkMode = false, sdkInt = Build.VERSION_CODES.S - 1)
+        val second =
+            MaterialYouTheme.from(context, darkMode = false, sdkInt = Build.VERSION_CODES.S - 1)
+
+        assertEquals(first, second)
+        assertEquals(first.hashCode(), second.hashCode())
+    }
+
+    /**
+     * **正式入口** `from(context, darkMode)`（兩參數版）真的會依 [MaterialYouTheme.sdkIntProvider]
+     * 的值分流——這是本模組招牌功能的開關，在此之前**零測試覆蓋**。
+     *
+     * 突變實證（2026-09-08 深審）：把兩參數版改成寫死 `from(context, darkMode, 30)`，也就是 Material You
+     * 在任何裝置上永遠不會啟用，**當時 52 條測試全綠**。唯二呼叫它的地方是兩個 從未實際 render 過的 `@Preview`，所以沒有任何東西會發現。
+     *
+     * 這條**不斷言 `>= 31` 那條路算出什麼**（在純 JVM 下它拿到的是 mockk stub 的預設值，沒有 意義），只斷言「換一個 provider
+     * 值，結果就不同」——那正好是「開關有沒有接上」這件事， 而且不依賴 stub 的具體行為。
+     */
+    @Test
+    fun `the production entry point actually routes on the sdk provider`() {
+        val original = MaterialYouTheme.sdkIntProvider
+        try {
+            var asked = 0
+
+            MaterialYouTheme.sdkIntProvider = {
+                asked++
+                Build.VERSION_CODES.S - 1
+            }
+            val below = MaterialYouTheme.from(context, darkMode = false)
+
+            MaterialYouTheme.sdkIntProvider = {
+                asked++
+                Build.VERSION_CODES.S
+            }
+            val atOrAbove = MaterialYouTheme.from(context, darkMode = false)
+
+            assertEquals(2, asked, "兩參數版沒有去問 sdkIntProvider——它可能寫死了某個值")
+            assertEquals(
+                LightTheme.colors,
+                below.colors,
+                "provider 回 <31 時應該走退化路徑、直接重用 LightTheme 的色盤",
+            )
+            assertNotEquals(
+                below.colors,
+                atOrAbove.colors,
+                "provider 回 >=31 與 <31 得到同一組色盤——分流沒有生效（寫死 sdkInt 就會這樣）",
+            )
+        } finally {
+            MaterialYouTheme.sdkIntProvider = original
+        }
+    }
+
+    /**
+     * `>= 31` 路徑的**呼叫處**守門：角色映射，以及 `keyAccent`／`candidateHighlight` 不撞色。
+     *
+     * 在此之前這條路徑只有「與退化值不同」一條斷言；relaxed mock 下所有系統色都是 0，所以 （2026-09-15 突變實測，68 條全綠）把
+     * `candidateHighlight` 的 `separationReferences` 退回 `listOf(background)`（還原 I1 修正）、或直接寫
+     * `candidateHighlight = keyAccent` 都零反應。
+     *
+     * 做法：material3 1.3.x 的 `dynamicLightColorScheme` 在 `SDK_INT < 34` 時走
+     * `dynamicTonalPalette(context)`， 經 `ColorResourceHelper` 讀
+     * `context.resources.getColor(android.R.color.system_*, theme)`（javap 確認）； JVM 單元測試裡 `SDK_INT`
+     * 是 0，一定走這條。所以只要讓 mock 依 resource id 回色值，就能餵進一組色階。
+     *
+     * 期望值由 material3 自己的 `dynamic*ColorScheme` 對**同一個** mock 算出來當對照，不是抄本模組的映射邏輯。 色階
+     * fixture（[TONAL_PALETTES]）只是「tone 由亮到暗單調、五組色相各不相同」的近似 M3 baseline 配色， **數值未對照官方表**，也不代表任何實機桌布。
+     */
+    @Test
+    fun `the dynamic path maps scheme roles and keeps keyAccent and candidateHighlight apart`() {
+        val palettedContext = contextWithSystemPalettes()
+        val original = MaterialYouTheme.sdkIntProvider
+        try {
+            MaterialYouTheme.sdkIntProvider = { Build.VERSION_CODES.S }
+            for (darkMode in listOf(false, true)) {
+                val scheme =
+                    if (darkMode) dynamicDarkColorScheme(palettedContext)
+                    else dynamicLightColorScheme(palettedContext)
+                val colors = MaterialYouTheme.from(palettedContext, darkMode).colors
+                val mode = if (darkMode) "dark" else "light"
+
+                assertEquals(scheme.surface.toKeyboardUInt(), colors.background, "$mode background")
+                assertEquals(
+                    scheme.surfaceVariant.toKeyboardUInt(),
+                    colors.keyFill,
+                    "$mode keyFill",
+                )
+                assertEquals(scheme.onSurface.toKeyboardUInt(), colors.keyText, "$mode keyText")
+                assertEquals(
+                    scheme.onSurface.toKeyboardUInt(),
+                    colors.candidateText,
+                    "$mode candidateText",
+                )
+                assertNotEquals(
+                    colors.keyAccent,
+                    colors.candidateHighlight,
+                    "$mode：candidateHighlight 與 keyAccent 撞成同一色（H1）——功能鍵底色與選中候選分不出來",
+                )
+            }
+        } finally {
+            MaterialYouTheme.sdkIntProvider = original
+        }
+    }
+
+    /**
+     * `>= 31` 路徑**傳給 `pickAccentColor` 的參數**守門。上一條只斷言兩個強調色「不相等」，所以 （2026-10-11 突變實測，70 條全綠）把
+     * `keyAccent` 或 `candidateHighlight` 的 `textPartner` 改成 `background`、或從候選裡拿掉
+     * `inversePrimary`，都沒有反應。
+     *
+     * 斷言的是規格性質，不是重跑一次 `pickAccentColor`：選中的色必須是「對 `keyText` 達 4.5」的候選之一，而且它的 最小分離度等於這些候選裡的最大值。
+     *
+     * 這條的界線：
+     * - 候選角色清單是照著 `MaterialYouTheme` 抄的；產品碼**多加**一個角色時，只有它剛好被選中才會紅。
+     * - 對比度用的是正式的 `contrastRatio`，公式本身由 `ContrastFormulaKnownValuesTest` 把關。
+     * - 這組 fixture 分不出 `keyAccent` 的 `separationReferences` 少傳 `keyFill`、候選清單縮到只剩 `inversePrimary`、
+     *   呼叫處把文字門檻放寬到 3.0（實測三者在這條都全綠）；那三項由下一條用另一組色階守。
+     */
+    @Test
+    fun `the dynamic path picks the best separated role among those that carry the text`() {
+        val palettedContext = contextWithSystemPalettes()
+        val original = MaterialYouTheme.sdkIntProvider
+        try {
+            MaterialYouTheme.sdkIntProvider = { Build.VERSION_CODES.S }
+            for (darkMode in listOf(false, true)) {
+                val mode = if (darkMode) "dark" else "light"
+                val scheme =
+                    if (darkMode) dynamicDarkColorScheme(palettedContext)
+                    else dynamicLightColorScheme(palettedContext)
+                val colors = MaterialYouTheme.from(palettedContext, darkMode).colors
+                val roles =
+                    listOf(
+                            scheme.primaryContainer,
+                            scheme.tertiaryContainer,
+                            scheme.secondaryContainer,
+                            scheme.primary,
+                            scheme.tertiary,
+                            scheme.secondary,
+                            scheme.inversePrimary,
+                            scheme.onSurfaceVariant,
+                        )
+                        .map { it.toKeyboardUInt() }
+                val carriesText = roles.filter { contrastRatio(it, colors.keyText) >= 4.5 }
+                assertTrue(carriesText.isNotEmpty(), "$mode fixture 前置條件：至少一個角色對 keyText 達 4.5")
+
+                fun accentSeparation(color: UInt) =
+                    minOf(
+                        contrastRatio(color, colors.keyFill),
+                        contrastRatio(color, colors.background),
+                    )
+                assertTrue(colors.keyAccent in carriesText, "$mode keyAccent 對 keyText 未達 4.5")
+                assertEquals(
+                    carriesText.maxOf(::accentSeparation),
+                    accentSeparation(colors.keyAccent),
+                    1e-9,
+                    "$mode keyAccent 不是分離度最好的那個",
+                )
+
+                fun highlightSeparation(color: UInt) =
+                    minOf(
+                        contrastRatio(color, colors.background),
+                        contrastRatio(color, colors.keyAccent),
+                    )
+                assertTrue(
+                    colors.candidateHighlight in carriesText,
+                    "$mode candidateHighlight 對 keyText 未達 4.5",
+                )
+                assertEquals(
+                    carriesText.maxOf(::highlightSeparation),
+                    highlightSeparation(colors.candidateHighlight),
+                    1e-9,
+                    "$mode candidateHighlight 不是分離度最好的那個",
+                )
+            }
+        } finally {
+            MaterialYouTheme.sdkIntProvider = original
+        }
+    }
+
+    /**
+     * 守 `keyAccent` 的 `separationReferences` 真的含 `keyFill`。原本那組 fixture 裡，對 background 分離度最好的角色
+     * 同時也是對 keyFill 最好的，少傳 `keyFill` 選出來的顏色一樣。這裡每個模式改兩格。第一格：把該模式的 `surfaceVariant` （light 是
+     * `system_neutral2_100`、dark 是 `_700`）設成與該模式的 `inversePrimary` 同色，讓「只看 background 最好」的那個角色 對
+     * keyFill 的對比剛好是 1.0。第二格（`secondary`）用來守文字門檻，見下方行內註解。 **這是為了分辨參數而造的色階，不是任何真實桌布。**
+     */
+    @Test
+    fun `keyAccent is scored against keyFill too and neither accent relaxes the text threshold`() {
+        val original = MaterialYouTheme.sdkIntProvider
+        try {
+            MaterialYouTheme.sdkIntProvider = { Build.VERSION_CODES.S }
+            for (darkMode in listOf(false, true)) {
+                val mode = if (darkMode) "dark" else "light"
+                // 兩個模式要各用一組：`_100` 同時是 dark 的 onSurface、`_700` 同時是 light 的 onSurfaceVariant，
+                // 一起改會連另一個模式的文字色都換掉。
+                val palettes = TONAL_PALETTES.toMutableList()
+                palettes[4] =
+                    TONAL_PALETTES[4].toMutableList().also {
+                        if (darkMode) it[9] = 0xFF6750A4u else it[3] = 0xFFD0BCFFu
+                    }
+                // `secondary`（light 是 accent2_600、dark 是 accent2_200）換成對 keyText 約 4.0 的灰：沒過 4.5，
+                // 呼叫處把文字門檻放寬時它就進得了候選。light 下它的分離度比所有達標的角色都好，
+                // 門檻一放寬就會被選中（實測轉紅的是 light）。dark 下它對 keyFill 只有 1.26，`keyAccent` 不會選它；
+                // **這條抓不到「只在 dark 把 `keyAccent` 的門檻放寬」**，也抓不到任何放寬到 4.0 以上的突變（near-miss 離 4.5 太遠）；
+                // 那些由 `neither accent call site lowers the text threshold below the default` 守。
+                palettes[1] =
+                    TONAL_PALETTES[1].toMutableList().also {
+                        if (darkMode) it[4] = 0xFF6E6E6Eu else it[8] = 0xFF7A7A7Au
+                    }
+                val palettedContext = contextWithSystemPalettes(palettes)
+                val scheme =
+                    if (darkMode) dynamicDarkColorScheme(palettedContext)
+                    else dynamicLightColorScheme(palettedContext)
+                val colors = MaterialYouTheme.from(palettedContext, darkMode).colors
+                val carriesText =
+                    listOf(
+                            scheme.primaryContainer,
+                            scheme.tertiaryContainer,
+                            scheme.secondaryContainer,
+                            scheme.primary,
+                            scheme.tertiary,
+                            scheme.secondary,
+                            scheme.inversePrimary,
+                            scheme.onSurfaceVariant,
+                        )
+                        .map { it.toKeyboardUInt() }
+                        .filter { contrastRatio(it, colors.keyText) >= 4.5 }
+                val bestAgainstBackgroundOnly =
+                    carriesText.maxByOrNull { contrastRatio(it, colors.background) }
+                        ?: error("$mode fixture 前置條件：至少一個角色對 keyText 達 4.5")
+                assertEquals(
+                    1.0,
+                    contrastRatio(bestAgainstBackgroundOnly, colors.keyFill),
+                    1e-9,
+                    "$mode fixture 前置條件：只看 background 最好的角色必須與 keyFill 同色",
+                )
+
+                fun accentSeparation(color: UInt) =
+                    minOf(
+                        contrastRatio(color, colors.keyFill),
+                        contrastRatio(color, colors.background),
+                    )
+                val nearMiss = contrastRatio(scheme.secondary.toKeyboardUInt(), colors.keyText)
+                assertTrue(
+                    nearMiss > 3.5 && nearMiss < 4.5,
+                    "$mode fixture 前置條件：secondary 對 keyText 是 $nearMiss",
+                )
+                assertTrue(colors.keyAccent in carriesText, "$mode keyAccent 對 keyText 未達 4.5")
+                assertTrue(
+                    colors.candidateHighlight in carriesText,
+                    "$mode candidateHighlight 對 keyText 未達 4.5",
+                )
+                assertNotEquals(
+                    bestAgainstBackgroundOnly,
+                    colors.keyAccent,
+                    "$mode keyAccent 選了與 keyFill 同色的角色——separationReferences 少了 keyFill？",
+                )
+                assertEquals(
+                    carriesText.maxOf(::accentSeparation),
+                    accentSeparation(colors.keyAccent),
+                    1e-9,
+                    "$mode keyAccent 不是對 keyFill 與 background 兩者最弱一邊最好的那個",
+                )
+            }
+        } finally {
+            MaterialYouTheme.sdkIntProvider = original
+        }
+    }
+
+    /**
+     * 守 `keyAccent` 與 `candidateHighlight` 呼叫 `pickAccentColor` 時**沒有另外傳一個比預設 4.5 低的文字門檻**，兩個模式都守。
+     * 上一條的 near-miss 角色對 `keyText` 約 4.0，dark 的那個對 keyFill 只有 1.26，所以（2026-10-12 實測）只在 dark 把
+     * `keyAccent` 的門檻放寬到 3.0、或把 `candidateHighlight` 放寬到 4.0、或在 light 把 `keyAccent` 放寬到
+     * 4.2，上一條都仍全綠；這條補上這些缺口。
+     *
+     * 做法：用**未動過**的 [TONAL_PALETTES]，只把 `secondary`（light 是 `accent2_600`、dark 是
+     * `accent2_200`）換成一個中灰， 對 `keyText` 的對比刻意落在 4.4–4.5 之間（差一點點沒過 AA），對 keyFill／background
+     * 的最小分離度則大於所有達標角色。 於是只要呼叫處把門檻放寬到這個對比以下，灰色就會勝出、斷言轉紅。
+     *
+     * **界線**：灰色對 keyText 是 light 4.468、dark 4.449，門檻要放寬到不高於這個值，灰色才進得了候選、這條才會紅。所以只在 dark 放寬到 (4.449,
+     * 4.5)、或只在 light 放寬到 (4.468, 4.5) 的突變抓不到；兩個模式一起放寬時，抓不到的是 (4.468, 4.5)（2026-10-12
+     * 實跑：4.44、4.45、4.46 紅，4.47 起綠）。這段殘餘沒有別的測試守——`pickAccentColor`
+     * 預設值那條釘的是預設值，不是呼叫處。**這組灰色只為分辨參數而造，不代表任何實際桌布。**
+     */
+    @Test
+    fun `neither accent call site lowers the text threshold below the default`() {
+        val original = MaterialYouTheme.sdkIntProvider
+        try {
+            MaterialYouTheme.sdkIntProvider = { Build.VERSION_CODES.S }
+            for (darkMode in listOf(false, true)) {
+                val mode = if (darkMode) "dark" else "light"
+                val palettes = TONAL_PALETTES.toMutableList()
+                palettes[1] =
+                    TONAL_PALETTES[1].toMutableList().also {
+                        if (darkMode) it[4] = 0xFF666666u else it[8] = 0xFF828282u
+                    }
+                // dark 另把 `inversePrimary`（`accent1_600`）換成更暗的紫：它是 dark 下 keyAccent 的得主，換暗之後
+                // 灰色與它的對比拉開，`candidateHighlight`（參照 background 與 keyAccent）放寬門檻時灰色才勝得出。
+                if (darkMode) {
+                    palettes[0] = TONAL_PALETTES[0].toMutableList().also { it[8] = 0xFF2A1B55u }
+                }
+                val palettedContext = contextWithSystemPalettes(palettes)
+                val scheme =
+                    if (darkMode) dynamicDarkColorScheme(palettedContext)
+                    else dynamicLightColorScheme(palettedContext)
+                val colors = MaterialYouTheme.from(palettedContext, darkMode).colors
+                val roles =
+                    listOf(
+                            scheme.primaryContainer,
+                            scheme.tertiaryContainer,
+                            scheme.secondaryContainer,
+                            scheme.primary,
+                            scheme.tertiary,
+                            scheme.secondary,
+                            scheme.inversePrimary,
+                            scheme.onSurfaceVariant,
+                        )
+                        .map { it.toKeyboardUInt() }
+                val nearMissColor = scheme.secondary.toKeyboardUInt()
+                val carriesText = roles.filter { contrastRatio(it, colors.keyText) >= 4.5 }
+                val nearMiss = contrastRatio(nearMissColor, colors.keyText)
+                assertTrue(
+                    nearMiss >= 4.4 && nearMiss < 4.5,
+                    "$mode fixture 前置條件：灰色對 keyText 是 $nearMiss",
+                )
+                assertTrue(carriesText.isNotEmpty(), "$mode fixture 前置條件：至少一個角色對 keyText 達 4.5")
+
+                fun accentSeparation(color: UInt) =
+                    minOf(
+                        contrastRatio(color, colors.keyFill),
+                        contrastRatio(color, colors.background),
+                    )
+                assertTrue(
+                    accentSeparation(nearMissColor) > carriesText.maxOf(::accentSeparation),
+                    "$mode fixture 前置條件：灰色的分離度必須大於所有達標角色，否則門檻放寬時它也選不上",
+                )
+                assertTrue(colors.keyAccent in carriesText, "$mode keyAccent 對 keyText 未達 4.5")
+                assertNotEquals(nearMissColor, colors.keyAccent, "$mode keyAccent 選了沒過 4.5 的灰色")
+
+                fun highlightSeparation(color: UInt) =
+                    minOf(
+                        contrastRatio(color, colors.background),
+                        contrastRatio(color, colors.keyAccent),
+                    )
+                assertTrue(
+                    highlightSeparation(nearMissColor) > carriesText.maxOf(::highlightSeparation),
+                    "$mode fixture 前置條件：灰色對 background 與 keyAccent 的最小分離度必須大於所有達標角色",
+                )
+                assertTrue(
+                    colors.candidateHighlight in carriesText,
+                    "$mode candidateHighlight 對 keyText 未達 4.5",
+                )
+                assertNotEquals(
+                    nearMissColor,
+                    colors.candidateHighlight,
+                    "$mode candidateHighlight 選了沒過 4.5 的灰色",
+                )
+            }
+        } finally {
+            MaterialYouTheme.sdkIntProvider = original
+        }
+    }
+
+    /** 動態路徑只換 `id` 與 `colors`；dimens／shapes／typography 必須原樣沿用退化主題的 styleSheet。 */
+    @Test
+    fun `the dynamic path replaces only id and colors of the fallback styleSheet`() {
+        for (darkMode in listOf(false, true)) {
+            val fallback = if (darkMode) DarkTheme.styleSheet else LightTheme.styleSheet
+            val theme = MaterialYouTheme.from(context, darkMode, sdkInt = Build.VERSION_CODES.S)
+
+            assertNotEquals(fallback.colors, theme.colors, "前置條件：這次呼叫要真的走進動態路徑")
+            assertEquals(
+                fallback.copy(id = MaterialYouTheme.ID, colors = theme.colors),
+                theme.styleSheet,
+            )
+        }
+    }
+
+    private fun contextWithSystemPalettes(palettes: List<List<UInt>> = TONAL_PALETTES): Context {
+        val idToColor = HashMap<Int, Int>()
+        for ((ids, tones) in SYSTEM_PALETTE_IDS.zip(palettes)) {
+            ids.zip(tones).forEach { (id, argb) -> idToColor[id] = argb.toInt() }
+        }
+        val resources = mockk<Resources>()
+        every { resources.getColor(any<Int>(), any()) } answers
+            {
+                val id = firstArg<Int>()
+                idToColor[id] ?: error("dynamicTonalPalette 讀了 fixture 沒提供的 resource id $id")
+            }
+        return mockk(relaxed = true) { every { this@mockk.resources } returns resources }
+    }
+
+    private companion object {
+        /** 每組 13 個 shade，順序 0、10、50、100…1000（對應 tone 100、99、95、90…0）。 */
+        val SYSTEM_PALETTE_IDS: List<List<Int>> =
+            listOf(
+                listOf(
+                    android.R.color.system_accent1_0,
+                    android.R.color.system_accent1_10,
+                    android.R.color.system_accent1_50,
+                    android.R.color.system_accent1_100,
+                    android.R.color.system_accent1_200,
+                    android.R.color.system_accent1_300,
+                    android.R.color.system_accent1_400,
+                    android.R.color.system_accent1_500,
+                    android.R.color.system_accent1_600,
+                    android.R.color.system_accent1_700,
+                    android.R.color.system_accent1_800,
+                    android.R.color.system_accent1_900,
+                    android.R.color.system_accent1_1000,
+                ),
+                listOf(
+                    android.R.color.system_accent2_0,
+                    android.R.color.system_accent2_10,
+                    android.R.color.system_accent2_50,
+                    android.R.color.system_accent2_100,
+                    android.R.color.system_accent2_200,
+                    android.R.color.system_accent2_300,
+                    android.R.color.system_accent2_400,
+                    android.R.color.system_accent2_500,
+                    android.R.color.system_accent2_600,
+                    android.R.color.system_accent2_700,
+                    android.R.color.system_accent2_800,
+                    android.R.color.system_accent2_900,
+                    android.R.color.system_accent2_1000,
+                ),
+                listOf(
+                    android.R.color.system_accent3_0,
+                    android.R.color.system_accent3_10,
+                    android.R.color.system_accent3_50,
+                    android.R.color.system_accent3_100,
+                    android.R.color.system_accent3_200,
+                    android.R.color.system_accent3_300,
+                    android.R.color.system_accent3_400,
+                    android.R.color.system_accent3_500,
+                    android.R.color.system_accent3_600,
+                    android.R.color.system_accent3_700,
+                    android.R.color.system_accent3_800,
+                    android.R.color.system_accent3_900,
+                    android.R.color.system_accent3_1000,
+                ),
+                listOf(
+                    android.R.color.system_neutral1_0,
+                    android.R.color.system_neutral1_10,
+                    android.R.color.system_neutral1_50,
+                    android.R.color.system_neutral1_100,
+                    android.R.color.system_neutral1_200,
+                    android.R.color.system_neutral1_300,
+                    android.R.color.system_neutral1_400,
+                    android.R.color.system_neutral1_500,
+                    android.R.color.system_neutral1_600,
+                    android.R.color.system_neutral1_700,
+                    android.R.color.system_neutral1_800,
+                    android.R.color.system_neutral1_900,
+                    android.R.color.system_neutral1_1000,
+                ),
+                listOf(
+                    android.R.color.system_neutral2_0,
+                    android.R.color.system_neutral2_10,
+                    android.R.color.system_neutral2_50,
+                    android.R.color.system_neutral2_100,
+                    android.R.color.system_neutral2_200,
+                    android.R.color.system_neutral2_300,
+                    android.R.color.system_neutral2_400,
+                    android.R.color.system_neutral2_500,
+                    android.R.color.system_neutral2_600,
+                    android.R.color.system_neutral2_700,
+                    android.R.color.system_neutral2_800,
+                    android.R.color.system_neutral2_900,
+                    android.R.color.system_neutral2_1000,
+                ),
+            )
+
+        /** 與 [SYSTEM_PALETTE_IDS] 一一對應：primary、secondary、tertiary、neutral、neutral variant。 */
+        val TONAL_PALETTES: List<List<UInt>> =
+            listOf(
+                listOf(
+                    0xFFFFFFFFu,
+                    0xFFFFFBFEu,
+                    0xFFF6EDFFu,
+                    0xFFEADDFFu,
+                    0xFFD0BCFFu,
+                    0xFFB69DF8u,
+                    0xFF9A82DBu,
+                    0xFF7F67BEu,
+                    0xFF6750A4u,
+                    0xFF4F378Bu,
+                    0xFF381E72u,
+                    0xFF21005Du,
+                    0xFF000000u,
+                ),
+                listOf(
+                    0xFFFFFFFFu,
+                    0xFFFFFBFEu,
+                    0xFFF6EDFFu,
+                    0xFFE8DEF8u,
+                    0xFFCCC2DCu,
+                    0xFFB0A7C0u,
+                    0xFF958DA5u,
+                    0xFF7A7289u,
+                    0xFF625B71u,
+                    0xFF4A4458u,
+                    0xFF332D41u,
+                    0xFF1D192Bu,
+                    0xFF000000u,
+                ),
+                listOf(
+                    0xFFFFFFFFu,
+                    0xFFFFFBFAu,
+                    0xFFFFECF1u,
+                    0xFFFFD8E4u,
+                    0xFFEFB8C8u,
+                    0xFFD29DACu,
+                    0xFFB58392u,
+                    0xFF986977u,
+                    0xFF7D5260u,
+                    0xFF633B48u,
+                    0xFF492532u,
+                    0xFF31111Du,
+                    0xFF000000u,
+                ),
+                listOf(
+                    0xFFFFFFFFu,
+                    0xFFFFFBFEu,
+                    0xFFF4EFF4u,
+                    0xFFE6E1E5u,
+                    0xFFC9C5CAu,
+                    0xFFAEAAAEu,
+                    0xFF939094u,
+                    0xFF787579u,
+                    0xFF605D62u,
+                    0xFF484649u,
+                    0xFF313033u,
+                    0xFF1C1B1Fu,
+                    0xFF000000u,
+                ),
+                listOf(
+                    0xFFFFFFFFu,
+                    0xFFFFFBFEu,
+                    0xFFF5EEFAu,
+                    0xFFE7E0ECu,
+                    0xFFCAC4D0u,
+                    0xFFAEA9B4u,
+                    0xFF938F99u,
+                    0xFF79747Eu,
+                    0xFF605D66u,
+                    0xFF49454Fu,
+                    0xFF322F37u,
+                    0xFF1D1A22u,
+                    0xFF000000u,
+                ),
+            )
+    }
+
+    /**
+     * 預設的 provider 必須是「問這台裝置」，不是某個寫死的值。
+     *
+     * **這條的鑑別力很窄，寫清楚以免被高估**：它比對的是 `Build.VERSION.SDK_INT` 與一個「本來就 是 `{ Build.VERSION.SDK_INT }`」的
+     * provider——正常情況下兩邊是同一個運算式。它唯一抓得到的 是「有人把預設 provider 換成字面值或別的運算式」（突變實測：換成 `{ 30 }` → 本條紅，因為 JVM
+     * 單元測試裡 `Build.VERSION.SDK_INT` 是 0）。它**抓不到**、也不該被期待抓到「`SDK_INT` 本身回報錯誤」——那不是這一層能驗的事。
+     */
+    @Test
+    fun `the default sdk provider reports the running platform level`() {
+        assertEquals(
+            Build.VERSION.SDK_INT,
+            MaterialYouTheme.sdkIntProvider(),
+            "預設 provider 沒有回報執行環境的 API 等級",
+        )
+    }
+}

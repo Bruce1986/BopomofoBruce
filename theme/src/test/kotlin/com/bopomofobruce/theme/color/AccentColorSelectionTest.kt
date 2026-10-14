@@ -1,0 +1,301 @@
+package com.bopomofobruce.theme.color
+
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Test
+
+/**
+ * G3 守門：[pickAccentColor] 是純函式（不需要 Android runtime），所以可以用假造的色彩組合在 JVM 上驗證 `MaterialYouTheme`
+ * 動態取色路徑的選色邏輯。`dynamicLightColorScheme`／`dynamicDarkColorScheme` 的呼叫處另由 `MaterialYouThemeTest` 以
+ * resource id 色階 fixture 守（只涵蓋 material3 在 `SDK_INT < 34` 的路徑）；實際桌布的色值這兩處都驗不到。
+ *
+ * 色值取自 [com.bopomofobruce.theme.DarkTheme] 附近的真實數字，用 Python 重算過 WCAG 對比度（見 commit 說明），不是憑空編的。
+ */
+class AccentColorSelectionTest {
+
+    private val keyText = 0xE6E1E5u
+    private val keyFill = 0x2B2930u
+    private val background = 0x1C1B1Fu
+
+    /**
+     * 模擬 G3 描述的真實缺陷：優先序第一的候選（模擬 primaryContainer）文字對比度很高，但因為跟 surface 幾乎同 tone、對 keyFill/background
+     * 的分離度很差；優先序其後的候選（模擬跳出 container/surface 這組固定 tone 關係的角色）文字剛好壓線過 4.5，但分離度好得多。函式必須選
+     * 分離度更好的那個，而不是照優先序選第一個。
+     */
+    @Test
+    fun `picks the candidate with the best separation among those that pass the text threshold`() {
+        val containerLike = 0x4F378Bu // text 7.22 (通過)，keyFill 1.54 / background 1.84（分離度差）
+        val distinctHue = 0x855196u // text 4.50 (通過)，keyFill 2.47 / background 2.95（分離度較好）
+        val badCandidate = 0x2E2B33u // text 10.78 (通過)，keyFill 1.03 / background 1.23（分離度更差）
+
+        val picked =
+            pickAccentColor(
+                candidates = listOf(containerLike, distinctHue, badCandidate),
+                textPartner = keyText,
+                separationReferences = listOf(keyFill, background),
+            )
+
+        assertEquals(distinctHue, picked)
+    }
+
+    /**
+     * 極端桌布情境（G3 明確要求覆蓋）：所有候選色彩角色的 tone 都落在中段，沒有任何一個能同時滿足 文字 AA 4.5 與分離度——container 與 surface 同 tone
+     * 的最壞情況。函式必須退回「文字對比度最高」 的候選、不丟例外。**回傳的仍是一個低於 4.5 的顏色，而且回傳值看不出走的是 fallback**（見 `pickAccentColor`
+     * KDoc 第 3 點；`MaterialYouTheme` 目前不檢查，已列入 devlog 總表）。這條只釘「選哪一個」，不代表結果達標。
+     */
+    @Test
+    fun `falls back to the highest text contrast candidate when nothing passes the text threshold`() {
+        val highSeparationLowText = 0xD0BCFFu // text 1.32（不通過），分離度很好（keyFill 8.42 / bg 10.05）
+        val lowSeparationHigherText = 0x9E8FBFu // text 2.28（不通過但比上面高），分離度較差
+
+        val picked =
+            pickAccentColor(
+                candidates = listOf(highSeparationLowText, lowSeparationHigherText),
+                textPartner = keyText,
+                separationReferences = listOf(keyFill, background),
+            )
+
+        assertEquals(lowSeparationHigherText, picked)
+    }
+
+    /**
+     * H2（第十一輪審查）：舊版寫法是 `listOf(candidate, candidate)`——同一個 UInt 值放兩次，回傳值不管 `pickAccentColor` 內部
+     * tie-break 規則是什麼都必然等於那個值，對 KDoc 明文宣稱的「同分時保留排序在前 的那個」語意零鑑別力。
+     *
+     * 改用兩個「不同的 UInt」但分離度分數精確相等的候選：`relativeLuminance()`／`contrastRatio()` 只看 `(argb shr 16) and
+     * 0xFF` 等低 24 bit（R/G/B），完全不看最上面的 alpha byte（bit 24-31）。 `earlierCandidate` 與 `laterCandidate`
+     * 的 RGB 完全相同、只差 alpha byte（0x11 vs 0x99），因此兩者的 `contrastRatio` 是數學上精確相等（同一個 double
+     * 值），不是四捨五入湊巧相等——可以真正驗證 `maxWithOrNull(compareBy(...))` 在 compare == 0 時保留先出現的候選，而不是恰好兩個一樣的值。
+     */
+    @Test
+    fun `keeps the earlier candidate on an exact tie`() {
+        val earlierCandidate = 0x11855196u // alpha=0x11，RGB 與 laterCandidate 相同
+        val laterCandidate = 0x99855196u // alpha=0x99，RGB 與 earlierCandidate 相同 → 分離度分數精確相等
+
+        val picked =
+            pickAccentColor(
+                candidates = listOf(earlierCandidate, laterCandidate),
+                textPartner = keyText,
+                separationReferences = listOf(keyFill, background),
+            )
+
+        assertEquals(earlierCandidate, picked)
+    }
+
+    /**
+     * KDoc 寫的是「同分（含 fallback 分支同分）」。上一條兩個候選都過文字門檻，走的是分離度那條比較；fallback 分支的同分沒有人守 （2026-10-12 突變實測：只在
+     * fallback 分支改成取後者，92 條全綠）。這裡兩個候選都不過文字門檻（對 keyText 2.28）、RGB 相同只差 alpha。
+     */
+    @Test
+    fun `keeps the earlier candidate on an exact tie in the fallback branch too`() {
+        val earlierCandidate = 0x119E8FBFu
+        val laterCandidate = 0x999E8FBFu
+
+        val picked =
+            pickAccentColor(
+                candidates = listOf(earlierCandidate, laterCandidate),
+                textPartner = keyText,
+                separationReferences = listOf(keyFill, background),
+            )
+
+        assertEquals(earlierCandidate, picked)
+    }
+
+    /**
+     * 這條只驗 [pickAccentColor] 的機制，不代表任何一個角色實際該傳哪些參照色（`candidateHighlight` 現行傳的是 `listOf(background,
+     * keyAccent)`，見 `MaterialYouTheme`；只傳 `background` 是 H1 修正前的舊寫法）。這裡用 合成色值（不綁在任何真實主題上，純粹驗證機制）確認
+     * [pickAccentColor] 只看呼叫端傳入的 `separationReferences`，不會偷用其他色。`refA`（亮）與 `refB`（暗）刻意取得很開，讓「靠近亮
+     * 端的候選」與「靠近暗端但仍過文字門檻的候選」在兩個 reference 上排名互換。
+     */
+    @Test
+    fun `separation is scored only against the references the caller passes in`() {
+        val syntheticText = 0x000000u
+        val refA = 0xF5F5F5u // 亮
+        val refB = 0x141414u // 暗
+        val brightCandidate = 0xF0F0F0u // text 18.4（通過），refA 1.05（差）、refB 16.17（好）
+        val midCandidate =
+            0x7C7C7Cu // text 5.03（通過），refA 3.83（好）、refB 4.41（比 brightCandidate 的 16.17 差）
+
+        val pickedForRefAOnly =
+            pickAccentColor(
+                candidates = listOf(brightCandidate, midCandidate),
+                textPartner = syntheticText,
+                separationReferences = listOf(refA),
+            )
+        val pickedForRefBOnly =
+            pickAccentColor(
+                candidates = listOf(brightCandidate, midCandidate),
+                textPartner = syntheticText,
+                separationReferences = listOf(refB),
+            )
+
+        assertEquals(midCandidate, pickedForRefAOnly)
+        assertEquals(brightCandidate, pickedForRefBOnly)
+    }
+
+    /**
+     * H1（第十一輪審查）：`keyAccent` 與 `candidateHighlight` 用同一組候選清單（成員相同、只是排序 不同）各呼叫一次
+     * [pickAccentColor]，貼近真實 M3 baseline 時兩次都選中同一個顏色（撞色）。 H1 當時加了 `excluded`
+     * 參數，讓第二次呼叫排除第一次已選中的顏色（**正式呼叫端在 I1 之後已不傳它**，這條只驗參數本身的機制）。這裡重用第一條測試的三個候選值： `distinctHue`
+     * 分離度最好、原本會被選中；把它排除後，剩下的兩個候選裡 `containerLike` 分離度 比 `badCandidate` 好，應該被選中。
+     */
+    @Test
+    fun `excludes an already-chosen color and picks the next best candidate`() {
+        val containerLike = 0x4F378Bu // text 7.22（通過），keyFill 1.54 / background 1.84
+        val distinctHue = 0x855196u // text 4.50（通過），keyFill 2.47 / background 2.95（分離度最好）
+        val badCandidate = 0x2E2B33u // text 10.78（通過），keyFill 1.03 / background 1.23（分離度最差）
+
+        val picked =
+            pickAccentColor(
+                candidates = listOf(containerLike, distinctHue, badCandidate),
+                textPartner = keyText,
+                separationReferences = listOf(keyFill, background),
+                excluded = setOf(distinctHue),
+            )
+
+        assertEquals(containerLike, picked)
+    }
+
+    /**
+     * H1 退化情境：排除後候選清單變空（所有候選角色的顏色都跟 `excluded` 撞在一起，理論上只有桌布 配色高度單調的極端情境才會發生）。[pickAccentColor] 的
+     * KDoc 明文記載此時會忽略排除限制、退回 原本規則選色，不丟例外、也不偽造一個不在候選清單裡的假顏色——回傳值因此仍可能等於 `excluded`
+     * 裡的顏色，呼叫端要自己判斷是否要另外提示使用者。
+     */
+    @Test
+    fun `falls back to ignoring the exclusion when every candidate is excluded`() {
+        val onlyCandidate = 0x855196u // text 4.50（通過），單一候選，同時也是要被排除的顏色
+
+        val picked =
+            pickAccentColor(
+                candidates = listOf(onlyCandidate),
+                textPartner = keyText,
+                separationReferences = listOf(keyFill, background),
+                excluded = setOf(onlyCandidate),
+            )
+
+        assertEquals(onlyCandidate, picked)
+    }
+
+    /**
+     * 上一條只有一個候選，「忽略排除、走原本規則」與「直接回第一個候選」答案相同（2026-10-12 突變實測：退化分支改成 `listOf(candidates.first())`，92
+     * 條全綠）。這裡三個候選全被排除，照原本規則該選的 `distinctHue` 排在第二個。
+     */
+    @Test
+    fun `ignoring the exclusion applies the normal rule instead of taking the first candidate`() {
+        val containerLike = 0x4F378Bu // text 7.22（通過），keyFill 1.54 / background 1.84
+        val distinctHue = 0x855196u // text 4.50（通過），keyFill 2.47 / background 2.95（分離度最好）
+        val badCandidate = 0x2E2B33u // text 10.78（通過），keyFill 1.03 / background 1.23
+        val all = listOf(containerLike, distinctHue, badCandidate)
+
+        val picked =
+            pickAccentColor(
+                candidates = all,
+                textPartner = keyText,
+                separationReferences = listOf(keyFill, background),
+                excluded = all.toSet(),
+            )
+
+        assertEquals(distinctHue, picked)
+    }
+
+    /**
+     * I1（第十二輪審查）：H1 用 `excluded` 硬性把 `keyAccent` 已選中的顏色從候選清單移除、再重新評分—— 這個「先過濾、再評分」的順序本身會讓分離度倒退，重現
+     * B22 修掉的缺陷（見 [com.bopomofobruce.theme.MaterialYouTheme] 呼叫處註解的 M3 baseline 實算數字：light 下從
+     * 1.66:1 倒退到 1.26:1，dark 下倒退到 B22 明講「不及 3:1」的 1.84:1 那個色值）。
+     *
+     * **這裡守的不是上面那個 M3 baseline 情境**：那個情境裡三個 container 都過文字門檻，改成併入 `separationReferences` 之後
+     * `candidateHighlight` 仍落在 container 上（色階 fixture 實跑是 light 1.23:1／dark 1.99:1），倒退沒有解掉，見
+     * `MaterialYouTheme` 呼叫處註解。這裡構造的是另一種情境：`keyAccentColor` 是唯一通過文字門檻、且對 background 分離度 2.17:1
+     * 的候選（不是三者中最高——`weakestFailingCandidate` 是
+     * 2.31:1，但它不過文字門檻）；`weakerFailingCandidate`／`weakestFailingCandidate` 兩個都不過文字
+     * 門檻，但**越接近文字門檻的那個（`weakerFailingCandidate`）分離度反而越差**（1.69:1，比 `weakestFailingCandidate` 的
+     * 2.31:1 還差）——這種「文字對比與背景分離度方向相反」的關係， 用 Python 對這三個色值重算過 WCAG 相對亮度與對比度確認存在（不是隨手編的巧合）。
+     *
+     * 舊呼叫方式（`excluded = setOf(keyAccentColor)`，`separationReferences = listOf(background)`， 對應 H1
+     * 修正後、I1 修正前的 `dynamicColorsFor()`）：`keyAccentColor` 被排除後，剩下兩個候選都不過文字門檻， 退回「文字對比度最高」的 fallback
+     * 分支，選中 `weakerFailingCandidate`——分離度只有 1.69:1， 明顯比 `keyAccentColor` 自己的 2.17:1 差。
+     *
+     * 新呼叫方式（I1 修正後：不排除，`separationReferences = listOf(background, keyAccentColor)`）： 三個候選都不排除，只有
+     * `keyAccentColor` 過文字門檻，函式選中它自己（分離度 2.17:1）—— 沒有為了避開撞色（`candidateHighlight` 與 `keyAccent`
+     * 撞成同一個值）而選到分離度更差的顏色。
+     *
+     * **已證明會紅**：把下面「新呼叫方式」暫時改成舊呼叫方式（`excluded = setOf(keyAccentColor)`， `separationReferences =
+     * listOf(background)`），重跑本測試， `org.opentest4j.AssertionFailedError: expected: <1578042> but
+     * was: <14158996>` FAILED （`1578042` = `keyAccentColor` 0x18143A，`14158996` =
+     * `weakerFailingCandidate` 0xD80C94， 證明舊呼叫方式選到分離度更差的候選）；改回新呼叫方式後綠。
+     */
+    @Test
+    fun `does not sacrifice separation from background just to dodge a collision with keyAccent`() {
+        val keyAccentTextPartner = 0xF5F5F5u
+        val backgroundRef = 0x683E82u
+        val keyAccentColor = 0x18143Au // text 16.05（通過），對 background 2.17:1（三者中唯一過文字門檻的）
+        val weakerFailingCandidate = 0xD80C94u // text 4.38（不通過，最接近門檻），對 background 1.69:1（三者中最差）
+        val weakestFailingCandidate = 0xE06244u // text 3.21（不通過，離門檻更遠），對 background 2.31:1（比上面好）
+
+        val pickedWithOldExcludedStyle =
+            pickAccentColor(
+                candidates =
+                    listOf(keyAccentColor, weakerFailingCandidate, weakestFailingCandidate),
+                textPartner = keyAccentTextPartner,
+                separationReferences = listOf(backgroundRef),
+                excluded = setOf(keyAccentColor),
+            )
+        assertEquals(
+            weakerFailingCandidate,
+            pickedWithOldExcludedStyle,
+            "sanity check：I1 修正前（H1 的硬性排除）的呼叫方式應該選到分離度較差的 weakerFailingCandidate，" +
+                "藉此證明下面的新呼叫方式確實選到不同、更好的結果",
+        )
+
+        val pickedWithNewSeparationReferenceStyle =
+            pickAccentColor(
+                candidates =
+                    listOf(keyAccentColor, weakerFailingCandidate, weakestFailingCandidate),
+                textPartner = keyAccentTextPartner,
+                separationReferences = listOf(backgroundRef, keyAccentColor),
+            )
+
+        assertEquals(keyAccentColor, pickedWithNewSeparationReferenceStyle)
+    }
+
+    /**
+     * 文字門檻從下方釘住：`justBelow` 對 keyText 4.4475（差 0.05 沒過 AA）、分離度 2.50；`passing` 7.22、分離度 1.54。 門檻被放寬到
+     * 4.4475 以下時，`justBelow` 會靠分離度勝出。
+     */
+    @Test
+    fun `a candidate just below the text threshold cannot win on separation`() {
+        val justBelow = 0x666666u
+        val passing = 0x4F378Bu
+
+        val picked =
+            pickAccentColor(
+                candidates = listOf(justBelow, passing),
+                textPartner = keyText,
+                separationReferences = listOf(keyFill, background),
+            )
+
+        assertEquals(passing, picked)
+    }
+
+    /**
+     * KDoc 寫明兩個清單都不可為空。第二個案例刻意挑「沒有候選通過文字門檻」的輸入：那條 fallback 分支不會去讀 `separationReferences`，少了
+     * `require` 就會靜靜回傳一個值，而不是丟例外。
+     */
+    @Test
+    fun `rejects empty candidates and empty separation references`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            pickAccentColor(
+                candidates = emptyList(),
+                textPartner = 0xFF000000u,
+                separationReferences = listOf(0xFFFFFFFFu),
+            )
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            pickAccentColor(
+                candidates = listOf(0xFF888888u),
+                textPartner = 0xFF888888u,
+                separationReferences = emptyList(),
+            )
+        }
+    }
+}

@@ -1,0 +1,208 @@
+package com.bopomofobruce.theme
+
+import android.content.Context
+import android.os.Build
+import androidx.annotation.RequiresApi
+import androidx.annotation.VisibleForTesting
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import com.bopomofobruce.common.KeyboardColors
+import com.bopomofobruce.common.KeyboardDimens
+import com.bopomofobruce.common.KeyboardTheme
+import com.bopomofobruce.theme.color.pickAccentColor
+import com.bopomofobruce.theme.color.toKeyboardUInt
+import com.bopomofobruce.theme.style.StyleSheet
+import kotlin.ConsistentCopyVisibility
+
+/**
+ * Material You 動態色主題。Android 12+（API 31，`Build.VERSION_CODES.S`）讀系統桌布色；<31 沒有
+ * `dynamicLightColorScheme` / `dynamicDarkColorScheme` 可用，退化為固定的 [LightTheme] / [DarkTheme] 色盤 （id
+ * 仍回報 [ID]，讓呼叫端知道「使用者選的是 Material You」，即使實際顏色是退化值）。
+ *
+ * SDK 等級不在分支處直接讀 `Build.VERSION.SDK_INT`，而是經 `sdkIntProvider`（正式入口）或 `sdkInt` 參數（測試專用
+ * overload）注入，是為了讓分流可以在純 JVM unit test 下驗證，不需要 Robolectric（本專案目前沒有引入）。>=31 分支在 JVM 測試裡可以依 resource
+ * id 餵一組 `system_accent*`／`system_neutral*` 色階（material3 在 `SDK_INT < 34` 時經 `Resources.getColor`
+ * 讀它們）， 角色映射與 `keyAccent`／`candidateHighlight` 不撞色因此有守門（見 `MaterialYouThemeTest`）；**真實桌布會產生什麼色值、
+ * 對比度是否達標**仍需要 connectedAndroidTest / 實機驗證，這裡沒有量測。
+ *
+ * `data class`：equals/hashCode 以 [id] + [styleSheet] 為準，讓相同輸入兩次呼叫 [from] 得到相等的實例 （[styleSheet] 本身已是
+ * data class，逐欄位比較）。這只解決值語意，**不會**讓用到 [MaterialYouTheme] 的 composable 自動被 Compose 跳過重組——2.0.20+ 的
+ * strong skipping 對 unstable 型別是用 `===` 比較， 要真的可 skip 必須在 `:common` 的 [KeyboardTheme] interface 標
+ * `@Stable`/`@Immutable`，那屬於 contracts-v1（凍結中），本模組不能動，已記在 devlog 當 W2 follow-up。
+ */
+@ConsistentCopyVisibility
+data class MaterialYouTheme
+private constructor(override val id: String, val styleSheet: StyleSheet) : KeyboardTheme {
+
+    override val colors: KeyboardColors
+        get() = styleSheet.colors
+
+    override val dimens: KeyboardDimens
+        get() = styleSheet.dimens
+
+    companion object {
+        const val ID: String = "material-you"
+
+        /**
+         * 正式路徑讀取執行裝置 API 等級的**唯一**位置。抽成可替換的 provider 是為了讓下面那個 兩參數版本（真正的正式入口）能在純 JVM 被測到。
+         *
+         * 背景（2026-09-08 深審）：在此之前，兩參數版本直接寫 `from(context, darkMode,
+         * Build.VERSION.SDK_INT)`，而**唯二呼叫它的地方是兩個從未實際 render 過的 `@Preview`**。突變實測：把它改成寫死
+         * `from(context, darkMode, 30)`——也就是 Material You 在任何裝置上永遠不會啟用、本模組的招牌功能靜默失效——**52 條測試全綠**。
+         * JVM 單元測試改不動 `Build.VERSION.SDK_INT`（JDK 21 已封死 final 欄位的反射改寫）， 所以改用這個縫。
+         *
+         * **未覆蓋的部分縮到只剩 `{ Build.VERSION.SDK_INT }` 這個單一運算式**（無法在 JVM 驗證）， 而「兩參數版本會依 provider
+         * 的值分流」現在有守門（見 `MaterialYouThemeTest`）。
+         *
+         * 正式程式碼**不得寫入**這個變數——它只有測試會換掉，且測試必須在結束前還原（`MaterialYouThemeTest` 用 `try`／`finally`）。
+         */
+        @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+        internal var sdkIntProvider: () -> Int = { Build.VERSION.SDK_INT }
+
+        /**
+         * 正式入口。回傳的是**呼叫當下**的快照：桌布色與 [darkMode] 在這一刻被讀進來、算成固定的色值，之後不會自己更新。
+         *
+         * 呼叫端契約：本模組**不監聽**桌布變更或系統深色模式切換，也不提供快取失效機制。IME 顯示期間若這兩者改變， 呼叫端（W2-B 接線處）必須自己偵測並重新呼叫本函式。
+         * `ThemePreviews` 裡的 `remember { from(...) }` 不帶 key，是 Preview 只渲染一次才成立的寫法，**不要照抄進 IME**。
+         *
+         * 動態路徑不保證對比：所有候選角色對 `keyText` 都不到 4.5 時，`keyAccent`／`candidateHighlight` 會是「文字對比最高、 但仍低於
+         * 4.5」的那個色（見 `pickAccentColor` 的第 3 點），本函式不會以任何方式通知呼叫端。
+         *
+         * 本函式不接任何例外：`>= 31` 時 material3 的 `dynamicLightColorScheme`／`dynamicDarkColorScheme`
+         * 讀系統色資源若丟例外，會原樣傳給呼叫端。
+         */
+        fun from(context: Context, darkMode: Boolean): MaterialYouTheme =
+            from(context, darkMode, sdkIntProvider())
+
+        /**
+         * 測試用的 SDK 注入版本。**不要在正式程式碼呼叫**——傳入與裝置實際 API 等級不符的 [sdkInt] 會讓 `< 31` 的裝置走進
+         * `@RequiresApi(S)` 的動態取色路徑而在執行期崩潰。
+         */
+        @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+        internal fun from(context: Context, darkMode: Boolean, sdkInt: Int): MaterialYouTheme {
+            val fallback = if (darkMode) DarkTheme.styleSheet else LightTheme.styleSheet
+            // Lint 的 NewApi 資料流分析只認得對 `Build.VERSION.SDK_INT` 的直接比較；這裡刻意透過
+            // `sdkInt` 參數注入（正式路徑由上面的兩參數版本經 `sdkIntProvider` 填入
+            // `Build.VERSION.SDK_INT`），讓分流能在純 JVM unit test 驗證（見 class KDoc）。
+            // 實際執行路徑與直接寫 `Build.VERSION.SDK_INT >= S` 等價，手動抑制這條誤報。
+            @Suppress("NewApi")
+            val colors =
+                if (sdkInt >= Build.VERSION_CODES.S) {
+                    dynamicColorsFor(context, darkMode)
+                } else {
+                    fallback.colors
+                }
+            return MaterialYouTheme(id = ID, styleSheet = fallback.copy(id = ID, colors = colors))
+        }
+
+        @RequiresApi(Build.VERSION_CODES.S)
+        private fun dynamicColorsFor(context: Context, darkMode: Boolean): KeyboardColors {
+            val scheme =
+                if (darkMode) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            val background = scheme.surface.toKeyboardUInt()
+            val keyFill = scheme.surfaceVariant.toKeyboardUInt()
+            val keyText = scheme.onSurface.toKeyboardUInt()
+
+            // G3（codex 獨立審查 + 第八輪 Opus tracer 的推理）：B22 把 keyAccent 寫死映到
+            // scheme.primaryContainer、candidateHighlight 寫死映到 scheme.secondaryContainer，跟
+            // BuiltInThemes 修掉的缺陷同源——M3 的 *Container 與 surface 是固定 tone 目標（light 下
+            // surface≈98/container≈90，dark 下 6/30；dark 的 6 這裡原本寫 10），桌布只換色相與彩度、不換 tone
+            // （**這些 tone 與「不換 tone」都是 API 31–33 的結論**：material3 1.3.1 反組譯，SDK_INT < 34 走
+            // dynamicLight／DarkColorScheme31、由色階算出各角色。API 34 以上 light 與 dark 都改讀系統資源
+            // system_surface_light／system_surface_dark 等，那條路徑上的 tone 沒有查證），所以這個映射
+            // 在任何桌布下都只有約 1–2:1 的自身分離度。改成用 pickAccentColor 從多個候選角色中選：
+            // 保留文字達 AA 4.5 的候選，其中挑與 keyFill/background（keyAccent）或 background
+            // （candidateHighlight）分離度最大的一個。這個選色函式本身是純數學，已用假造的色彩組合在
+            // JVM 覆蓋（見 AccentColorSelectionTest，含「container 與 surface 同 tone」的極端情境）。
+            // 注意：本函式的角色映射與不撞色在 JVM 以 resource id 色階 fixture 守門（MaterialYouThemeTest，
+            // 2026-09-15 補），但沒有 Robolectric、也沒有實機驗證——實際桌布的數字未經驗證。在那組色階 fixture 上，選出的
+            // keyAccent 對 background 是 light 1.62:1／dark 2.88:1，**低於 3.0**（見下方 I1 段與 devlog 總表）。
+            val accentCandidates =
+                listOf(
+                        scheme.primaryContainer,
+                        scheme.tertiaryContainer,
+                        scheme.secondaryContainer,
+                        scheme.primary,
+                        scheme.tertiary,
+                        scheme.secondary,
+                        scheme.inversePrimary,
+                        scheme.onSurfaceVariant,
+                    )
+                    .map { it.toKeyboardUInt() }
+            val highlightCandidates =
+                listOf(
+                        scheme.secondaryContainer,
+                        scheme.tertiaryContainer,
+                        scheme.primaryContainer,
+                        scheme.secondary,
+                        scheme.tertiary,
+                        scheme.primary,
+                        scheme.inversePrimary,
+                        scheme.onSurfaceVariant,
+                    )
+                    .map { it.toKeyboardUInt() }
+
+            val keyAccent =
+                pickAccentColor(
+                    candidates = accentCandidates,
+                    textPartner = keyText,
+                    separationReferences = listOf(keyFill, background),
+                )
+
+            // H1（第十一輪審查）：accentCandidates 與 highlightCandidates 成員相同（只是排序不同），
+            // 用貼近真實 M3 baseline 的 tone 分布實測，兩次呼叫最後都只剩 inversePrimary 同時通過
+            // 文字門檻且分離度最好，於是 keyAccent 與 candidateHighlight 撞成同一個顏色——功能鍵按下
+            // 的底色跟候選列選中游標的底色分不出來，正是 B22 註解要避免、繞一圈又回來的缺陷。
+            //
+            // I1（第十二輪審查）：H1 當時用 excluded = setOf(keyAccent) 硬性把 keyAccent 選中的顏色
+            // 從候選清單移除、再重新評分，結果**先過濾、再評分**這個順序本身會讓分離度倒退：用 M3 baseline
+            // 色票實算（不是 API 31–33 動態配色的 tone，見下方 2026-10-12 更正），light 下 keyAccent 選中 inversePrimary（對
+            // background 1.66:1），排除後 candidateHighlight 落到 tertiaryContainer（對 background
+            // 只剩 1.26:1，比排除前更差）；dark 下落到 secondaryContainer（1.84:1，正是 B22 註解裡
+            // `BuiltInThemes.kt` 記載「只有 1.84:1，不及 3:1」的同一個色值/數字，被動態路徑撿回來）。
+            // （2026-10-12 更正：這一段的數字是拿 M3 baseline 色票算的，dark 的 surface 用了 `#1C1B1F`
+            // （tone 10）；API 31–33 的動態配色 dark surface 是 neutralVariant6，比它更暗，所以那條路徑上
+            // dark 是 container 對 background 約 1.99、inversePrimary 約 2.88（見下方 fixture 實跑），
+            // 不是 1.84／2.66。選到的色值確實與 BuiltInThemes 那個 `#4A4458` 相同，只是背景不同、
+            // 數字不是 1.84。light 的 1.66 也是對 baseline 色票 `#FFFBFE`（約 tone 99）算的，tone 98 下是 1.62。
+            // API 34 以上 light 與 dark 的各角色都來自系統資源，這些數字在那條路徑上都沒有驗證。）
+            // 根因：excluded 是硬性排除，不管排除之後剩下的候選有多差都不會回頭；而三個 container
+            // 候選彼此 tone 相近，只要 keyAccent 選中 inversePrimary，第二次呼叫幾乎必然落進這個分離
+            // 度差的 container 群，不是罕見路徑。
+            //
+            // 已改：不再用 excluded 硬性過濾，改成把 keyAccent 併入 separationReferences——讓「與
+            // keyAccent 分得開」變成跟「與 background 分得開」同級的評分項，而不是二元的
+            // 排除／不排除。這同時解掉「excluded 只比對完全相同的 UInt，視覺上幾乎相同但不是同一個
+            // UInt 的顏色排不掉」的問題（excluded 用 `it in excluded` 做精確比對，見 pickAccentColor 的實作；
+            // 這一點的討論在 feat-w1b-theme.md 第十二輪 I1）。
+            //
+            // **這個改法沒有解掉上面 I1 描述的倒退**（2026-10-12 以 MaterialYouThemeTest 的色階
+            // fixture 實跑，非實機）：keyAccent 自己在評分裡恆為 1.0（最低分），所以只要還有別的候選
+            // 通過文字門檻，結果就與硬性排除幾乎相同——light 仍選中 tertiaryContainer（對 background
+            // 1.23:1，與舊的 excluded 寫法選到同一色）；dark 選中 tertiaryContainer（1.99:1，舊寫法是
+            // secondaryContainer 1.99:1）。兩者都低於不避撞色時的 inversePrimary（1.62／2.88），
+            // 也都不及固定色盤守的 3.0。新舊寫法選到的顏色可以不同（dark 就是），但在這組色階下對
+            // background 的分離度沒有差別。真正讓新寫法勝出的情境是「只有 keyAccent 一個候選通過文字
+            // 門檻」：舊寫法會掉進 fallback 分支選到不過文字門檻的顏色，新寫法會回傳 keyAccent 自己
+            // （撞色，但文字可讀）——`AccentColorSelectionTest` 的 `does not sacrifice separation
+            // from background just to dodge a collision with keyAccent` 守的就是這一點，不是上面
+            // 那個 M3 baseline 情境。動態路徑 candidateHighlight 對 background 的分離度因此**未解決**，
+            // 與 keyAccent 對 background 同列待 W2-B 實機驗證時處理。
+            val candidateHighlight =
+                pickAccentColor(
+                    candidates = highlightCandidates,
+                    textPartner = keyText,
+                    separationReferences = listOf(background, keyAccent),
+                )
+
+            return KeyboardColors(
+                background = background,
+                keyFill = keyFill,
+                keyText = keyText,
+                keyAccent = keyAccent,
+                candidateText = keyText,
+                candidateHighlight = candidateHighlight,
+            )
+        }
+    }
+}

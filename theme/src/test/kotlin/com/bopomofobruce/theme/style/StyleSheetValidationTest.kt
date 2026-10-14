@@ -1,0 +1,234 @@
+package com.bopomofobruce.theme.style
+
+import com.bopomofobruce.common.KeyboardColors
+import com.bopomofobruce.common.KeyboardDimens
+import com.bopomofobruce.theme.LightTheme
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.Json
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Test
+
+class StyleSheetValidationTest {
+
+    private val validColors =
+        KeyboardColors(
+            background = 0xFF1E1E1Eu,
+            keyFill = 0xFF2E2E2Eu,
+            keyText = 0xFFEAEAEAu,
+            keyAccent = 0xFF4A90E2u,
+            candidateText = 0xFFEAEAEAu,
+            candidateHighlight = 0xFF4A90E2u,
+        )
+
+    private val validDimens =
+        KeyboardDimens(keyHeightDp = 48f, rowGapDp = 4f, keyGapDp = 4f, candidateRowHeightDp = 40f)
+
+    @Test
+    fun `StyleSheet rejects blank id`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            StyleSheet(id = "", colors = validColors, dimens = validDimens)
+        }
+    }
+
+    @Test
+    fun `KeyboardShapes rejects negative corner radius`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            KeyboardShapes(keyCornerRadiusDp = -1f)
+        }
+    }
+
+    @Test
+    fun `KeyboardShapes rejects non-finite corner radius`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            KeyboardShapes(panelCornerRadiusDp = Float.NaN)
+        }
+    }
+
+    @Test
+    fun `KeyboardShapes rejects negative or non-finite candidate row corner radius`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            KeyboardShapes(candidateRowCornerRadiusDp = -1f)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            KeyboardShapes(candidateRowCornerRadiusDp = Float.NaN)
+        }
+    }
+
+    @Test
+    fun `KeyboardTypography rejects zero or negative font sizes`() {
+        assertThrows(IllegalArgumentException::class.java) { KeyboardTypography(keyLabelSp = 0f) }
+        assertThrows(IllegalArgumentException::class.java) {
+            KeyboardTypography(candidateTextSp = -5f)
+        }
+        // 0f 要單獨測：`> 0f` 誤寫成 `>= 0f` 時 -5f 照樣被擋，只有 0f 分得出來。
+        assertThrows(IllegalArgumentException::class.java) {
+            KeyboardTypography(candidateTextSp = 0f)
+        }
+    }
+
+    // 這條補的是 +Infinity：前面幾條只餵 NaN 與負值。2026-09-15 補這條時六個欄位各有一個 `isFinite()`，逐一刪掉全套仍綠；
+    // 歷班第 21 輪起改成閉區間檢查（圓角 `0f..MAX_CORNER_RADIUS_DP`、字級 `> 0f && <= MAX_FONT_SIZE_SP`），產品碼裡已經沒有
+    // `isFinite()`，+Infinity 現在是被上限擋下的；這條與 `…cap every size field` 一起守上限。
+    @Test
+    fun `KeyboardShapes and KeyboardTypography reject positive infinity in every size field`() {
+        val inf = Float.POSITIVE_INFINITY
+        val builders: Map<String, () -> Any> =
+            mapOf(
+                "keyCornerRadiusDp" to { KeyboardShapes(keyCornerRadiusDp = inf) },
+                "candidateRowCornerRadiusDp" to
+                    {
+                        KeyboardShapes(candidateRowCornerRadiusDp = inf)
+                    },
+                "panelCornerRadiusDp" to { KeyboardShapes(panelCornerRadiusDp = inf) },
+                "keyLabelSp" to { KeyboardTypography(keyLabelSp = inf) },
+                "keySubLabelSp" to { KeyboardTypography(keySubLabelSp = inf) },
+                "candidateTextSp" to { KeyboardTypography(candidateTextSp = inf) },
+            )
+        for ((field, build) in builders) {
+            assertThrows(IllegalArgumentException::class.java, { build() }, field)
+        }
+    }
+
+    @Test
+    fun `KeyboardTypography rejects zero, negative or non-finite sub label size`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            KeyboardTypography(keySubLabelSp = 0f)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            KeyboardTypography(keySubLabelSp = -1f)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            KeyboardTypography(keySubLabelSp = Float.NaN)
+        }
+    }
+
+    @Test
+    fun `KeyboardTypography rejects out-of-range font weight`() {
+        assertThrows(IllegalArgumentException::class.java) { KeyboardTypography(fontWeight = 0) }
+        assertThrows(IllegalArgumentException::class.java) { KeyboardTypography(fontWeight = 1001) }
+    }
+
+    // O2（第十四輪 tracer）：反序列化路徑上 require 丟的仍是 IllegalArgumentException，不是
+    // SerializationException——呼叫端若只接 SerializationException 會漏接。這條測試直接走
+    // decodeFromString，證明「結構合法但欄位超出範圍」的主題 JSON 逃出來的例外型別。
+    @Test
+    fun `StyleSheet decodeFromString throws IllegalArgumentException for out-of-range nested field`() {
+        val jsonWithZeroKeyLabelSp =
+            """
+            {
+                "id": "bad-typography",
+                "colors": {
+                    "background": "#1E1E1E",
+                    "keyFill": "#2E2E2E",
+                    "keyText": "#EAEAEA",
+                    "keyAccent": "#4A90E2",
+                    "candidateText": "#EAEAEA",
+                    "candidateHighlight": "#4A90E2"
+                },
+                "dimens": {
+                    "keyHeightDp": 48.0,
+                    "rowGapDp": 4.0,
+                    "keyGapDp": 4.0,
+                    "candidateRowHeightDp": 40.0
+                },
+                "typography": {
+                    "keyLabelSp": 0.0
+                }
+            }
+            """
+                .trimIndent()
+
+        val thrown =
+            assertThrows(IllegalArgumentException::class.java) {
+                Json.decodeFromString(StyleSheet.serializer(), jsonWithZeroKeyLabelSp)
+            }
+
+        // 光斷言 IllegalArgumentException 不夠：kotlinx-serialization 1.7.3 的
+        // SerializationException 本身就繼承 IllegalArgumentException，所以即使未來這條路徑改成
+        // 把 require 包成 SerializationException（＝呼叫端只 catch SerializationException 就接得
+        // 住，本測試想證明的問題也就不存在了），上面那條斷言仍會綠。必須額外排除掉子類，這條
+        // 測試才真的鎖得住「逃出來的是裸的 IAE、接 SerializationException 會漏接」這個性質。
+        assertFalse(
+            thrown is SerializationException,
+            "expected a bare IllegalArgumentException that `catch (e: SerializationException)` " +
+                "would NOT catch, but got ${thrown::class.qualifiedName}",
+        )
+    }
+
+    // 以下四條補的是「接受端點」與「同型欄位漏掉的那一個」（2026-10-11 突變實測，補之前 70 條全綠）：
+    // `isNotBlank`→`isNotEmpty`、拿掉 panel 的 `>= 0f`、keyCorner `>= 0f`→`> 0f`、
+    // fontWeight `1..1000`→`1..999`／`2..1000` 都沒有任何一條會紅。（圓角那兩個突變是當時 `>= 0f && isFinite()` 的寫法；
+    // 現行是閉區間，對應的突變是拿掉下界、或把下界改成不含 0。）
+
+    @Test
+    fun `StyleSheet rejects whitespace-only id`() {
+        val base = LightTheme.styleSheet
+        assertThrows(IllegalArgumentException::class.java) {
+            StyleSheet(id = "   ", colors = base.colors, dimens = base.dimens)
+        }
+    }
+
+    @Test
+    fun `KeyboardShapes rejects negative panel corner radius`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            KeyboardShapes(panelCornerRadiusDp = -1f)
+        }
+    }
+
+    @Test
+    fun `KeyboardShapes accepts zero for every corner radius`() {
+        val square =
+            KeyboardShapes(
+                keyCornerRadiusDp = 0f,
+                candidateRowCornerRadiusDp = 0f,
+                panelCornerRadiusDp = 0f,
+            )
+        assertEquals(0f, square.keyCornerRadiusDp)
+        assertEquals(0f, square.candidateRowCornerRadiusDp)
+        assertEquals(0f, square.panelCornerRadiusDp)
+    }
+
+    @Test
+    fun `KeyboardTypography accepts both ends of the documented weight range`() {
+        assertEquals(1, KeyboardTypography(fontWeight = 1).fontWeight)
+        assertEquals(1000, KeyboardTypography(fontWeight = 1000).fontWeight)
+    }
+
+    /**
+     * 有限的 dp／sp 不代表乘上密度後的 px 有限：`2e38f` 過得了 `isFinite()`，卻會讓 `RoundedCornerShape` 在畫的時候丟例外
+     * （2026-10-12 實測）。上限本身可過、超過一點就拒，三個圓角與三個字級逐欄驗。
+     */
+    @Test
+    fun `KeyboardShapes and KeyboardTypography cap every size field`() {
+        val maxRadius = KeyboardShapes.MAX_CORNER_RADIUS_DP
+        val maxFont = KeyboardTypography.MAX_FONT_SIZE_SP
+        assertEquals(1000f, maxRadius, "圓角上限的數值變了——已存的主題 JSON 可能因此解不出來")
+        assertEquals(1000f, maxFont, "字級上限的數值變了——已存的主題 JSON 可能因此解不出來")
+
+        KeyboardShapes(maxRadius, maxRadius, maxRadius)
+        KeyboardTypography(maxFont, maxFont, maxFont)
+
+        val tooRound = Math.nextUp(maxRadius)
+        val tooBig = Math.nextUp(maxFont)
+        val builders: List<Pair<String, () -> Unit>> =
+            listOf(
+                "keyCornerRadiusDp" to { KeyboardShapes(keyCornerRadiusDp = tooRound) },
+                "candidateRowCornerRadiusDp" to
+                    {
+                        KeyboardShapes(candidateRowCornerRadiusDp = tooRound)
+                    },
+                "panelCornerRadiusDp" to { KeyboardShapes(panelCornerRadiusDp = tooRound) },
+                "keyLabelSp" to { KeyboardTypography(keyLabelSp = tooBig) },
+                "keySubLabelSp" to { KeyboardTypography(keySubLabelSp = tooBig) },
+                "candidateTextSp" to { KeyboardTypography(candidateTextSp = tooBig) },
+            )
+        for ((field, build) in builders) {
+            assertThrows(IllegalArgumentException::class.java, { build() }, field)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            KeyboardShapes(keyCornerRadiusDp = 2e38f)
+        }
+    }
+}
