@@ -71,7 +71,7 @@ internal fun contrastRatio(a: UInt, b: UInt): Double {
  * [com.bopomofobruce.theme.MaterialYouTheme] 的呼叫處註解，附 M3 baseline 實算數字）。
  * [com.bopomofobruce.theme.MaterialYouTheme.dynamicColorsFor] 已改成**不用** [excluded]，改為把 `keyAccent`
  * 併入 [separationReferences]，讓「與 keyAccent 分得開」變成跟「與 background 分得開」同級的評分項，而不是二元的硬性排除／不排除。[excluded]
- * 參數本身**保留在本函式的公開 API**（見下方 KDoc 與 `AccentColorSelectionTest` 既有的兩條測試），因為它是描述明確、已有測試覆蓋
+ * 參數本身**保留在本函式的公開 API**（見下方 KDoc 與 `AccentColorSelectionTest` 裡傳入 [excluded] 的測試），因為它是描述明確、已有測試覆蓋
  * 的通用純函式功能——之後若有呼叫端需要「絕對不可以跟某個顏色相同」這種硬性排除語意（跟 `candidateHighlight` 這種「盡量分得開但分離度優先」的語意不同），仍可以直接重用；只是
  * `dynamicColorsFor()` 這個呼叫處不再使用它。
  *

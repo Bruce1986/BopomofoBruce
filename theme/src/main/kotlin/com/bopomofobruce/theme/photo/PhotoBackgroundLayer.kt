@@ -18,7 +18,7 @@ private const val TAG = "PhotoBackgroundLayer"
 
 /**
  * 用 Coil 載入 [PhotoBackground.uri]，套上模糊、透明度、色調，鋪成鍵盤面板最底層背景。
- * - 模糊走 `Modifier.blur()`：這個 API 在 Android 12（API 31）以下是 **no-op**——Compose 沒有軟體
+ * - 模糊走 `Modifier.blur()`：這個 API 在 Android 12（API 31）以前（`< 31`）是 **no-op**——Compose 沒有軟體
  *   fallback，`RenderEffect` 是硬體合成才有的機制。本模組 `minSdk = 28`，所以只在 `Build.VERSION.SDK_INT >=
  *   Build.VERSION_CODES.S`（API 31）時才套用 `.blur()`；`< 31` 一律跳過模糊， 只疊 `.alpha()` 與
  *   [PhotoBackground.tint]（見下）當降級效果——不假裝有模糊。

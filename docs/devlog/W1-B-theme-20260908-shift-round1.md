@@ -24,6 +24,7 @@
 | 歷班第 5～8 輪 | 本檔 `# 排程深審 2026-09-15 第 1～4 輪` | 2026-09-15 |
 | 歷班第 9 輪 | 本檔 `# 排程深審 2026-09-22 第 1 輪` | 2026-09-22 |
 | 歷班第 10 輪起 | 本檔 `# 手動 GGR fix-loop … 第 N 輪（歷班第 N+9 輪）` | 2026-10-10 起 |
+| 歷班第 30 輪起 | 本檔 `# 排程深審 2026-10-14 …（歷班第 N 輪）` | 2026-10-14 起 |
 
 手動 GGR fix-loop 各節的標題有兩個數字：「第 N 輪」是那次 fix-loop 自己的輪次，「歷班第 M 輪」是接續前面各班的累計輪次，M＝N＋9。
 本檔內文與總表引用這幾節時一律用歷班輪次。`feat-w1b-theme.md` 的「第十二輪」（I1）與本檔的「歷班第 12 輪」是不同的兩輪。程式碼註解裡只寫中文數字輪次的
@@ -1031,3 +1032,13 @@ Light `keyFill` 改成 `#FEFEFE`（色值不設絕對快照是刻意的）；亮
 - 留給之後的事（不在本 PR 做）：`theme/src/main` 的註解行數與程式碼行數接近 1:1，其中 `pickAccentColor` 的 KDoc 與 `MaterialYouTheme` 呼叫處註解各疊了三、四層更正。
   建議 merge 後另開一支只動註解的 PR，把沿革搬進 devlog、原始碼只留現況與原因。`MaterialYouThemeTest` 的色階測試綁在 material3 1.3.1 讀資源的方式上，
   升 compose BOM 時若轉紅，先讀該檔 class KDoc。`sdkIntProvider` 是全域可變狀態，測試靠循序執行才安全，日後若開 JUnit 平行執行要先處理。
+
+# 排程深審 2026-10-14 afternoon 第 1 輪（歷班第 30 輪）
+
+視角：錯誤處理／契約、註解誠實性、突變抽樣（12 個），另跑 Codex。產品行為 0 改動；95 tests / 0 failures。
+
+- 錯誤處理／契約、Codex：零 finding。突變 12 個殺 10 個，存活的兩個（`SCHEME_SHAPE` 長度上限、`>= textThreshold` 改 `>`）本檔已記為已評估／等價。
+- 🟡 註解三處與現況不符，已改：`pickAccentColor` KDoc 說 `excluded` 有「既有的兩條測試」，實際傳入 `excluded` 的測試已不只兩條（改成不寫條數）；
+  `ContrastFormulaKnownValuesTest` 權重測試 KDoc 寫 R↔B 對調時「本條以外另有 5 條紅」，在 95 條下重跑是 6 條（本輪實跑，連本條共 7 條紅）；
+  `PhotoBackgroundLayer` KDoc「API 31 以下是 no-op」與程式碼（`>= 31` 才套用）字面矛盾，改成「`< 31`」。
+
