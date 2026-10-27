@@ -8,9 +8,11 @@ on:
     branches: [main]
 
 # 同 branch / PR 的連續 push 互相 cancel，避免浪費 Actions 額度。
+# 只在 pull_request 事件取消進行中的 run；push 到 main 的 run 一律跑到完，
+# 避免同一支 main commit 的 CI 結果被下一個 push 取消、留下沒有終態的 commit。
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # 預設權限收最小；只需要讀 repo 內容即可（PR comment 由 Gemini bot 自己處理）。
 permissions:
