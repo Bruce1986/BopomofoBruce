@@ -7,9 +7,10 @@ on:
   pull_request:
     branches: [main]
 
-# 同 branch / PR 的連續 push 互相 cancel，避免浪費 Actions 額度。
-# 只在 pull_request 事件取消進行中的 run；push 到 main 的 run 一律跑到完，
-# 避免同一支 main commit 的 CI 結果被下一個 push 取消、留下沒有終態的 commit。
+# 同一個 PR 的連續 push 互相 cancel，避免浪費 Actions 額度。
+# 只在 pull_request 事件取消進行中的 run；push 到 main 時，進行中的 run 不取消。
+# 注意：同一 group 只保留一個排隊中的 run，連續多次 push 到 main 時，
+# 中間還在排隊的 run 仍會被較新的取代，那幾個 commit 不會有 CI 結果。
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}

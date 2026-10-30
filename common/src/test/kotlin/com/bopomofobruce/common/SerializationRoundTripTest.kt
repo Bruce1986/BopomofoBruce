@@ -178,9 +178,14 @@ class SerializationRoundTripTest {
                 }
             """
                     .trimIndent()
-            assertThrows(SerializationException::class.java) {
-                json.decodeFromString(KeyboardColors.serializer(), jsonStr)
-            }
+            val e =
+                assertThrows(
+                    SerializationException::class.java,
+                    { json.decodeFromString(KeyboardColors.serializer(), jsonStr) },
+                    "bad=\"$bad\"",
+                )
+            // 確認是長度檢查丟的，而不是缺欄位等其他 SerializationException。
+            assertTrue(e.message!!.contains("Hex value must be"), "bad=\"$bad\": ${e.message}")
         }
     }
 
@@ -198,9 +203,11 @@ class SerializationRoundTripTest {
             }
         """
                 .trimIndent()
-        assertThrows(SerializationException::class.java) {
-            json.decodeFromString(KeyboardColors.serializer(), jsonStr)
-        }
+        val e =
+            assertThrows(SerializationException::class.java) {
+                json.decodeFromString(KeyboardColors.serializer(), jsonStr)
+            }
+        assertTrue(e.message!!.contains("Invalid hex format"), e.message)
     }
 
     @Test
