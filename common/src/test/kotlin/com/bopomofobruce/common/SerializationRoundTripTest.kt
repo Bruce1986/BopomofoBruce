@@ -1,7 +1,9 @@
 package com.bopomofobruce.common
 
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -156,6 +158,56 @@ class SerializationRoundTripTest {
         assertEquals(0xFF2E2E2Eu, colors.keyFill)
         assertEquals(0xFFEAEAEAu, colors.keyText)
         assertEquals(0xFF4A90E2u, colors.keyAccent)
+    }
+
+    @Test
+    fun `KeyboardColors rejects hex string with wrong digit count`() {
+        // UIntHexSerializer 只接受 6-digit(RGB) 或 8-digit(ARGB)；其餘長度應該
+        // 丟 SerializationException，而不是靜默截斷/補值或丟出錯誤型別的例外。
+        val badLengths = listOf("1E1E1", "1E1E1E1", "", "1E1E1E1E1")
+        for (bad in badLengths) {
+            val jsonStr =
+                """
+                {
+                    "background": "$bad",
+                    "keyFill": "FF000000",
+                    "keyText": "FF000000",
+                    "keyAccent": "FF000000",
+                    "candidateText": "FF000000",
+                    "candidateHighlight": "FF000000"
+                }
+            """
+                    .trimIndent()
+            val e =
+                assertThrows(
+                    SerializationException::class.java,
+                    { json.decodeFromString(KeyboardColors.serializer(), jsonStr) },
+                    "bad=\"$bad\"",
+                )
+            // 確認是長度檢查丟的，而不是缺欄位等其他 SerializationException。
+            assertTrue(e.message!!.contains("Hex value must be"), "bad=\"$bad\": ${e.message}")
+        }
+    }
+
+    @Test
+    fun `KeyboardColors rejects non-hex characters`() {
+        val jsonStr =
+            """
+            {
+                "background": "GGGGGG",
+                "keyFill": "FF000000",
+                "keyText": "FF000000",
+                "keyAccent": "FF000000",
+                "candidateText": "FF000000",
+                "candidateHighlight": "FF000000"
+            }
+        """
+                .trimIndent()
+        val e =
+            assertThrows(SerializationException::class.java) {
+                json.decodeFromString(KeyboardColors.serializer(), jsonStr)
+            }
+        assertTrue(e.message!!.contains("Invalid hex format"), e.message)
     }
 
     @Test
