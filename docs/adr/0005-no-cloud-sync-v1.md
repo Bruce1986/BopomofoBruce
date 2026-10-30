@@ -55,7 +55,7 @@ Solo Edition 整個劃掉雲端 + 帳號相關（[SoloEdition §1, §5](../REBUI
 
 **正面**
 - AndroidManifest 無 `INTERNET` permission = 使用者看 app info 時直接看到「無網路權限」— 是最強的隱私廣告
-- 沒有 `:sync` / `:metrics` / `:tv` module 要寫（相對 [ADR-0002](0002-eight-modules-not-thirty.md) 公司版 30 module 切分省下 3 個），也沒有帳號系統要寫
+- 沒有 `:sync` / `:metrics` / `:tv` module 要寫（相對 [ADR-0002](0002-eight-modules-not-thirty.md) 公司版 30+ module 切分省下 3 個），也沒有帳號系統要寫
 - 不需處理 conflict resolution / key management / account recovery / GDPR data export / 滲透事件
 - 沒有伺服器成本：v1 永久零營運成本
 - 上架審查簡單：Play Console Data Safety 表格幾乎全填「不收集」；F-Droid 可拿 zero-tracking badge
