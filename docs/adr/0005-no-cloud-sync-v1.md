@@ -3,7 +3,7 @@
 - 日期：2026-06-20
 - 狀態：Accepted
 - 提議者：Bruce
-- 相關：[ADR-0002](0002-eight-modules-not-thirty.md)（沒有 `:sync` / `:metrics` module 就是這條決定的具現化）
+- 相關：[ADR-0002](0002-eight-modules-not-thirty.md)（沒有 `:sync` / `:metrics` / `:tv` module 就是這條決定的具現化）
 
 ## Context（背景）
 
