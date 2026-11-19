@@ -1,4 +1,7 @@
 # Consumer ProGuard rules for the :decoder module.
 #
-# Empty by design at W0-1 skeleton — no module-specific shrink rules needed yet.
-# Downstream Wave 實作該 module 時再加：keep rules、optimization hints 等。
+# bpmf_jni.c 以 Java_com_bopomofobruce_decoder_JniBpmfNative_* 名稱綁定，
+# 類別名與 native 方法名都不能被混淆。
+-keepclasseswithmembernames class com.bopomofobruce.decoder.JniBpmfNative {
+    native <methods>;
+}
