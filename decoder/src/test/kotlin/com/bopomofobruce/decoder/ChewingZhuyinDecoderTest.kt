@@ -88,6 +88,8 @@ class ChewingZhuyinDecoderTest {
         decoder.commit(stale)
         // 與最新結果第 0 個同字同分、只差來源：不是這個 decoder 給的候選，不能被當成它。
         decoder.commit(Candidate("好", 1f, CandidateSource.PERSONAL))
+        // 與最新結果第 1 個（郝 0.5f PRIMARY）同字同來源、只差分數：例如被重新計分過的物件。
+        decoder.commit(Candidate("郝", 0.25f, CandidateSource.PRIMARY))
         assertTrue(native.calls.none { it.startsWith("commit") }, native.calls.toString())
     }
 
