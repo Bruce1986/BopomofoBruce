@@ -71,6 +71,15 @@ class ZhuyinTextTest {
         assertEquals("ㄇㄚ ㄇㄚ˙", ZhuyinText.normalize("ㄇㄚ ㄇㄚ˙"))
         assertEquals("ㄇㄚ", ZhuyinText.normalize("ㄇㄚ "))
         assertEquals("", ZhuyinText.normalize(" " + cp(0x3000) + " "))
+        for (t in listOf(cp(0x02CA), cp(0x02C7), cp(0x02CB), cp(0x02D9))) {
+            assertEquals("ㄇㄚ${t}ㄇㄚ", ZhuyinText.normalize("ㄇㄚ$t ㄇㄚ"), t) // 每個聲調後的空白都刪
+        }
+    }
+
+    @Test
+    fun `trailing first-tone space is dropped, so output must not be concatenated`() {
+        assertEquals("ㄍㄨㄥ ㄖㄣˊ", ZhuyinText.normalize("ㄍㄨㄥ " + "ㄖㄣˊ")) // 整串一次正規化才對
+        assertEquals("ㄍㄨㄥㄖㄣˊ", ZhuyinText.normalize("ㄍㄨㄥ ") + "ㄖㄣˊ") // KDoc 警告的誤用
     }
 
     @Test
@@ -81,14 +90,28 @@ class ZhuyinTextTest {
 
     @Test
     fun `valid sequences`() {
-        val cases = listOf("ㄋㄧˇㄏㄠˇ", "ㄍㄨㄥ ㄖㄣˊ", "ㄇㄚ", "ㄇㄚ˙", "ㄓ", "ㄧ", "ㄦˊ", "ㄋㄧˇ ㄏㄠˇ ", "ㄒㄩㄝˊ")
+        val cases =
+            listOf(
+                "ㄋㄧˇㄏㄠˇ",
+                "ㄍㄨㄥ ㄖㄣˊ",
+                "ㄇㄚ",
+                "ㄇㄚ˙",
+                "ㄓ",
+                "ㄧ",
+                "ㄦˊ",
+                "ㄋㄧˇ ㄏㄠˇ ",
+                "ㄒㄩㄝˊ",
+                "ㄉㄚˋ",
+                "ㄉㄚˋ ㄇㄚ",
+            )
         for (s in cases) assertTrue(ZhuyinText.isValidSequence(s), s)
     }
 
     @Test
-    fun `lone initials pass because the check is structural only`() {
-        // KDoc 記載的已知缺口：bpmf.h 的「ㄏ ㄋㄧˇ」擋不下；ㄑ˙（啐）在 libchewing 字庫裡，不能用聲韻規則硬擋。
-        for (s in listOf("ㄏ ㄋㄧˇ", "ㄑ˙")) assertTrue(ZhuyinText.isValidSequence(s), s)
+    fun `known blind spots pass because the check is structural only`() {
+        // KDoc 記載的已知缺口：bpmf.h 的「ㄏ ㄋㄧˇ」擋不下；ㄑ˙（啐）在 libchewing 字庫裡，不能用聲韻規則硬擋；
+        // 輕聲前置的「媽媽」ㄇㄚ˙ㄇㄚ 與後置寫法正規化後相同（待裁決）。
+        for (s in listOf("ㄏ ㄋㄧˇ", "ㄑ˙", "ㄇㄚ˙ㄇㄚ")) assertTrue(ZhuyinText.isValidSequence(s), s)
     }
 
     @Test
@@ -100,15 +123,26 @@ class ZhuyinTextTest {
                 "ㄏㄋㄧˇ", // 兩個聲母相連
                 "ㄍㄨㄥㄖㄣˊ", // 一聲漏空白 → 韻母後接聲母
                 "ㄋㄧㄨˇ", // 兩個介音
+                "ㄇㄚㄚ", // 兩個韻母
                 "ㄚㄧ", // 介音在韻母後
                 "ㄋㄧˇˇ", // 重複聲調
                 "ˇㄋㄧ", // 開頭聲調
                 "ㄋㄧ ˇ", // 空白後的聲調
+                "˙ㄇㄚ", // 輕聲前置（開頭）
+                "ㄇㄚ ˙ㄇㄚ", // 輕聲前置（空白後）
                 cp(0x4E00) + "ㄉㄧㄢˇ", // 未正規化的 一
                 "ㄋㄧˇa", // 非注音
                 cp(0x31A0), // Bopomofo Extended ㆠ U+31A0
+                "ㄇㄚ" + cp(0x00B7), // 中點（待裁決）
+                "ㄇㄚ" + cp(0x200B) + "ㄇㄚ", // 零寬空白（待裁決）
+                "ㄇㄚ" + cp(0x3000) + "ㄇㄚ", // 非 U+0020 的空白要先 normalize
+                "ㄇㄚ\tㄇㄚ",
             )
         for (s in cases) assertFalse(ZhuyinText.isValidSequence(s), s)
+        // 未正規化的易混字元一律不算聲調／空白
+        for (k in ZhuyinText.CONFUSABLES.keys) {
+            assertFalse(ZhuyinText.isValidSequence("ㄇㄚ$k"), "U+%04X".format(k.code))
+        }
     }
 
     @Test
