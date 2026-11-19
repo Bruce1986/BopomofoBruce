@@ -103,6 +103,8 @@ class ZhuyinTextTest {
                 "ㄒㄩㄝˊ",
                 "ㄉㄚˋ",
                 "ㄉㄚˋ ㄇㄚ",
+                "ㄇㄚ ", // 尾端一聲空白也算音節結尾
+                "ㄉㄚˋ ㄇㄚ ",
             )
         for (s in cases) assertTrue(ZhuyinText.isValidSequence(s), s)
     }
