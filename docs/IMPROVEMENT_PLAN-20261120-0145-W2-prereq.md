@@ -115,7 +115,7 @@ W1 的 high 幾乎都是「照驗收看完全合格但功能不能用」。建�
 | W2-B | 可被裝在系統 IME 列表 | 實機上「ㄋㄧˇ → 點候選 → 測試 EditText 出現該字」；把 `commitText` 拿掉時 instrumented test 要紅 |
 | W2-B | 退格、空白、Enter、Shift 完整 | 每顆功能鍵在 composing 空／非空兩種狀態各一條情境測試（W2-B1 已照此寫） |
 | W2-C | 所有設定變更立即生效 | 改主題後 `KeyboardTheme` Flow 在一次收集內送出新值；把寫入 DataStore 拿掉時測試要紅 |
-| W2-D | 簡繁互轉 round-trip 100 條 | （視 §5 裁決） |
+| W2-D | 簡繁互轉 round-trip 100 條 | （視 §5b D1-5 裁決） |
 
 **裁決**：（待填：全採／部分採／不採）
 
@@ -123,8 +123,41 @@ W1 的 high 幾乎都是「照驗收看完全合格但功能不能用」。建�
 
 ## 5. 其他待裁決（由本輪子工作包回報後補上）
 
-- W2-A1：JNI C glue 擺放位置與跨模組原生庫連結方式（子包回報後補選項）。
-- W2-D：簡繁轉換是否引入 OpenCC（授權、字典體積、APK 大小門檻）。
+### 5a. W2-B1 processor chain 回報的契約缺口
+
+| # | 問題 | 選項 | 建議 |
+|---|---|---|---|
+| B1-1 | 純插字的 `Custom`（`insert_am`／`insert_pm`／`url_insert_dot_com`）在 W2-B2 前按了沒反應 | A：全部留給 W2-B2（現況）／B：chain 先實作這三個插字 id，切頁 id 仍交上層 | B（等 §2 裁決後做） |
+| B1-2 | `ImeContextProvider` 只有 `deleteSurroundingText(1, 0)`，composing 空時退格會把 emoji（surrogate pair）切成半個 | A：維持現況／B：改送 `KEYCODE_DEL` 交給輸入框處理字素／C：契約加 `getTextBeforeCursor` | B；若要做 emoji 鍵盤前一定要修好，C 較正確但動契約 |
+| B1-3 | 契約沒有 `performEditorAction`，單行欄位的「搜尋／前往」做不到 | A：W2-B2 service 在 Enter 進 chain 前攔下／B：契約加方法 | A |
+| B1-4 | composing 中按數字 | A：反白候選＋數字一起上屏（現況）／B：數字鍵選第 N 個候選 | A，B 之後可做成設定 |
+| B1-5 | `InputProcessor` KDoc 說 Enter 會選候選，`KeyAction` KDoc 說 Enter 送 composing 原文，兩處矛盾 | A：照 `KeyAction`（現況，送原文）／B：照 `InputProcessor` | A，並修正 `InputProcessor` 的 KDoc |
+| B1-6 | `Candidate` 沒有「這個候選吃掉幾個音節」的資訊，選字只能清空整個 composing；子包回報 libchewing wrapper 只回游標所在音節的候選，兩者對不上（**未獨立查證**） | A：v1 限制一次只組一個音節／B：契約 `Candidate` 補欄位（contracts-v2） | 先查證 wrapper 行為再決定；這題會影響 W2-A1 |
+| B1-7 | 長按由 UI 層把 `longPress.action` 包成新 `KeyData` 再送進 chain | 確認／否決 | 確認 |
+
+### 5b. W2-D1 字串工具回報
+
+| # | 問題 | 選項 | 建議 |
+|---|---|---|---|
+| D1-1 | 中點（U+00B7、U+2027、U+30FB）要不要當輕聲 | A：不轉（現況）／B：轉成 ˙ | A（U+2027 在臺灣常當間隔號） |
+| D1-2 | 輕聲前置寫法（`˙ㄉㄜ`） | A：判不合法（現況）／B：沒有歧義時搬到音節後面 | B，另開小包 |
+| D1-3 | 字源相近的漢字（丫、幺、又、刀、儿…） | A：不收（現況）／B：opt-in 寬鬆模式 | A |
+| D1-4 | 零寬字元（U+200B、U+FEFF） | A：保留、判不合法（現況）／B：`normalize` 直接刪 | B，先確認 IME 實際會遇到 |
+| D1-5 | 簡繁轉換 | A：引入 OpenCC（Apache-2.0、字典數 MB）／B：字對字對照表（一簡對多繁錯誤多）／C：W2 不做 | C，或先定 APK 大小預算再選 A |
+
+### 5c. W2-A1 decoder JNI 回報
+
+JNI glue 擺放已由子包選定（理由見該分支 `docs/devlog/W2-A1-decoder-jni-20261120.md`）：`:decoder` 自己編
+`libbpmf_jni.so`，`JNI_OnLoad` 以 `dlopen("libbpmf.so")`＋`dlsym` 取四個函式，decoder-native 一行不改。
+放棄的替代方案：把 glue 編進 `libbpmf.so`（要改 #8 的 version script）、AGP prefab（新外部相依）。
+**這個做法在 Android linker namespace 下是否成立只能靠實機確認，目前未驗證。**
+
+| # | 問題 | 選項 | 建議 |
+|---|---|---|---|
+| A1-1 | 字典初始化失敗 | A：建構時丟例外，`:ime` 接住顯示錯誤（現況）／B：回一個永遠空候選的 decoder | A（B 會安靜地壞掉） |
+| A1-2 | `close()` 之後再呼叫 | A：`input` 回空、其餘 no-op（現況）／B：丟例外 | A（避免 service 結束時的競態讓鍵盤 crash） |
+| A1-3 | `commit` 怎麼找回候選 index | A：和最近一次 `input` 的結果結構比對（現況）／B：`Candidate` 加 id（動契約） | 先 A，W2-A2 合併個人字典時再評估 |
+| A1-4 | `bpmf_input()` 只回游標所在音節的候選，DEVPLAN 的「1k 條注音 Top-1 ≥ 95%」做不到 | A：擴 C API 支援整句轉換（另開包）／B：把驗收改成逐音節 | 與 §5a B1-6 一起決定 |
 
 ---
 
@@ -134,11 +167,12 @@ W1 的 high 幾乎都是「照驗收看完全合格但功能不能用」。建�
 |---|---|---|---|
 | W2-A1 | `:decoder` JNI binding＋`ZhuyinDecoder` 真實實作＋`DecoderModule` | 疊在 PR #8 上（stacked） | 無 |
 | W2-A2 | `:decoder` Room 個人字典 | main | 無（W2-A1 之後再開，避免同時改 `decoder/build.gradle.kts`） |
-| W2-B1 | `:ime` processor chain runtime（純 Kotlin，無 service／UI） | main | 無；切換鍵與 `Custom` 先回 `Unhandled` |
+| W2-B1a | `:ime` processor chain dispatcher（純 Kotlin） | main | 無 |
+| W2-B1b | `:ime` 預設 processor（注音／選字／退格／Enter／Shift／直接輸入） | 疊在 W2-B1a 上 | 無；切換鍵與 `Custom` 先回 `Unhandled`（§5a） |
 | W2-B2 | `:ime` `InputMethodService`＋`AbstractComposeView` 掛載 | W2-B1 | §1、§1b、§2 |
 | W2-B3 | `:ime` `CandidateRow`／`SoftKeyboardView` Compose 元件 | W2-B2 | §3 |
 | W2-C | `:settings` | PR #9 合併後 | §3 |
 | W2-D1 | `:common` 全形／半形、注音 normalize | main | 無 |
 | W2-D2 | emoji／kaomoji 鍵盤 | main | §5 OpenCC 不影響 |
 
-合併順序建議：#11 → #8 → #9 → W2-D1 → W2-B1 → W2-A1（rebase 到合併後的 main）→ 其餘。
+合併順序建議：#11 → #8 → #9 → W2-D1 → W2-B1a → W2-B1b → W2-A1（rebase 到合併後的 main）→ 其餘。
