@@ -45,6 +45,15 @@ class WidthConversionTest {
     }
 
     @Test
+    fun `already converted chars are left untouched`() {
+        val full = fullwidthVisible + cp(0x3000)
+        assertEquals(full, WidthConversion.toFullwidth(full))
+        assertEquals("$asciiVisible ", WidthConversion.toHalfwidth("$asciiVisible "))
+        assertEquals("ＡＢ", WidthConversion.toFullwidth("ＡB")) // 半全混合
+        assertEquals("AB", WidthConversion.toHalfwidth("ＡB"))
+    }
+
+    @Test
     fun `chars just outside the ranges are left untouched`() {
         // U+0020 以下的控制字元、U+007F DEL、U+FF00（未指派）、U+FF5F ｟、U+FFE0 ￠
         val outside = cp(0x001F, 0x007F, 0xFF00, 0xFF5F, 0xFFE0)

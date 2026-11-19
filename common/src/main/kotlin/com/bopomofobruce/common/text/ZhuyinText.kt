@@ -45,10 +45,11 @@ object ZhuyinText {
      * 1. 依 [CONFUSABLES] 逐字替換。
      * 2. 所有空白（`Char.isWhitespace()`，含 U+3000、U+00A0、Tab、換行）視為 U+0020。
      * 3. 刪掉多餘空白：開頭、連續空白的第二個以後、緊接在聲調符號後的空白（見 `bpmf.h`：tone 2–5 之後或尚未打字時的空白是 true
-     *    no-op）。一聲音節後的空白是音節界線，會保留——**字串最後那一個除外**：`bpmf.h` 允許緩衝最後一個一聲音節省略空白，所以只對「整串、已打完」的輸入不改變解碼結果。
+     *    no-op）。一聲音節後的空白是音節界線，會保留——**字串最後那一個除外**：`bpmf.h` 允許緩衝最後一個一聲音節省略空白，且 `bpmf_input()` 每次都先
+     *    `chewing_Reset()`、只解碼當次送進來的整串，所以刪掉它不改變該次的解碼結果。
      *
-     * 因此輸出**不能再接續拼接**，也不能當逐鍵累積的 composing buffer：`normalize("ㄍㄨㄥ ") + "ㄖㄣˊ"` 是 `ㄍㄨㄥㄖㄣˊ`，解碼器會讀成
-     * ㄖㄨㄣˊ。呼叫端應保存原始輸入，只在送 [com.bopomofobruce.common.ZhuyinDecoder.input] 前對整串呼叫一次。
+     * 但輸出**不能再接續拼接**，也不能存回去當累積用的 composing buffer：`normalize("ㄍㄨㄥ ") + "ㄖㄣˊ"` 是 `ㄍㄨㄥㄖㄣˊ`，解碼器會讀成
+     * ㄖㄨㄣˊ。呼叫端應保存原始輸入，每次送 [com.bopomofobruce.common.ZhuyinDecoder.input] 前對原始輸入整串重新呼叫（逐鍵呼叫也可以）。
      *
      * 其他字元（非注音的中文、英文、Bopomofo Extended 等）原樣保留，交給 [isValidSequence] 判斷。
      *
