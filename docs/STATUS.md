@@ -6,7 +6,7 @@
 > 啟動 prompt 模板：[DEVPLAN-SubagentFanout §6](DEVPLAN-SubagentFanout-20260620-0851.md#6-子代理啟動樣板)
 <!-- Doc-naming pushback (Gemini #3496050473): DEVPLAN 檔名含時間戳 (YYYYMMDD-HHMM) 是專案強制 doc-naming 慣例（CLAUDE.md「檔名必須加上日期時間」），不接受改為無時間戳檔名。link rot 是已知 trade-off；重命名時須同步更新本檔所有指向 DEVPLAN 的引用，以及 project-handbook.md / AGENTS.md / GEMINI.md / docs/adr/。 -->
 
-最後一次 lead 巡視：2026-08-11 13:36
+最後一次 lead 巡視：2026-11-20 01:55
 
 ---
 
@@ -29,13 +29,16 @@
 
 | ID | Wave | 範圍（獨占模組／檔案） | 狀態 | 認領者 | Worktree | 分支 | PR | 更新時間 |
 |----|------|----------------------|------|--------|----------|------|----|---------|
-| W1-A | W1 | `:decoder-native` libchewing → libbpmf.so | 🟠 In progress | sonnet-A | ../BopomofoBruce-w1a-decoder-native | feat/w1a-decoder-native | —（fix-loop 已收斂，尚未開 PR） | 2026-08-11 13:36 |
-| W1-B | W1 | `:theme` Material You + 自訂相片背景 | 🟠 In progress | sonnet-B | ../BopomofoBruce-w1b-theme | feat/w1b-theme | —（fix-loop 已收斂，尚未開 PR） | 2026-08-11 13:36 |
-| W1-C | W1 | `:keyboards` 注音 4×10、符號、數字、密碼 | 🟠 In progress | sonnet-C | ../BopomofoBruce-w1c-keyboards | feat/w1c-keyboards | —（fix-loop 已收斂，尚未開 PR） | 2026-08-11 13:36 |
-| W2-A | W2 | `:decoder` JNI binding + 個人字典（Room） | 🔵 Backlog | — | — | — | — | — |
-| W2-B | W2 | `:ime` InputMethodService + Compose IME view | 🔵 Backlog | — | — | — | — | — |
+| W1-A | W1 | `:decoder-native` libchewing → libbpmf.so | 🟣 In review | claude-lead | ../BopomofoBruce-w1a-decoder-native | feat/w1a-decoder-native | [#8](https://github.com/Bruce1986/BopomofoBruce/pull/8)（CI 綠，待 owner merge） | 2026-11-20 01:55 |
+| W1-B | W1 | `:theme` Material You + 自訂相片背景 | 🟣 In review | claude-lead | ../BopomofoBruce-w1b-theme | feat/w1b-theme | [#9](https://github.com/Bruce1986/BopomofoBruce/pull/9)（CI 綠，待 owner merge） | 2026-11-20 01:55 |
+| W1-C | W1 | `:keyboards` 注音 4×10、符號、數字、密碼 | ✅ Merged | sonnet-C | — | feat/w1c-keyboards | [#10](https://github.com/Bruce1986/BopomofoBruce/pull/10) | 2026-09-07 |
+| W2-A1 | W2 | `:decoder` JNI binding + `ZhuyinDecoder` 真實實作（疊在 #8 上） | 🟠 In progress | claude-sub | worktrees/BopomofoBruce-w2a-decoder-jni | feat/w2-decoder-jni | — | 2026-11-20 01:55 |
+| W2-A2 | W2 | `:decoder` 個人字典（Room） | 🔵 Backlog | — | — | — | — | — |
+| W2-B1 | W2 | `:ime` processor chain runtime（純 Kotlin） | 🟠 In progress | claude-sub | worktrees/BopomofoBruce-w2b-processor-chain | feat/w2-ime-processor-chain | — | 2026-11-20 01:55 |
+| W2-B2/B3 | W2 | `:ime` InputMethodService＋Compose 元件 | ⛔ Blocked | — | — | — | — | 待 owner 裁決 [W2 前置 §1–§3](IMPROVEMENT_PLAN-20261120-0145-W2-prereq.md) |
 | W2-C | W2 | `:settings` 設定頁 + FirstRun | 🔵 Backlog | — | — | — | — | — |
-| W2-D | W2 | emoji 鍵盤 + 簡繁／字串工具（`:common` 例外擴充） | 🔵 Backlog | — | — | — | — | — |
+| W2-D1 | W2 | `:common` 全形／半形、注音 normalize | 🟠 In progress | claude-sub | worktrees/BopomofoBruce-w2d-text-utils | feat/w2-common-text-utils | — | 2026-11-20 01:55 |
+| W2-D2 | W2 | emoji／kaomoji 鍵盤（簡繁轉換待裁決） | 🔵 Backlog | — | — | — | — | — |
 | W3-1 | W3 | `:app` wiring（手動 DI、Manifest 補完、整合） | 🔵 Backlog | — | — | — | — | — |
 | W3-2 | W3 | Beta 5 人試打 + P0 修 | 🔵 Backlog | — | — | — | — | — |
 | W4-A | W4 | Privacy policy、README 上線版、Play 截圖／資料安全表 | 🔵 Backlog | — | — | — | — | — |
@@ -49,9 +52,11 @@
 
 > 認領 / 開工時 append；merge 後刪。
 
-- W1-A  ../BopomofoBruce-w1a-decoder-native  feat/w1a-decoder-native  PR —  agent=sonnet-A  since=2026-08-10 15:03  heartbeat=2026-08-11 13:36（fix-loop 收斂：12 輪、連續兩輪零 finding；測試 JVM 9＋實機 4）
-- W1-B  ../BopomofoBruce-w1b-theme  feat/w1b-theme  PR —  agent=sonnet-B  since=2026-08-10 15:03  heartbeat=2026-08-11 13:36（fix-loop 收斂：19 輪、連續兩輪零 finding；測試 52）
-- W1-C  ../BopomofoBruce-w1c-keyboards  feat/w1c-keyboards  PR —  agent=sonnet-C  since=2026-08-10 15:03  heartbeat=2026-08-11 13:36（fix-loop 收斂：14 輪、連續兩輪零 finding；測試 37）
+- W1-A  ../BopomofoBruce-w1a-decoder-native  feat/w1a-decoder-native  PR #8  agent=claude-lead  since=2026-08-10 15:03  heartbeat=2026-11-20 01:55（待 owner merge）
+- W1-B  ../BopomofoBruce-w1b-theme  feat/w1b-theme  PR #9  agent=claude-lead  since=2026-08-10 15:03  heartbeat=2026-11-20 01:55（待 owner merge）
+- W2-A1  worktrees/BopomofoBruce-w2a-decoder-jni  feat/w2-decoder-jni  PR —  agent=claude-sub  since=2026-11-20 01:40
+- W2-B1  worktrees/BopomofoBruce-w2b-processor-chain  feat/w2-ime-processor-chain  PR —  agent=claude-sub  since=2026-11-20 01:40
+- W2-D1  worktrees/BopomofoBruce-w2d-text-utils  feat/w2-common-text-utils  PR —  agent=claude-sub  since=2026-11-20 01:40
 
 > 註：本波三包的 STATUS 記帳由 lead 統一維護（三個子代理同時開工，避免同一檔案三方衝突）；子代理不改本檔。
 > `.claude/worktrees/` 下四個 W0 殘留 worktree 仍在，其中三個含未提交殘值，見 [REVIEW-ProjectStatus-20260807-0209.md §三](REVIEW-ProjectStatus-20260807-0209.md)，撿完殘值後清除。
@@ -83,7 +88,7 @@
 
 > ⛔ 狀態的包必在這裡留條目（為什麼卡、誰要解、ETA）。
 
-_(空)_
+- W2-B2/B3：`language_toggle` 目的地、toggle 單／雙向、`Custom` id 語意、主題 shapes/typography 待 owner 裁決（[W2 前置](IMPROVEMENT_PLAN-20261120-0145-W2-prereq.md)）。
 
 ---
 
@@ -95,3 +100,4 @@ _(空)_
 |------|--------|------|
 | 2026-06-20 | Bruce | 初始化 STATUS.md，17 包全部 Backlog |
 | 2026-08-07 | claude-lead（審查） | W1-A/B/C 幽靈認領（06-20 認領後 48 天無 heartbeat、worktree/分支從未建立）依 stale 規則退回 Backlog；全案審查報告見 [REVIEW-ProjectStatus-20260807-0209.md](REVIEW-ProjectStatus-20260807-0209.md)；續跑 vs 冷凍待 owner 拍板 |
+| 2026-11-20 | claude-lead | 主表對齊現況（#8／#9 待 merge、#10 已合併）；W2 拆成 A1／A2／B1／B2-B3／D1／D2，A1、B1、D1 開工；B2/B3 等 [W2 前置裁決](IMPROVEMENT_PLAN-20261120-0145-W2-prereq.md) |
