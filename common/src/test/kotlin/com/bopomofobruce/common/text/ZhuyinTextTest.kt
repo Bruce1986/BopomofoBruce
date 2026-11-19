@@ -86,6 +86,12 @@ class ZhuyinTextTest {
     }
 
     @Test
+    fun `lone initials pass because the check is structural only`() {
+        // KDoc 記載的已知缺口：bpmf.h 的「ㄏ ㄋㄧˇ」擋不下；ㄑ˙（啐）在 libchewing 字庫裡，不能用聲韻規則硬擋。
+        for (s in listOf("ㄏ ㄋㄧˇ", "ㄑ˙")) assertTrue(ZhuyinText.isValidSequence(s), s)
+    }
+
+    @Test
     fun `invalid sequences`() {
         val cases =
             listOf(
