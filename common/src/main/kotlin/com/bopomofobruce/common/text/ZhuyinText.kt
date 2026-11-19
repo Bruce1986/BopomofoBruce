@@ -21,24 +21,27 @@ object ZhuyinText {
 
     /** 二、三、四、輕聲（正規形）。 */
     // 碼位一律寫成 Int：ktfmt 會把 '\uXXXX' 改寫成字面字元，組合用附加符號（U+0301 等）因而無法辨識。
-    private val TONE_MARKS = setOf(0x02CA, 0x02C7, 0x02CB, 0x02D9).map { it.toChar() }.toSet()
+    // 寫成函式直接比碼位：逐字呼叫時不裝箱、不做雜湊查找。
+    private fun isToneMark(c: Char): Boolean {
+        val code = c.code
+        return code == 0x02CA || code == 0x02C7 || code == 0x02CB || code == 0x02D9
+    }
 
     /** 易混字元 → 正規形。只收「在注音字串裡只可能是這個意思」的對應；有爭議的（中點當輕聲、輕聲前置、字源相近的漢字如 丫／幺／又）刻意不收。 */
     val CONFUSABLES: Map<Char, Char> =
         mapOf(
-                0x4E00 to 0x3127, // 一 CJK UNIFIED IDEOGRAPH-4E00 → ㄧ BOPOMOFO LETTER I
-                0x2F00 to 0x3127, // ⼀ KANGXI RADICAL ONE → ㄧ
-                0x02C9 to 0x0020, // ˉ MODIFIER LETTER MACRON（一聲符號）→ 空白（一聲結束音節）
-                0x00B4 to 0x02CA, // ´ ACUTE ACCENT → ˊ MODIFIER LETTER ACUTE ACCENT
-                0x0301 to 0x02CA, // COMBINING ACUTE ACCENT → ˊ
-                0x030C to 0x02C7, // COMBINING CARON → ˇ CARON
-                0x0060 to 0x02CB, // ` GRAVE ACCENT → ˋ MODIFIER LETTER GRAVE ACCENT
-                0xFF40 to 0x02CB, // ｀ FULLWIDTH GRAVE ACCENT → ˋ
-                0x0300 to 0x02CB, // COMBINING GRAVE ACCENT → ˋ
-                0x0307 to 0x02D9, // COMBINING DOT ABOVE → ˙ DOT ABOVE
-            )
-            .entries
-            .associate { (from, to) -> from.toChar() to to.toChar() }
+            0x4E00.toChar() to
+                0x3127.toChar(), // 一 CJK UNIFIED IDEOGRAPH-4E00 → ㄧ BOPOMOFO LETTER I
+            0x2F00.toChar() to 0x3127.toChar(), // ⼀ KANGXI RADICAL ONE → ㄧ
+            0x02C9.toChar() to 0x0020.toChar(), // ˉ MODIFIER LETTER MACRON（一聲符號）→ 空白（一聲結束音節）
+            0x00B4.toChar() to 0x02CA.toChar(), // ´ ACUTE ACCENT → ˊ MODIFIER LETTER ACUTE ACCENT
+            0x0301.toChar() to 0x02CA.toChar(), // COMBINING ACUTE ACCENT → ˊ
+            0x030C.toChar() to 0x02C7.toChar(), // COMBINING CARON → ˇ CARON
+            0x0060.toChar() to 0x02CB.toChar(), // ` GRAVE ACCENT → ˋ MODIFIER LETTER GRAVE ACCENT
+            0xFF40.toChar() to 0x02CB.toChar(), // ｀ FULLWIDTH GRAVE ACCENT → ˋ
+            0x0300.toChar() to 0x02CB.toChar(), // COMBINING GRAVE ACCENT → ˋ
+            0x0307.toChar() to 0x02D9.toChar(), // COMBINING DOT ABOVE → ˙ DOT ABOVE
+        )
 
     /**
      * 把注音字串轉成正規形。輸入應是「打算當注音」的字串——例如 `一` 一律被換成 `ㄧ`，不能拿來處理一般中文。
@@ -62,7 +65,7 @@ object ZhuyinText {
             val c = CONFUSABLES[raw] ?: if (raw.isWhitespace()) SPACE else raw
             if (c == SPACE) {
                 val prev = out.lastOrNull()
-                if (prev == null || prev == SPACE || prev in TONE_MARKS) continue
+                if (prev == null || prev == SPACE || isToneMark(prev)) continue
             }
             out.append(c)
         }
@@ -97,7 +100,7 @@ object ZhuyinText {
                 }
             when {
                 r > 0 -> if (r > rank) rank = r else return false
-                c in TONE_MARKS || c == SPACE -> {
+                isToneMark(c) || c == SPACE -> {
                     if (rank > 0) syllables++ else if (c != SPACE) return false
                     rank = 0
                 }

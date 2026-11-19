@@ -19,8 +19,11 @@ package com.bopomofobruce.common.text
  */
 object WidthConversion {
     // 碼位寫成 Int：ktfmt 會把 '\uXXXX' 改寫成字面字元，U+3000 因而看起來像普通空白。
-    private val ASCII_VISIBLE = 0x0021..0x007E
-    private val FULLWIDTH_VISIBLE = 0xFF01..0xFF5E
+    // 邊界寫成 const、在 when 裡用字面範圍：編譯器才會把 `in` 化成兩次整數比較，不經 IntRange.contains。
+    private const val ASCII_VISIBLE_START = 0x0021
+    private const val ASCII_VISIBLE_END = 0x007E
+    private const val FULLWIDTH_VISIBLE_START = 0xFF01
+    private const val FULLWIDTH_VISIBLE_END = 0xFF5E
     private const val OFFSET = 0xFEE0
     private const val SPACE = 0x0020.toChar()
     private const val IDEOGRAPHIC_SPACE = 0x3000.toChar()
@@ -29,9 +32,11 @@ object WidthConversion {
     fun toHalfwidth(text: CharSequence): String =
         buildString(text.length) {
             for (c in text) {
+                val code = c.code
                 append(
                     when {
-                        c.code in FULLWIDTH_VISIBLE -> (c.code - OFFSET).toChar()
+                        code in FULLWIDTH_VISIBLE_START..FULLWIDTH_VISIBLE_END ->
+                            (code - OFFSET).toChar()
                         c == IDEOGRAPHIC_SPACE -> SPACE
                         else -> c
                     }
@@ -43,9 +48,10 @@ object WidthConversion {
     fun toFullwidth(text: CharSequence): String =
         buildString(text.length) {
             for (c in text) {
+                val code = c.code
                 append(
                     when {
-                        c.code in ASCII_VISIBLE -> (c.code + OFFSET).toChar()
+                        code in ASCII_VISIBLE_START..ASCII_VISIBLE_END -> (code + OFFSET).toChar()
                         c == SPACE -> IDEOGRAPHIC_SPACE
                         else -> c
                     }
