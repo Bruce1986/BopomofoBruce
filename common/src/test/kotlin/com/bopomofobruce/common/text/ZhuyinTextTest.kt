@@ -106,6 +106,33 @@ class ZhuyinTextTest {
     }
 
     @Test
+    fun `every letter is classified into its own category`() {
+        // 三類手寫成字面字串，與實作的碼位區間分開；任一字母歸錯類，某個組合就會翻轉。
+        val initials = "ㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㄓㄔㄕㄖㄗㄘㄙ"
+        val medials = "ㄧㄨㄩ"
+        val finals = "ㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦ"
+        assertEquals(37, initials.length + medials.length + finals.length)
+        for (i in initials) for (m in medials) for (f in finals) {
+            assertTrue(ZhuyinText.isValidSequence("$i$m$f"), "$i$m$f")
+        }
+        for ((later, earlier) in
+            listOf(medials to initials, finals to medials, finals to initials)) {
+            for (a in later) for (b in earlier) assertFalse(
+                ZhuyinText.isValidSequence("$a$b"),
+                "$a$b",
+            )
+        }
+    }
+
+    @Test
+    fun `only U+3105 to U+3129 count as zhuyin letters`() {
+        for (code in 0x3100..0x312F) {
+            val want = code in 0x3105..0x3129
+            assertEquals(want, ZhuyinText.isValidSequence(cp(code)), "U+%04X".format(code))
+        }
+    }
+
+    @Test
     fun `normalize repairs inputs the validator would otherwise reject`() {
         val raw = cp(0x4E00, 0x3000) + "ㄉㄧㄢ" + cp(0x00B4)
         assertFalse(ZhuyinText.isValidSequence(raw))
