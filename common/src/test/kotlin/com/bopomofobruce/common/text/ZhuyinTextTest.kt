@@ -33,10 +33,10 @@ class ZhuyinTextTest {
 
     @Test
     fun `near-miss characters are not mapped`() {
-        // 丁 二 ⼆(KANGXI TWO) ¯ ' U+0302 U+0304 ˆ、中點 · ‧ ・（待裁決，暫不當輕聲）、字源相近的 丫
+        // 丁 二 ⼆(KANGXI TWO) ¯ ' U+0302 U+0304 ˆ；待裁決的：中點 · ‧ ・、字源相近的 丫、ZERO WIDTH SPACE
         val untouched =
             listOf(0x4E01, 0x4E8C, 0x2F06, 0x00AF, 0x0027, 0x0302, 0x0304, 0x02C6) +
-                listOf(0x00B7, 0x2027, 0x30FB, 0x4E2B)
+                listOf(0x00B7, 0x2027, 0x30FB, 0x4E2B, 0x200B)
         for (code in untouched) {
             assertEquals(
                 "ㄇ" + cp(code),

@@ -3,11 +3,17 @@ package com.bopomofobruce.common.text
 /**
  * 注音字串的正規化與結構檢查。
  *
- * **正規形**＝注音鍵盤（`keyboards/` 的 `Zhuyin.symbol`）與 native 解碼器（`decoder-native` 的 `bpmf.h`
- * `bpmf_input()`）共用的格式：
- * - 注音符號只用 U+3105 ㄅ–U+3129 ㄩ：聲母 U+3105–U+3119（ㄅ…ㄙ）、韻母 U+311A–U+3126（ㄚ…ㄦ）、 介音 U+3127–U+3129（ㄧㄨㄩ）。
+ * **正規形**＝注音鍵盤（`keyboards/` 配列 JSON 裡 [com.bopomofobruce.common.KeyAction.Zhuyin] 的 `symbol`）與
+ * native 解碼器（`bpmf.h` 的 `bpmf_input()`）共用的格式：
+ * - 注音符號只用 U+3105 ㄅ–U+3129 ㄩ：聲母 U+3105–U+3119（ㄅ…ㄙ）、韻母 U+311A–U+3126（ㄚ…ㄦ）、介音 U+3127–U+3129（ㄧㄨㄩ）。
  * - 聲調放在音節 **後面**：二聲 U+02CA ˊ、三聲 U+02C7 ˇ、四聲 U+02CB ˋ、輕聲 U+02D9 ˙。
  * - 一聲不標，以 ASCII 空白 U+0020 結束音節（大千配列的空白鍵＝一聲鍵）；字串最後一個一聲音節可省略空白。
+ *
+ * 出處：`bpmf.h` 在 W1-A 分支 `feat/w1a-decoder-native` 的 `decoder-native/cmake/include/bpmf.h`，下文引用的
+ * `word.csv` 在同分支 libchewing submodule 的 `data/dict/chewing/word.csv`；W1-A 合併前 main 上都找不到。
+ *
+ * 刻意未處理、待 owner 裁決（動手前先問）：中點（· ‧ ・）當輕聲、輕聲前置（`˙ㄇㄚ`）、字源相近的漢字（丫／幺／又）、零寬字元（U+200B 等）。這些字元目前 [normalize]
+ * 原樣保留、[isValidSequence] 回 `false`。
  */
 object ZhuyinText {
     private const val SPACE = ' '
