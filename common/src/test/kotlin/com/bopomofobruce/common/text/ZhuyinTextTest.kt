@@ -116,7 +116,10 @@ class ZhuyinTextTest {
     fun `known blind spots pass because the check is structural only`() {
         // KDoc 記載的已知缺口：bpmf.h 的「ㄏ ㄋㄧˇ」擋不下；ㄑ˙（啐）在 libchewing 字庫裡，不能用聲韻規則硬擋；
         // 輕聲前置的「媽媽」ㄇㄚ˙ㄇㄚ 與後置寫法正規化後相同（待裁決）。
-        for (s in listOf("ㄏ ㄋㄧˇ", "ㄑ˙", "ㄇㄚ˙ㄇㄚ")) assertTrue(ZhuyinText.isValidSequence(s), s)
+        // 開頭空白與連續空白不是正規形，但結構檢查不擋（KDoc 有記載）。
+        for (s in listOf("ㄏ ㄋㄧˇ", "ㄑ˙", "ㄇㄚ˙ㄇㄚ", " ㄇㄚ", "ㄇㄚ  ㄇㄚ")) {
+            assertTrue(ZhuyinText.isValidSequence(s), s)
+        }
     }
 
     @Test

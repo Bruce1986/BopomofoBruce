@@ -85,7 +85,9 @@ object ZhuyinText {
      * 所述 pre-edit 上限的輸入也照樣通過：上限是 libchewing `MAX_CHI_SYMBOL_LEN`＝39，計的是 pre-edit
      * 裡的**中文字數**（約等於音節數，不是注音符號數）；達到上限後被丟掉的音節不會報錯，解碼器回的是別的音節的候選，呼叫端要自己限制長度。
      *
-     * 其他不檢查的：聲韻搭配規則（如 ㄦ 不接聲母）。空字串或只有空白回傳 `false`。非正規形字元（如 `一`、`´`）一律回傳 `false`，先呼叫 [normalize]。
+     * 其他不檢查的：聲韻搭配規則（如 ㄦ 不接聲母）。空字串或只有空白回傳 `false`。開頭空白與連續空白（` ㄇㄚ`、`ㄇㄚ ㄇㄚ`）不擋、照樣回
+     * `true`——它們不是正規形（[normalize] 會刪掉），但解碼器把多餘空白當 no-op，結構上不影響音節切分。非正規形字元（如 `一`、`´`）一律回傳
+     * `false`，先呼叫 [normalize]。
      */
     fun isValidSequence(text: CharSequence): Boolean {
         var syllables = 0
