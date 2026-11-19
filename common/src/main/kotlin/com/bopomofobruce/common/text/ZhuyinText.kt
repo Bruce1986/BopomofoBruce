@@ -52,8 +52,8 @@ object ZhuyinText {
      *
      * 其他字元（非注音的中文、英文、Bopomofo Extended 等）原樣保留，交給 [isValidSequence] 判斷。
      *
-     * 刻意 **不** 做 Unicode NFKC：NFKC 會把正規形的輕聲 U+02D9 DOT ABOVE 拆成 U+0020 + U+0307，把 U+00B4 拆成 U+0020
-     * + U+0301（皆以 python `unicodedata` 實測）。
+     * 刻意 **不** 做 Unicode NFKC：NFKC 會把正規形的輕聲 U+02D9 DOT ABOVE 拆成 U+0020 加 U+0307，把 U+00B4 拆成 U+0020
+     * 加 U+0301（皆以 python `unicodedata` 實測）。
      */
     fun normalize(text: CharSequence): String {
         val out = StringBuilder(text.length)
@@ -73,7 +73,8 @@ object ZhuyinText {
      * 檢查 [text] 是否為「由完整注音音節組成」的正規形序列（只看結構，不查字典）。
      *
      * 每個音節＝依序的〔聲母〕〔介音〕〔韻母〕至少一項，後接一個聲調符號、空白或字串結尾。因此會擋下 `bpmf.h`
-     * 列為「偵測不到、會回錯音節候選」的其中幾種輸入：兩個聲母相連（`ㄏㄋㄧˇ`）、一聲音節漏了空白（`ㄍㄨㄥㄖㄣˊ`）、重複或開頭的聲調符號（`ㄋㄧˇˇ`、`ˇㄋㄧ`）。
+     * 列為「偵測不到、會回錯音節候選」的其中幾種輸入：兩個聲母相連（`ㄏㄋㄧˇ`）、一聲音節漏了空白（`ㄍㄨㄥㄖㄣˊ`）、緩衝中段重複或開頭的聲調符號（`bpmf.h` 的例子
+     * `ㄋㄧˇˇㄏㄠˇ`）；開頭或結尾的同類輸入（`ˇㄋㄧ`、`ㄋㄧˇˇ`）也回 `false`。
      *
      * **擋不下**的同類輸入：夾在中間、字典裡沒有的單獨聲母（`bpmf.h` 的例子 `ㄏ ㄋㄧˇ`）。`ㄏ` 單獨一個在結構上合法，要查字典才知道它不是音節；也不能改用「只有 ㄓ–ㄙ
      * 能單獨成音節」的規則代替，因為 libchewing 內建字庫（`data/dict/chewing/word.csv`）有 `ㄑ`（胠）、`ㄑ˙`（啐）這類例外。超過 `bpmf.h`
