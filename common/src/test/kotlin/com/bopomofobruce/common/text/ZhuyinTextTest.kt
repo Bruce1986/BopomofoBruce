@@ -71,6 +71,9 @@ class ZhuyinTextTest {
         assertEquals("ㄇㄚ ㄇㄚ˙", ZhuyinText.normalize("ㄇㄚ ㄇㄚ˙"))
         assertEquals("ㄇㄚ", ZhuyinText.normalize("ㄇㄚ "))
         assertEquals("", ZhuyinText.normalize(" " + cp(0x3000) + " "))
+        val m = cp(0x02C9) // ˉ 換成空白後，同樣受開頭／連續／聲調後／結尾的刪除規則
+        assertEquals("ㄇㄚ ㄇㄚˊ", ZhuyinText.normalize("${m}ㄇㄚ$m${m}ㄇㄚˊ$m"))
+        assertEquals("ㄇㄚ", ZhuyinText.normalize("ㄇㄚ$m"))
         for (t in listOf(cp(0x02CA), cp(0x02C7), cp(0x02CB), cp(0x02D9))) {
             assertEquals("ㄇㄚ${t}ㄇㄚ", ZhuyinText.normalize("ㄇㄚ$t ㄇㄚ"), t) // 每個聲調後的空白都刪
         }
