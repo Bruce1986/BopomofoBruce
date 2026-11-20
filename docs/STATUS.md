@@ -36,7 +36,7 @@
 | W2-A2 | W2 | `:decoder` 個人字典（Room） | 🔵 Backlog | — | — | — | — | — |
 | W2-B1a | W2 | `:ime` processor chain dispatcher（純 Kotlin） | 🟣 In review | claude-lead | ../../worktrees/BopomofoBruce-w2b1a-chain | feat/w2-ime-processor-chain-core | [#13](https://github.com/Bruce1986/BopomofoBruce/pull/13) | 2026-11-20 10:40 |
 | W2-B1b | W2 | `:ime` 預設 processor（疊在 #13 上） | 🟣 In review | claude-lead | ../../worktrees/BopomofoBruce-w2b1b-defaults | feat/w2-ime-default-processors | [#14](https://github.com/Bruce1986/BopomofoBruce/pull/14) | 2026-11-20 10:40 |
-| W2-B2/B3 | W2 | `:ime` InputMethodService＋Compose 元件 | ⛔ Blocked | — | — | — | — | 待 owner 裁決 [W2 前置 §1–§3](IMPROVEMENT_PLAN-20261120-0145-W2-prereq.md) |
+| W2-B2/B3 | W2 | `:ime` InputMethodService＋Compose 元件 | ⛔ Blocked | — | — | — | — | 待 owner 裁決 [W2 前置 §1–§3、§5a](IMPROVEMENT_PLAN-20261120-0145-W2-prereq.md) |
 | W2-C | W2 | `:settings` 設定頁 + FirstRun | 🔵 Backlog | — | — | — | — | — |
 | W2-D1 | W2 | `:common` 全形／半形、注音 normalize | 🟣 In review | claude-lead | ../../worktrees/BopomofoBruce-w2d-text-utils | feat/w2-common-text-utils | [#12](https://github.com/Bruce1986/BopomofoBruce/pull/12) | 2026-11-20 10:40 |
 | W2-D2 | W2 | emoji／kaomoji 鍵盤（簡繁轉換待裁決） | 🔵 Backlog | — | — | — | — | — |
@@ -74,6 +74,7 @@
 
 > 最近 5 筆。再往前的搬 `docs/devlog/` 歸檔。
 
+- W1-C  feat/w1c-keyboards  PR [#10](https://github.com/Bruce1986/BopomofoBruce/pull/10)  merged 2026-09-16 by Bruce1986 (squash)  commit=9442d90
 - W0-1  feat/w0-gradle-skeleton  PR [#2](https://github.com/Bruce1986/BopomofoBruce/pull/2)  merged 2026-06-20 by claude-lead (squash)  commit=6bd6cda
 - W0-3  feat/w0-ci  PR [#3](https://github.com/Bruce1986/BopomofoBruce/pull/3)  merged 2026-06-20 by claude-lead (squash)  commit=eade2b0
 - W0-4  feat/w0-adr  PR [#5](https://github.com/Bruce1986/BopomofoBruce/pull/5)  merged 2026-06-20 by claude-lead (squash)  commit=ac0e9a2

@@ -53,7 +53,7 @@ W2 依 DEVPLAN 依賴 W1 全部合併；為了不讓 W2 卡在合併等待，本
 ### 1b. toggle 是單向跳轉還是雙向切換
 
 W1-C devlog（`W1-C-keyboards-20260810-1531.md`）已指出：`KeyAction` 的 KDoc 用「切換到 X」的單向措辭，但
-`symbol_standard` 的「注音」掛 `language_toggle`、「ABC」掛 `symbol_toggle`，**只有在雙向語意下才自洽**；
+當時 `symbol_standard` 的「注音」掛 `language_toggle`、「ABC」掛 `symbol_toggle`，**只有在雙向語意下才自洽**（現在 main 上已改成「注音」＝`Custom("switch_to_zhuyin")`、「ABC」＝`language_toggle`）；
 當時判定這是 `:common` 契約層級的決定，留給 lead／`:ime`（同檔的 J1 更正段已撤回這個結論）。之後 round6（J1）加了
 `switch_to_zhuyin`、round13 再加 `Custom("switch_back")` 補回程，但單向或雙向的語意仍沒有定案。
 
@@ -130,7 +130,9 @@ W1 的 high 幾乎都是「照驗收看完全合格但功能不能用」。建�
 | W2-A | 1k 條真實注音輸入 unit test | 1k 條輸入的 Top-1 與直接呼叫 libchewing 的結果逐條比對；把候選排序反過來時測試要紅 |
 | W2-A | 個人字典加詞/刪詞/查詢 Room test | 加一個詞後同一個注音的 Top-1 變成該詞；刪除後恢復原 Top-1 |
 | W2-B | 可被裝在系統 IME 列表 | 實機上「ㄋㄧˇ → 點候選 → 測試 EditText 出現該字」；把 `commitText` 拿掉時 instrumented test 要紅 |
-| W2-B | 退格、空白、Enter、Shift 完整 | 每顆功能鍵在 composing 空／非空兩種狀態各一條情境測試（W2-B1 已照此寫） |
+| W2-B | 用 fake decoder 仍可顯示假候選詞 → 點選送字 | （未改寫，沿用原驗收；W2-B2／B3 負責） |
+| W2-B | Pixel 4a 上鍵盤展開 < 350 ms | （未改寫，沿用原驗收；W2-B2／B3 負責） |
+| W2-B | 退格、空白、Enter、Shift 完整（DEVPLAN 列在工作內容，不在驗收） | 每顆功能鍵在 composing 空／非空兩種狀態各一條情境測試（W2-B1 已照此寫） |
 | W2-C | 所有設定變更立即生效 | 改主題後 `KeyboardTheme` Flow 在一次收集內送出新值；把寫入 DataStore 拿掉時測試要紅 |
 | W2-D | 簡繁互轉 round-trip 100 條 | （視 §5b D1-5 裁決） |
 
