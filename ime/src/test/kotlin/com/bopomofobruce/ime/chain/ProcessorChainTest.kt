@@ -206,4 +206,37 @@ class ProcessorChainTest {
         assertEquals("秘密", context.getCommittedText()) // 回饋階段才拋：字已上屏
         assertEquals(composingB, chain.state.value) // state 已是 newState
     }
+
+    @Test
+    fun `an empty TextCommit in response to TextCommitted also fails fast`() {
+        val looper = InputProcessor { event, _ ->
+            if (event is InputEvent.TextCommitted) ProcessResult.TextCommit("", composingA)
+            else ProcessResult.TextCommit("你", composingB)
+        }
+        val chain = ProcessorChain(listOf(looper), context, composingA)
+
+        assertThrows<IllegalStateException> { chain.dispatch(InputEvent.Reset) }
+        assertEquals("你", context.getCommittedText())
+        assertEquals(composingB, chain.state.value)
+    }
+
+    @Test
+    fun `TextCommitted feedback walks the whole chain - a later processor can learn`() {
+        val committer = InputProcessor { event, _ ->
+            if (event == InputEvent.Reset) ProcessResult.TextCommit("你", composingB)
+            else ProcessResult.Unhandled
+        }
+        val learner = InputProcessor { event, _ ->
+            if (event is InputEvent.TextCommitted) {
+                log += "learn:${event.text}"
+                ProcessResult.StateChanged(composingA)
+            } else ProcessResult.Unhandled
+        }
+        val chain = ProcessorChain(listOf(committer, learner), context)
+
+        chain.dispatch(InputEvent.Reset)
+
+        assertEquals(listOf("learn:你"), log)
+        assertEquals(composingA, chain.state.value)
+    }
 }
