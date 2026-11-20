@@ -5,6 +5,21 @@
 
 ---
 
+## 2026-11-20 — W2 開工：A1／B1／D1 三包＋前置裁決文件（Claude Code，互動 session＋子代理）
+
+- 子代理在 worktree 平行實作三包，各自再跑本機 GGR fix-loop＋Codex，lead 重跑 CI 檢查後推送：
+  - W2-D1 `:common` 全形／半形與注音 normalize → #12（GGR 11 輪收斂；之後排程班依 Gemini 意見改常數寫法）。
+  - W2-B1 `:ime` processor chain → 拆成 #13（dispatcher）＋#14（預設 processor，疊在 #13 上）。GGR 12 輪未收斂，延長後第 16、17 輪連續零 finding；拆分後補兩條斷言，讓 #13 單獨也能抓到兩個原本只靠上層測試的突變。
+  - W2-A1 `:decoder` JNI binding → #16（疊在 #8 上；GGR 12 輪收斂）。`libbpmf_jni.so` 以 `dlopen` 取 `libbpmf.so` 的四個函式，decoder-native 一行不改；**未在實機驗證**。
+- #15：W2 前置待裁決事項（language_toggle 目的地、toggle 單／雙向、Custom id、主題 shapes/typography、驗收改寫、各包回報的契約缺口）。最關鍵的是 B1-8：注音配列沒有一聲鍵，而空白鍵目前是「上屏候選」。
+- review 意見 112 列已入 llm_workspace 語料（`claude-corpus-20261120-BopomofoBruce12-16.jsonl`、`codex-corpus-20261120-BopomofoBruce12-16.jsonl`）。
+- 教訓：
+  - `gh pr list` 預設的時間是建立時間，不是合併時間——曾據此把 #10 合併日寫成 09-07（實為 09-16），排程班更正。
+  - 互動 session 直接留 `/gemini review` 會繞過 `gemini_gate.py` 的全體每日額度，事後已補記 ledger；之後一律走 gate。
+- 下一步：等 owner 裁決 #15，再開 W2-B2／B3；W2-A2（Room 個人字典）不受裁決影響、可先開；有實機時先跑 #8／#16 的 `connectedDebugAndroidTest`。
+
+---
+
 ## 2026-09-13 — W1-C #10 排程深審班（Claude Code）
 
 - 兩條既有測試只掃短按、沒掃長按，已改用 `reachableChars()`：
