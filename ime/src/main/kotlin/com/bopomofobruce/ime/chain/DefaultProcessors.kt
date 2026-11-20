@@ -163,10 +163,10 @@ internal class DirectInputProcessor(
     private val shift: ShiftLatch,
 ) : InputProcessor {
     override fun process(event: InputEvent, state: InputState): ProcessResult {
+        val action = event.keyAction()
         val text =
-            when (val action = event.keyAction()) {
-                is KeyAction.Character ->
-                    if (shift.consume()) action.char.uppercase() else action.char.toString()
+            when (action) {
+                is KeyAction.Character -> action.char.toString()
                 KeyAction.Space -> " " // composing 非空的 Space 已由 CandidateSelectionProcessor 吃掉
                 KeyAction.SymbolToggle,
                 KeyAction.LanguageToggle,
@@ -178,6 +178,11 @@ internal class DirectInputProcessor(
                 null -> return ProcessResult.Unhandled // 前面的 processor 已處理／非按鍵事件
             }
         val prefix = if (state.composing.isEmpty()) "" else commitHighlightedOrRaw(state, decoder)
-        return ProcessResult.TextCommit(prefix + text, InputState.EMPTY)
+        // Shift 放到 decoder.commit 之後才用掉：commit 拋例外時 Shift 仍保留，重按同一鍵還是大寫。
+        val shifted = action is KeyAction.Character && shift.consume()
+        return ProcessResult.TextCommit(
+            prefix + (if (shifted) text.uppercase() else text),
+            InputState.EMPTY,
+        )
     }
 }
