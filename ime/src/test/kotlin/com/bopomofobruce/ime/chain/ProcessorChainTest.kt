@@ -221,6 +221,36 @@ class ProcessorChainTest {
     }
 
     @Test
+    fun `empty TextCommit is returned as-is`() {
+        val chain =
+            ProcessorChain(
+                listOf(recording("p1", ProcessResult.TextCommit("", composingA))),
+                context,
+            )
+
+        assertEquals(ProcessResult.TextCommit("", composingA), chain.dispatch(InputEvent.Reset))
+    }
+
+    @Test
+    fun `TextCommitted feedback - first non-Unhandled wins and later processors are not asked`() {
+        val committer = InputProcessor { event, _ ->
+            if (event == InputEvent.Reset) ProcessResult.TextCommit("你", InputState.EMPTY)
+            else ProcessResult.Unhandled
+        }
+        val first = InputProcessor { event, _ ->
+            if (event is InputEvent.TextCommitted) ProcessResult.StateChanged(composingA)
+            else ProcessResult.Unhandled
+        }
+        val later = recording("later", ProcessResult.StateChanged(composingB))
+        val chain = ProcessorChain(listOf(committer, first, later), context)
+
+        chain.dispatch(InputEvent.Reset)
+
+        assertTrue(log.isEmpty()) // later 沒被問到
+        assertEquals(composingA, chain.state.value)
+    }
+
+    @Test
     fun `TextCommitted feedback walks the whole chain - a later processor can learn`() {
         val committer = InputProcessor { event, _ ->
             if (event == InputEvent.Reset) ProcessResult.TextCommit("你", composingB)
