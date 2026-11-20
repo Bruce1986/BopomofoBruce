@@ -17,6 +17,8 @@ class ChewingZhuyinDecoderDeviceTest {
         DecoderModule.create(context).use { decoder ->
             val texts = decoder.input("ㄋㄧˇㄏㄠˇ").map { it.text }
             assertTrue("expected 好 in $texts", "好" in texts)
+            // glue 若把結尾 NUL 也複製進 byte array，最後一個候選會變成 "㝀\u0000"；好排第一，上一行抓不到。
+            assertTrue("control char in $texts", texts.all { t -> t.none { it.isISOControl() } })
         }
     }
 
