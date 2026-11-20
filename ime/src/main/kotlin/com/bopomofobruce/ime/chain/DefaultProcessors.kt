@@ -32,6 +32,9 @@ import kotlinx.coroutines.flow.asStateFlow
  *
  * **長按**：processor 一律只看 `KeyPressed.key.action`。UI 層送長按時必須把 `KeyData.longPress.action` 包成新的
  * `KeyData` 再送，不能送原鍵。
+ *
+ * **service 的責任**：換輸入欄／結束輸入時送 [InputEvent.Reset]；處理回 `Unhandled` 的切換鍵與 `Custom`；單行欄位的 Enter
+ * 動作（`performEditorAction`）要在進 chain 前自行攔下。
  */
 fun defaultProcessors(
     decoder: ZhuyinDecoder,
@@ -48,7 +51,10 @@ fun defaultProcessors(
         DirectInputProcessor(decoder, shift),
     )
 
-/** 一次性 Shift：按一下讓下一個 [KeyAction.Character] 轉大寫，用掉即放開；再按一下取消。UI 可觀察 [active] 畫大寫鍵帽。 */
+/**
+ * 一次性 Shift：按一下讓下一個 [KeyAction.Character] 轉大寫，用掉即放開（其他鍵都不消耗）；再按一下取消。UI 可觀察 [active] 畫大寫鍵帽， 所以 UI 與
+ * [defaultProcessors] 必須拿同一個實例，並與 chain 同生命週期。
+ */
 class ShiftLatch {
     private val _active = MutableStateFlow(false)
     val active: StateFlow<Boolean> = _active.asStateFlow()

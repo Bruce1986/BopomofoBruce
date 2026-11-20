@@ -263,6 +263,18 @@ class DefaultProcessorsTest {
     }
 
     @Test
+    fun `only a character consumes shift, with or without composing`() {
+        val c = chain()
+        c.press(KeyAction.Shift)
+        c.press(KeyAction.Backspace, KeyAction.Enter, KeyAction.Space) // composing 空
+        c.type("ㄋㄧˇ")
+        c.press(KeyAction.Backspace, KeyAction.Space, KeyAction.Zhuyin("ㄚ"), KeyAction.Enter)
+        assertTrue(shift.active.value)
+        c.press(KeyAction.Character('x'))
+        assertFalse(shift.active.value)
+    }
+
+    @Test
     fun `a decoder commit that throws leaves shift pressed`() {
         val throwing =
             object : ZhuyinDecoder by StubDecoder(Candidate("高", 0.9f, PRIMARY)) {
