@@ -43,6 +43,13 @@ private const val CHEWING_DATA_VERSION = "2026.3.22"
 
 private val CHEWING_CACHE_DIR_NAME = "$CHEWING_CACHE_DIR_PREFIX$CHEWING_DATA_VERSION"
 
+/**
+ * Dictionary files `bpmf_init()` cannot start without. [getDataPath] checks for them after
+ * extraction so a build that forgot to package them fails here with the missing file named, not
+ * later when `bpmf_init()` returns NULL without saying which file was absent.
+ */
+private val REQUIRED_CHEWING_FILES = listOf("word.dat", "tsi.dat")
+
 /** Serializes [extractChewingData] calls — see its KDoc for why. */
 private val extractionLock = Any()
 
@@ -50,11 +57,26 @@ private val extractionLock = Any()
  * Convenience wrapper for production callers: extracts into `context.cacheDir/chewing-$VERSION`
  * (see [CHEWING_DATA_VERSION]) and deletes any sibling `chewing-*` directories left behind by a
  * previous app version's data — see [deleteStaleChewingCacheDirs].
+ *
+ * @throws IOException if the app has no cache directory, if extraction fails, or if any of
+ *   [REQUIRED_CHEWING_FILES] is absent afterwards (i.e. it was not packaged under the APK's
+ *   `chewing/` assets).
  */
 fun getDataPath(context: Context): String {
-    val cacheDir = context.cacheDir
+    // getCacheDir() is a platform type here; check it explicitly so a null surfaces as a named
+    // IOException instead of a NullPointerException inside File(...).
+    val cacheDir: File =
+        context.cacheDir ?: throw IOException("Android cache directory is not available")
     deleteStaleChewingCacheDirs(cacheDir)
-    return extractChewingData(context.assets, File(cacheDir, CHEWING_CACHE_DIR_NAME)).absolutePath
+    val dataDir = extractChewingData(context.assets, File(cacheDir, CHEWING_CACHE_DIR_NAME))
+    val missing = REQUIRED_CHEWING_FILES.filterNot { File(dataDir, it).isFile }
+    if (missing.isNotEmpty()) {
+        throw IOException(
+            "Required chewing dictionary files missing from the APK's chewing/ assets: " +
+                missing.joinToString()
+        )
+    }
+    return dataDir.absolutePath
 }
 
 /**
@@ -127,6 +149,9 @@ fun extractChewingData(assets: AssetManager, targetDir: File): File =
             throw IllegalStateException("Could not create chewing data dir: $targetDir")
         }
 
+        // Copies whatever is under chewing/, without checking for specific names: the required
+        // word.dat/tsi.dat check lives in getDataPath() (REQUIRED_CHEWING_FILES), which throws
+        // IOException naming the missing file, so production callers never get a silent success.
         val assetNames = assets.list(CHEWING_ASSET_SUBDIR) ?: emptyArray()
         for (name in assetNames) {
             val target = File(targetDir, name)
