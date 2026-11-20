@@ -107,7 +107,7 @@ W1-C devlog（`W1-C-keyboards-20260810-1531.md`）已指出：`KeyAction` 的 KD
 ## 3. `KeyboardTheme` 是否帶 shapes／typography
 
 **問題**：PR #9 的 `StyleSheet` 有 `shapes`（圓角）與 `typography`（字級、字重），但 `:common` 的 `KeyboardTheme`
-只有 `colors` 與 `dimens`，而且 `StyleSheet` 沒有實作 `KeyboardTheme`。`:ime` 依 DEVPLAN 只能透過 `:common` 介面拿主題，
+只有 `id`、`colors` 與 `dimens`，而且 `StyleSheet` 沒有實作 `KeyboardTheme`。`:ime` 依 DEVPLAN 只能透過 `:common` 介面拿主題，
 所以使用者在設定頁調的圓角與字級**到不了鍵盤**。
 
 | 選項 | 內容 | 優點 | 缺點 |
@@ -136,6 +136,8 @@ W1 的 high 幾乎都是「照驗收看完全合格但功能不能用」。建�
 | W2-C | 所有設定變更立即生效 | 改主題後 `KeyboardTheme` Flow 在一次收集內送出新值；把寫入 DataStore 拿掉時測試要紅 |
 | W2-D | 簡繁互轉 round-trip 100 條 | （視 §5b D1-5 裁決） |
 
+本表的「原驗收」是 DEVPLAN 原文的摘要，只列有改寫建議或本輪討論到的條目；其餘 W2 驗收照 DEVPLAN 原文。
+
 **裁決**：（待填：全採／部分採／不採）
 
 ---
@@ -149,7 +151,7 @@ W1 的 high 幾乎都是「照驗收看完全合格但功能不能用」。建�
 | # | 問題 | 選項 | 建議 |
 |---|---|---|---|
 | B1-1 | 純插字的 `Custom`（`insert_am`／`insert_pm`／`url_insert_dot_com`）在 W2-B2 前按了沒反應 | A：全部留給 W2-B2（現況）／B：chain 先實作這三個插字 id，切頁 id 仍交上層 | B（等 §2 裁決後做） |
-| B1-2 | `ImeContextProvider` 只有 `deleteSurroundingText(1, 0)`，composing 空時退格會把 emoji（surrogate pair）切成半個 | A：維持現況／B：改送 `KEYCODE_DEL` 交給輸入框處理字素／C：契約加 `getTextBeforeCursor` | B；若要做 emoji 鍵盤前一定要修好，C 較正確但動契約 |
+| B1-2 | chain 的退格在 composing 空時呼叫 `ImeContextProvider.deleteSurroundingText(1, 0)`（契約另有 `sendKey`，選項 B 不必動契約），composing 空時退格會把 emoji（surrogate pair）切成半個 | A：維持現況／B：改送 `KEYCODE_DEL` 交給輸入框處理字素／C：契約加 `getTextBeforeCursor` | B；若要做 emoji 鍵盤前一定要修好，C 較正確但動契約 |
 | B1-3 | 契約沒有 `performEditorAction`，單行欄位的「搜尋／前往」做不到 | A：W2-B2 service 在 Enter 進 chain 前攔下／B：契約加方法 | A |
 | B1-4 | composing 中按數字 | A：反白候選＋數字一起上屏（現況）／B：數字鍵選第 N 個候選 | A，B 之後可做成設定 |
 | B1-5 | `InputProcessor` KDoc 說 Enter 會選候選，`KeyAction` KDoc 說 Enter 送 composing 原文，兩處矛盾 | A：照 `KeyAction`（現況，送原文）／B：照 `InputProcessor` | A，並修正 `InputProcessor` 的 KDoc |
