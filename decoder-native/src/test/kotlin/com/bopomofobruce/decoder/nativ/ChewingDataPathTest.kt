@@ -429,7 +429,9 @@ class ChewingDataPathTest {
         every { context.assets } returns assets
         every { context.cacheDir } returns null
 
-        assertThrows(IOException::class.java) { getDataPath(context) }
+        val error = assertThrows(IOException::class.java) { getDataPath(context) }
+
+        assertTrue(error.message!!.contains("cache directory"))
     }
 
     @Test
@@ -443,8 +445,12 @@ class ChewingDataPathTest {
         every { assets.open("chewing/word.dat") } throws IOException("simulated asset read failure")
         val context = fakeContext(assets, tempDir)
 
-        assertThrows(IOException::class.java) { getDataPath(context) }
+        val error = assertThrows(IOException::class.java) { getDataPath(context) }
 
+        // Pin the source: without this, the required-files check (tsi.dat is not stubbed here)
+        // would also throw IOException and keep the test green even if the read failure never
+        // happened.
+        assertEquals("simulated asset read failure", error.message)
         assertFalse(staleDir.exists(), "stale dir must be cleaned up even when extraction fails")
     }
 

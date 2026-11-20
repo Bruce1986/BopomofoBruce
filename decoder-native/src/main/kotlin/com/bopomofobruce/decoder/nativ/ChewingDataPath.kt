@@ -58,9 +58,10 @@ private val extractionLock = Any()
  * (see [CHEWING_DATA_VERSION]) and deletes any sibling `chewing-*` directories left behind by a
  * previous app version's data — see [deleteStaleChewingCacheDirs].
  *
- * @throws IOException if the app has no cache directory, if extraction fails, or if any of
- *   [REQUIRED_CHEWING_FILES] is absent afterwards (i.e. it was not packaged under the APK's
- *   `chewing/` assets).
+ * @throws IOException if the app has no cache directory, if copying an asset fails, or if any of
+ *   [REQUIRED_CHEWING_FILES] is not a regular file in the data directory afterwards (normally
+ *   because it was not packaged under the APK's `chewing/` assets).
+ * @throws IllegalStateException if the data directory cannot be created (see [extractChewingData]).
  */
 fun getDataPath(context: Context): String {
     // getCacheDir() is a platform type here; check it explicitly so a null surfaces as a named
@@ -72,7 +73,8 @@ fun getDataPath(context: Context): String {
     val missing = REQUIRED_CHEWING_FILES.filterNot { File(dataDir, it).isFile }
     if (missing.isNotEmpty()) {
         throw IOException(
-            "Required chewing dictionary files missing from the APK's chewing/ assets: " +
+            "Required chewing dictionary files missing or not regular files in $dataDir " +
+                "(not packaged under the APK's chewing/ assets?): " +
                 missing.joinToString()
         )
     }
