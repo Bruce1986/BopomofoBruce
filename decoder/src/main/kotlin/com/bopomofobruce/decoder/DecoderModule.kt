@@ -11,7 +11,8 @@ import com.bopomofobruce.decoder.nativ.getDataPath
  */
 object DecoderModule {
     /**
-     * 第一次呼叫會把字典從 APK assets 解到 cacheDir（[getDataPath]），有磁碟 I/O，不要在 main thread 呼叫。
+     * 每次呼叫都有磁碟 I/O（確認或解壓字典、`bpmf_init()` 開字典檔），不要在 main thread 呼叫；只有第一次會從 APK assets 解到
+     * cacheDir（[getDataPath]）。
      *
      * @throws java.io.IOException 字典從 assets 解到 cacheDir 失敗（讀 asset、寫檔或 rename 失敗）。
      * @throws IllegalStateException 字典目錄建立失敗，或 `bpmf_init()` 失敗。
