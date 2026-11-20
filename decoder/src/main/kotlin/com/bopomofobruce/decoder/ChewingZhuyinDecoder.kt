@@ -12,7 +12,9 @@ import java.io.Closeable
  * singleton 持有時，process 存活期間不 close。:ime 只透過 [ZhuyinDecoder] 使用、不要 close（service
  * 重建時拿回的是同一個實例）。[close] 可重複呼叫，只會釋放一次。關閉後 [input] 回空 list、[commit]／[reset] 是 no-op，不會碰 native。
  *
- * Thread-safety：同 [ZhuyinDecoder]，不 thread-safe、不加鎖；所有呼叫（含 [close]）要在同一個 dispatcher 上 serialise。
+ * Thread-safety：同 [ZhuyinDecoder]，不 thread-safe、不加鎖；所有呼叫（含 [close]）要在同一個 dispatcher 上
+ * serialise。實例會跨 service 重建存活，若 dispatcher 隨 service 建立／取消，換用新的之前要確定舊的上面已沒有進行中的呼叫（取消 coroutine
+ * 不會中斷正在跑的 native 呼叫）。
  *
  * 候選分數：libchewing 只給順序、不給分數，第 i 個（0 起算）給 `1 / (i + 1)`，保持嚴格遞減且落在 `(0, 1]`。這是排序用的名次，不是機率。
  *
