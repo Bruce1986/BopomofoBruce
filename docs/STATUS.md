@@ -31,14 +31,14 @@
 |----|------|----------------------|------|--------|----------|------|----|---------|
 | W1-A | W1 | `:decoder-native` libchewing → libbpmf.so | 🟣 In review | claude-lead | ../BopomofoBruce-w1a-decoder-native | feat/w1a-decoder-native | [#8](https://github.com/Bruce1986/BopomofoBruce/pull/8)（CI 綠，待 owner merge） | 2026-11-20 01:55 |
 | W1-B | W1 | `:theme` Material You + 自訂相片背景 | 🟣 In review | claude-lead | ../BopomofoBruce-w1b-theme | feat/w1b-theme | [#9](https://github.com/Bruce1986/BopomofoBruce/pull/9)（CI 綠，待 owner merge） | 2026-11-20 01:55 |
-| W1-C | W1 | `:keyboards` 注音 4×10、符號、數字、密碼 | ✅ Merged | sonnet-C | — | feat/w1c-keyboards | [#10](https://github.com/Bruce1986/BopomofoBruce/pull/10) | 2026-09-07 |
-| W2-A1 | W2 | `:decoder` JNI binding + `ZhuyinDecoder` 真實實作（疊在 #8 上） | 🟠 In progress | claude-sub | worktrees/BopomofoBruce-w2a-decoder-jni | feat/w2-decoder-jni | — | 2026-11-20 01:55 |
+| W1-C | W1 | `:keyboards` 注音 4×10、符號、數字、密碼 | ✅ Merged | sonnet-C | — | feat/w1c-keyboards | [#10](https://github.com/Bruce1986/BopomofoBruce/pull/10) | 2026-09-16 |
+| W2-A1 | W2 | `:decoder` JNI binding + `ZhuyinDecoder` 真實實作（疊在 #8 上） | 🟠 In progress | claude-sub | ../../worktrees/BopomofoBruce-w2a-decoder-jni | feat/w2-decoder-jni | —（分支未推） | 2026-11-20 01:55 |
 | W2-A2 | W2 | `:decoder` 個人字典（Room） | 🔵 Backlog | — | — | — | — | — |
-| W2-B1a | W2 | `:ime` processor chain dispatcher（純 Kotlin） | 🟣 In review | claude-lead | worktrees/BopomofoBruce-w2b1a-chain | feat/w2-ime-processor-chain-core | [#13](https://github.com/Bruce1986/BopomofoBruce/pull/13) | 2026-11-20 10:40 |
-| W2-B1b | W2 | `:ime` 預設 processor（疊在 #13 上） | 🟣 In review | claude-lead | worktrees/BopomofoBruce-w2b1b-defaults | feat/w2-ime-default-processors | [#14](https://github.com/Bruce1986/BopomofoBruce/pull/14) | 2026-11-20 10:40 |
+| W2-B1a | W2 | `:ime` processor chain dispatcher（純 Kotlin） | 🟣 In review | claude-lead | ../../worktrees/BopomofoBruce-w2b1a-chain | feat/w2-ime-processor-chain-core | [#13](https://github.com/Bruce1986/BopomofoBruce/pull/13) | 2026-11-20 10:40 |
+| W2-B1b | W2 | `:ime` 預設 processor（疊在 #13 上） | 🟣 In review | claude-lead | ../../worktrees/BopomofoBruce-w2b1b-defaults | feat/w2-ime-default-processors | [#14](https://github.com/Bruce1986/BopomofoBruce/pull/14) | 2026-11-20 10:40 |
 | W2-B2/B3 | W2 | `:ime` InputMethodService＋Compose 元件 | ⛔ Blocked | — | — | — | — | 待 owner 裁決 [W2 前置 §1–§3](IMPROVEMENT_PLAN-20261120-0145-W2-prereq.md) |
 | W2-C | W2 | `:settings` 設定頁 + FirstRun | 🔵 Backlog | — | — | — | — | — |
-| W2-D1 | W2 | `:common` 全形／半形、注音 normalize | 🟣 In review | claude-lead | worktrees/BopomofoBruce-w2d-text-utils | feat/w2-common-text-utils | [#12](https://github.com/Bruce1986/BopomofoBruce/pull/12) | 2026-11-20 10:40 |
+| W2-D1 | W2 | `:common` 全形／半形、注音 normalize | 🟣 In review | claude-lead | ../../worktrees/BopomofoBruce-w2d-text-utils | feat/w2-common-text-utils | [#12](https://github.com/Bruce1986/BopomofoBruce/pull/12) | 2026-11-20 10:40 |
 | W2-D2 | W2 | emoji／kaomoji 鍵盤（簡繁轉換待裁決） | 🔵 Backlog | — | — | — | — | — |
 | W3-1 | W3 | `:app` wiring（手動 DI、Manifest 補完、整合） | 🔵 Backlog | — | — | — | — | — |
 | W3-2 | W3 | Beta 5 人試打 + P0 修 | 🔵 Backlog | — | — | — | — | — |
@@ -55,10 +55,10 @@
 
 - W1-A  ../BopomofoBruce-w1a-decoder-native  feat/w1a-decoder-native  PR #8  agent=claude-lead  since=2026-08-10 15:03  heartbeat=2026-11-20 01:55（待 owner merge）
 - W1-B  ../BopomofoBruce-w1b-theme  feat/w1b-theme  PR #9  agent=claude-lead  since=2026-08-10 15:03  heartbeat=2026-11-20 01:55（待 owner merge）
-- W2-A1  worktrees/BopomofoBruce-w2a-decoder-jni  feat/w2-decoder-jni  PR —  agent=claude-sub  since=2026-11-20 01:40
-- W2-B1a  worktrees/BopomofoBruce-w2b1a-chain  feat/w2-ime-processor-chain-core  PR #13  agent=claude-lead  since=2026-11-20 01:40
-- W2-B1b  worktrees/BopomofoBruce-w2b1b-defaults  feat/w2-ime-default-processors  PR #14  agent=claude-lead  since=2026-11-20 01:40
-- W2-D1  worktrees/BopomofoBruce-w2d-text-utils  feat/w2-common-text-utils  PR #12  agent=claude-lead  since=2026-11-20 01:40
+- W2-A1  ../../worktrees/BopomofoBruce-w2a-decoder-jni  feat/w2-decoder-jni  PR —  agent=claude-sub  since=2026-11-20 01:40
+- W2-B1a  ../../worktrees/BopomofoBruce-w2b1a-chain  feat/w2-ime-processor-chain-core  PR #13  agent=claude-lead  since=2026-11-20 01:40
+- W2-B1b  ../../worktrees/BopomofoBruce-w2b1b-defaults  feat/w2-ime-default-processors  PR #14  agent=claude-lead  since=2026-11-20 01:40
+- W2-D1  ../../worktrees/BopomofoBruce-w2d-text-utils  feat/w2-common-text-utils  PR #12  agent=claude-lead  since=2026-11-20 01:40
 
 > 註：本波三包的 STATUS 記帳由 lead 統一維護（三個子代理同時開工，避免同一檔案三方衝突）；子代理不改本檔。
 > `.claude/worktrees/` 下四個 W0 殘留 worktree 仍在，其中三個含未提交殘值，見 [REVIEW-ProjectStatus-20260807-0209.md §三](REVIEW-ProjectStatus-20260807-0209.md)，撿完殘值後清除。
@@ -90,7 +90,7 @@
 
 > ⛔ 狀態的包必在這裡留條目（為什麼卡、誰要解、ETA）。
 
-- W2-B2/B3：`language_toggle` 目的地、toggle 單／雙向、`Custom` id 語意、主題 shapes/typography 待 owner 裁決（[W2 前置](IMPROVEMENT_PLAN-20261120-0145-W2-prereq.md)）。
+- W2-B2/B3：`language_toggle` 目的地、toggle 單／雙向、`Custom` id 語意、主題 shapes/typography，以及 §5a B1-1／B1-3／B1-9 待 owner 裁決（[W2 前置](IMPROVEMENT_PLAN-20261120-0145-W2-prereq.md)）。
 
 ---
 

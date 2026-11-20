@@ -31,7 +31,7 @@
 |---|---|
 | W1-A `:decoder-native`（PR #8） | 開啟中，head `5aa105a`，CI 綠、MERGEABLE，待 owner merge |
 | W1-B `:theme`（PR #9） | 開啟中，head `ea5e0ca`，CI 綠、MERGEABLE，待 owner merge |
-| W1-C `:keyboards`（PR #10） | 已於 2026-09-07 合併（`9442d90`） |
+| W1-C `:keyboards`（PR #10） | 已於 2026-09-16 合併（`9442d90`） |
 | W0 收尾（PR #11） | 開啟中，CI 綠，待 owner merge |
 | 實機 | 2026-11-20 `adb devices` 為空；09-08 曾接 ASUS Zenfone 10（Android 15） |
 
@@ -54,8 +54,8 @@ W2 依 DEVPLAN 依賴 W1 全部合併；為了不讓 W2 卡在合併等待，本
 
 W1-C devlog（`W1-C-keyboards-20260810-1531.md`）已指出：`KeyAction` 的 KDoc 用「切換到 X」的單向措辭，但
 `symbol_standard` 的「注音」掛 `language_toggle`、「ABC」掛 `symbol_toggle`，**只有在雙向語意下才自洽**；
-當時判定這是 `:common` 契約層級的決定，留給 lead／`:ime`。之後 round13 又加了 `Custom("switch_back")` 與
-`switch_to_zhuyin` 補回程，所以這題至今沒有定案。
+當時判定這是 `:common` 契約層級的決定，留給 lead／`:ime`（同檔的 J1 更正段已撤回這個結論）。之後 round6（J1）加了
+`switch_to_zhuyin`、round13 再加 `Custom("switch_back")` 補回程，但單向或雙向的語意仍沒有定案。
 
 | 選項 | 內容 | 優點 | 缺點 |
 |---|---|---|---|
@@ -140,6 +140,8 @@ W1 的 high 幾乎都是「照驗收看完全合格但功能不能用」。建�
 
 ## 5. 其他待裁決（由本輪子工作包回報後補上）
 
+**裁決**：（待填，逐項標選項，例如 B1-1：B）
+
 ### 5a. W2-B1 processor chain 回報的契約缺口
 
 | # | 問題 | 選項 | 建議 |
@@ -177,7 +179,7 @@ JNI glue 擺放已由子包選定（理由見該分支 `docs/devlog/W2-A1-decode
 | A1-1 | 字典初始化失敗 | A：建構時丟例外，`:ime` 接住顯示錯誤（現況）／B：回一個永遠空候選的 decoder | A（B 會安靜地壞掉） |
 | A1-2 | `close()` 之後再呼叫 | A：`input` 回空、其餘 no-op（現況）／B：丟例外 | A（避免 service 結束時的競態讓鍵盤 crash） |
 | A1-3 | `commit` 怎麼找回候選 index | A：和最近一次 `input` 的結果結構比對（現況）／B：`Candidate` 加 id（動契約） | 先 A，W2-A2 合併個人字典時再評估 |
-| A1-4 | `bpmf_input()` 只回游標所在音節的候選，DEVPLAN 的「1k 條注音 Top-1 ≥ 95%」做不到 | A：擴 C API 支援整句轉換（另開包）／B：把驗收改成逐音節 | 與 §5a B1-6 一起決定 |
+| A1-4 | `bpmf_input()` 只回游標所在音節的候選，DEVPLAN 的「Top-1 精度 ≥ libchewing baseline 的 95%」做不到 | A：擴 C API 支援整句轉換（另開包）／B：把驗收改成逐音節 | 與 §5a B1-6 一起決定 |
 
 ---
 
@@ -185,14 +187,14 @@ JNI glue 擺放已由子包選定（理由見該分支 `docs/devlog/W2-A1-decode
 
 | 包 | 範圍 | 基底 | 依賴的裁決 |
 |---|---|---|---|
-| W2-A1 | `:decoder` JNI binding＋`ZhuyinDecoder` 真實實作＋`DecoderModule` | 疊在 PR #8 上（stacked） | 無 |
+| W2-A1 | `:decoder` JNI binding＋`ZhuyinDecoder` 真實實作＋`DecoderModule` | 疊在 PR #8 上（stacked） | §5a B1-6、§5c A1-4（影響驗收與 `Candidate` 契約） |
 | W2-A2 | `:decoder` Room 個人字典 | main | 無（W2-A1 之後再開，避免同時改 `decoder/build.gradle.kts`） |
 | W2-B1a | `:ime` processor chain dispatcher（純 Kotlin） | main | 無 |
-| W2-B1b | `:ime` 預設 processor（注音／選字／退格／Enter／Shift／直接輸入） | 疊在 W2-B1a 上 | 無；切換鍵與 `Custom` 先回 `Unhandled`（§5a） |
-| W2-B2 | `:ime` `InputMethodService`＋`AbstractComposeView` 掛載 | W2-B1 | §1、§1b、§2 |
+| W2-B1b | `:ime` 預設 processor（注音／選字／退格／Enter／Shift／直接輸入） | 疊在 W2-B1a 上 | §5a B1-2、B1-5、B1-8、B1-10 會改它的行為；切換鍵與 `Custom` 先回 `Unhandled`（§5a） |
+| W2-B2 | `:ime` `InputMethodService`＋`AbstractComposeView` 掛載 | W2-B1 | §1、§1b、§2、§5a B1-1、B1-3、B1-9 |
 | W2-B3 | `:ime` `CandidateRow`／`SoftKeyboardView` Compose 元件 | W2-B2 | §3 |
 | W2-C | `:settings` | PR #9 合併後 | §3 |
 | W2-D1 | `:common` 全形／半形、注音 normalize | main | 無 |
-| W2-D2 | emoji／kaomoji 鍵盤 | main | §5 OpenCC 不影響 |
+| W2-D2 | emoji／kaomoji 鍵盤 | main | 無（§5b D1-5 簡繁轉換另議，不擋鍵盤本體） |
 
 合併順序建議：#11 → #8 → #9 → W2-D1 → W2-B1a → W2-B1b → W2-A1（rebase 到合併後的 main）→ 其餘。
