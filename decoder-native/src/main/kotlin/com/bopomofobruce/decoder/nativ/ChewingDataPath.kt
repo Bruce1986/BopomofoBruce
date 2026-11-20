@@ -153,7 +153,8 @@ fun extractChewingData(assets: AssetManager, targetDir: File): File =
 
         // Copies whatever is under chewing/, without checking for specific names: the required
         // word.dat/tsi.dat check lives in getDataPath() (REQUIRED_CHEWING_FILES), which throws
-        // IOException naming the missing file, so production callers never get a silent success.
+        // IOException naming the missing file, so callers that go through getDataPath() never get a
+        // silent success.
         val assetNames = assets.list(CHEWING_ASSET_SUBDIR) ?: emptyArray()
         for (name in assetNames) {
             val target = File(targetDir, name)
