@@ -79,8 +79,8 @@ internal class ResetProcessor(private val decoder: ZhuyinDecoder, private val sh
     InputProcessor {
     override fun process(event: InputEvent, state: InputState): ProcessResult {
         if (event != InputEvent.Reset) return ProcessResult.Unhandled
+        shift.consume() // 先放開：decoder.reset() 拋例外時 Shift 也不會卡住
         decoder.reset()
-        shift.consume()
         return ProcessResult.StateChanged(InputState.EMPTY)
     }
 }

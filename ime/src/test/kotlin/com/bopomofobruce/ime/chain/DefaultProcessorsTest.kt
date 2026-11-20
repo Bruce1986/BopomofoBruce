@@ -277,6 +277,20 @@ class DefaultProcessorsTest {
         assertTrue(shift.active.value)
     }
 
+    @Test
+    fun `a decoder reset that throws still releases shift`() {
+        val throwing =
+            object : ZhuyinDecoder by StubDecoder() {
+                override fun reset() = error("decoder down")
+            }
+        val c = chain(throwing)
+        c.press(KeyAction.Shift)
+
+        runCatching { c.dispatch(InputEvent.Reset) }
+
+        assertFalse(shift.active.value)
+    }
+
     /** 不論 buffer 都回固定 [candidates]（造 fake 給不出的「亂序」「無候選」）；commit 只收自己給過的候選，原文回饋就炸。 */
     private class StubDecoder(vararg val candidates: Candidate) : ZhuyinDecoder {
         override fun input(buffer: String) = candidates.toList()
