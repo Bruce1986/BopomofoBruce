@@ -29,8 +29,8 @@
   50 輪 init／input／commit／free，`detect_leaks=1` 無錯；`ㄋㄧˇㄏㄠˇ` → `好 郝 㚼 㝀`；`ㄏㄠˇx`、modified UTF-8 的 U+0000
   （`C0 80`）與 U+20000 都回 0 bytes；`libbpmf.so` 不存在、或只匯出 `bpmf_init` 時 `JNI_OnLoad` 回 `JNI_ERR`。
 - 對 glue 的 12 個單點突變，harness 殺掉 5 個（拿掉兩處 `ReleaseStringUTFChars`、init 不擋 NULL、只複製 1 byte、不呼叫
-  `bpmf_free`）。存活的：`count > 0`、dlopen NULL、負 index 三道是冗餘防禦；只檢查部分 dlsym 結果要「只缺一個符號」的 stub
-  才測得到；commit 丟掉 index 0 在 `bpmf.h` 的 API 上觀察不到；多複製結尾 NUL（最後一個候選帶 `\u0000`）只有裝置測試的
+  `bpmf_free`）。存活 7 個：`count > 0`、dlopen NULL、負 index 三道是冗餘防禦；不檢查 `p_init`、不檢查 `p_free` 兩個要
+  「只缺一個符號」的 stub 才測得到；commit 丟掉 index 0 在 `bpmf.h` 的 API 上觀察不到；多複製結尾 NUL（最後一個候選帶 `\u0000`）只有裝置測試的
   控制字元斷言守，尚未在實機跑過。
 
 ## 未驗證／已知缺口
@@ -39,7 +39,8 @@
   找得到先前 `System.loadLibrary("bpmf")` 載入的 lib 是依文件推論（兩個 ABI 的 `libbpmf.so` 都帶 SONAME `libbpmf.so`，
   `llvm-readelf -d` 實測），要靠這組測試確認：接上實機後跑
   `PATH="/opt/homebrew/opt/rustup/bin:$PATH" ./gradlew :decoder:connectedDebugAndroidTest`（字典由 decoder-native 的
-  `fetchChewingData` 準備，沒有快取時要連網）。3 條全過才算成立；`System.loadLibrary` 丟 `UnsatisfiedLinkError` 代表
-  `JNI_OnLoad` 的 dlopen／dlsym 失敗。
+  `fetchChewingData` 準備，沒有快取時要連網）。3 條全過才算成立。`UnsatisfiedLinkError` 不一定是 dlopen
+  的問題：先確認裝置 ABI 是 arm64-v8a／armeabi-v7a、兩顆 `.so` 都在測試 APK 裡、失敗的是 `loadLibrary("bpmf_jni")`
+  （訊息指向它的 `JNI_OnLoad`）而不是 `loadLibrary("bpmf")`，才算推翻這個推論。
 - DEVPLAN W2-A 的「1k 條真實注音」「Top-1 ≥ baseline 95%」不在本包；`bpmf_input()` 只回游標所在音節的候選。
 - `commit()` 以 `Candidate` 結構相等比對最近一次 `input()`；W2-A2 若重新計分，要拿原本的 candidate 回呼。分數是名次 `1/(i+1)`。
