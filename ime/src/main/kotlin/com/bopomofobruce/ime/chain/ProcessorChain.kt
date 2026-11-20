@@ -50,9 +50,13 @@ class ProcessorChain(
     }
 
     private fun applyCommit(result: ProcessResult.TextCommit) {
-        if (result.text.isNotEmpty()) context.commitText(result.text)
+        if (result.text.isEmpty()) {
+            _state.value = result.newState
+            return
+        }
+        // 先 commitText 再更新 state：commitText 拋例外時 state 保持不變。
+        context.commitText(result.text)
         _state.value = result.newState
-        if (result.text.isEmpty()) return
         when (val feedback = runChain(InputEvent.TextCommitted(result.text))) {
             is ProcessResult.StateChanged -> _state.value = feedback.newState
             is ProcessResult.TextCommit ->
