@@ -7,14 +7,14 @@
 
 - `decoder/cmake/`：新的 `libbpmf_jni.so`（純 C）。`JNI_OnLoad` 以 `dlopen("libbpmf.so")`＋`dlsym` 取 `bpmf.h` 的四個函式，
   缺任何一個就回 `JNI_ERR`，`System.loadLibrary` 當場丟 `UnsatisfiedLinkError`。
-- `BpmfNative`（internal seam）＋`JniBpmfNative`；`ChewingZhuyinDecoder`（＋`Closeable`）；`DecoderModule.create(context)`（不做 singleton）。
+- `BpmfNative`（internal seam）＋`JniBpmfNative`；`ChewingZhuyinDecoder`（＋`Closeable`）；`DecoderModule.create(context)`（本身不快取；照 ADR-0004 由 `BpmfApplication` 持有、:ime 不 close）。
   候選以 bytes 回 Kotlin 用標準 UTF-8 解碼（`NewStringUTF` 吃 modified UTF-8，BMP 以外會解錯）。
 
 ## JNI glue 放哪裡
 
 | 方案 | 結果 |
 |---|---|
-| **A. `:decoder` 自己的 CMake，執行期 dlopen（採用）** | decoder-native 一個檔案都不改；release `libbpmf.so` 仍只匯出四個 `bpmf_*`；無新相依。指標型別用 `__typeof__(bpmf_init)` 取自 `bpmf.h`。代價：符號是否存在只能在 `JNI_OnLoad` 檢查，多一顆 `.so`（arm64 27 KB）。 |
+| **A. `:decoder` 自己的 CMake，執行期 dlopen（採用）** | decoder-native 一個檔案都不改；release `libbpmf.so` 仍只匯出四個 `bpmf_*`；無新相依。指標型別用 `__typeof__(bpmf_init)` 取自 `bpmf.h`。代價：符號是否存在只能在 `JNI_OnLoad` 檢查，多一顆 `.so`（arm64 剝除符號後 5,968 bytes；debug APK 內是未剝除的 27 KB，`:app` strip 見交接文件 §3）。 |
 | B. glue 編進 `libbpmf.so` | 要改 decoder-native 的 CMakeLists、version script 與 `bpmf.h` 裡「只匯出四個函式」的敘述；decoder-native 的 C 要寫死 `:decoder` 的類別名，改名只會在裝置上 `UnsatisfiedLinkError`。 |
 | C. AGP prefab | 連結期就能檢查符號，但消費端要下載 `com.google.prefab:cli`（本機 gradle cache 沒有，屬新外部相依），兩邊 STL 要一致，也仍要改 decoder-native 的 build.gradle.kts。 |
 

@@ -8,8 +8,9 @@ import java.io.Closeable
 /**
  * 以 libchewing（經 `libbpmf.so`）實作的 [ZhuyinDecoder]。由 [DecoderModule.create] 建立。
  *
- * 生命週期：建構時取得一個 native handle，[close] 釋放它；呼叫端（:ime）負責在 service 銷毀時 [close]。[close] 可重複呼叫，只會釋放一次。關閉後
- * [input] 回空 list、[commit]／[reset] 是 no-op，不會碰 native。
+ * 生命週期：建構時取得一個 native handle，[close] 釋放它。由建立者（:app）持有並負責 [close]；照 ADR-0004 由 `BpmfApplication` 當
+ * singleton 持有時，process 存活期間不 close。:ime 只透過 [ZhuyinDecoder] 使用、不要 close（service
+ * 重建時拿回的是同一個實例）。[close] 可重複呼叫，只會釋放一次。關閉後 [input] 回空 list、[commit]／[reset] 是 no-op，不會碰 native。
  *
  * Thread-safety：同 [ZhuyinDecoder]，不 thread-safe、不加鎖；所有呼叫（含 [close]）要在同一個 dispatcher 上 serialise。
  *

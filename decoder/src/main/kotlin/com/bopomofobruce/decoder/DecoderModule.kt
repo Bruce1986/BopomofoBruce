@@ -4,9 +4,10 @@ import android.content.Context
 import com.bopomofobruce.decoder.nativ.getDataPath
 
 /**
- * :decoder 的手動 DI 入口（ADR-0004：不用 Hilt）。:app 呼叫 [create] 後把結果交給 :ime。
+ * :decoder 的手動 DI 入口（ADR-0004：不用 Hilt）。:app 的 `BpmfApplication` 呼叫 [create] 並持有結果（ADR-0004 的
+ * singleton），以 :common 的 `ZhuyinDecoder` 交給 :ime。
  *
- * 不做 singleton：[ChewingZhuyinDecoder] 持有要 [ChewingZhuyinDecoder.close] 的 native handle，誰建立誰釋放。
+ * 本身不快取：每次 [create] 都建立新的 native handle，由呼叫者負責 [ChewingZhuyinDecoder.close]。
  */
 object DecoderModule {
     /**
