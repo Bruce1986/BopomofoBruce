@@ -65,7 +65,7 @@ private val extractionLock = Any()
  */
 fun getDataPath(context: Context): String {
     // getCacheDir() is a platform type here; check it explicitly so a null surfaces as a named
-    // IOException instead of a NullPointerException inside File(...).
+    // IOException instead of an unexplained NullPointerException in deleteStaleChewingCacheDirs.
     val cacheDir: File =
         context.cacheDir ?: throw IOException("Android cache directory is not available")
     deleteStaleChewingCacheDirs(cacheDir)

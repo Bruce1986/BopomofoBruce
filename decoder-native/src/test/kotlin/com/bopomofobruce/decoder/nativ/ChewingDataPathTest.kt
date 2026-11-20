@@ -411,6 +411,22 @@ class ChewingDataPathTest {
     }
 
     @Test
+    fun `getDataPath throws when a required file name is occupied by a directory`() {
+        val assets =
+            fakeAssets(mapOf("word.dat" to byteArrayOf(1, 2, 3), "tsi.dat" to byteArrayOf(4, 5)))
+        val context = fakeContext(assets, tempDir)
+        val dataDir = File(getDataPath(context))
+        // Replace the extracted tsi.dat with a directory: extractChewingData skips any existing
+        // final name, so only the regular-file check in getDataPath can notice it.
+        assertTrue(File(dataDir, "tsi.dat").delete())
+        assertTrue(File(dataDir, "tsi.dat").mkdirs())
+
+        val error = assertThrows(IOException::class.java) { getDataPath(context) }
+
+        assertTrue(error.message!!.contains("tsi.dat"))
+    }
+
+    @Test
     fun `getDataPath throws when there are no chewing assets at all`() {
         val assets = mockk<AssetManager>()
         every { assets.list("chewing") } returns null
