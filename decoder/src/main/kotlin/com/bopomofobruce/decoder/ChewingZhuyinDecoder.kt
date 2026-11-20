@@ -35,14 +35,18 @@ class ChewingZhuyinDecoder internal constructor(private val native: BpmfNative, 
     override fun input(buffer: String): List<Candidate> {
         if (handle == 0L) return emptyList()
         val texts = splitCandidates(native.input(handle, buffer))
-        lastCandidates =
-            texts
-                .withIndex()
-                .filter { it.value.isNotEmpty() }
-                .mapIndexed { rank, (nativeIndex, text) ->
-                    Candidate(text, 1f / (rank + 1), CandidateSource.PRIMARY) to nativeIndex
-                }
-        return lastCandidates.map { it.first }
+        // 每次按鍵都會走到這裡：單次迴圈、預先配置容量，不產生中間集合。
+        val candidates = ArrayList<Candidate>(texts.size)
+        val pairs = ArrayList<Pair<Candidate, Int>>(texts.size)
+        for (nativeIndex in texts.indices) {
+            val text = texts[nativeIndex]
+            if (text.isEmpty()) continue
+            val candidate = Candidate(text, 1f / (candidates.size + 1), CandidateSource.PRIMARY)
+            candidates.add(candidate)
+            pairs.add(candidate to nativeIndex)
+        }
+        lastCandidates = pairs
+        return candidates
     }
 
     /**
