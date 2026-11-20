@@ -24,7 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * |`Enter`                                 |`sendKey(KEYCODE_ENTER)`     |上屏 composing 原文（不查候選）                  |
  * |`Shift`                                 |切換一次性大寫鎖                     |同左（只影響之後的 `Character`）                 |
  * |`Character(c)`                          |上屏 `c`（Shift 時轉大寫）           |上屏「highlight 候選（無則原文）+ c」              |
- * |`Reset` 事件                              |`decoder.reset()`、清空、放開 Shift|同左，composing **丟棄不上屏**                 |
+ * |`Reset` 事件                              |放開 Shift、`decoder.reset()`、清空|同左，composing **丟棄不上屏**                 |
  * |`SymbolToggle`／`LanguageToggle`／`Custom`|`Unhandled`，交給上層             |同左，composing 保留                        |
  *
  * 選中候選時會先呼叫 [ZhuyinDecoder.commit]；送出原文（Enter／無候選的 Space、Character）不呼叫，因為那不是 decoder 給的候選。 所有上屏都經由

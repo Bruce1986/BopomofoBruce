@@ -268,7 +268,14 @@ class DefaultProcessorsTest {
         c.press(KeyAction.Shift)
         c.press(KeyAction.Backspace, KeyAction.Enter, KeyAction.Space) // composing 空
         c.type("ㄋㄧˇ")
-        c.press(KeyAction.Backspace, KeyAction.Space, KeyAction.Zhuyin("ㄚ"), KeyAction.Enter)
+        c.press(KeyAction.Backspace, KeyAction.Space, KeyAction.Zhuyin("ㄚ"))
+        c.dispatch(InputEvent.CandidateSelected(99)) // 越界、被吞掉
+        c.press(
+            KeyAction.SymbolToggle,
+            KeyAction.LanguageToggle,
+            KeyAction.Custom("x"),
+            KeyAction.Enter,
+        )
         assertTrue(shift.active.value)
         c.press(KeyAction.Character('x'))
         assertFalse(shift.active.value)
