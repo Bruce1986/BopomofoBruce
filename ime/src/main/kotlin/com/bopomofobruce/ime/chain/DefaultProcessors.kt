@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * |`Zhuyin(s)`                             |buffer=`s`，查候選               |buffer 尾端接 `s`，用**完整** buffer 重查候選     |
  * |`Space`                                 |上屏 `" "`                     |有候選→上屏 highlight 候選；無候選→上屏 composing 原文|
  * |`CandidateSelected(i)`                  |無候選，忽略                       |上屏第 i 個候選；i 越界則忽略（不 fall through）      |
- * |`Backspace`                             |`deleteSurroundingText(1, 0)`|只刪 buffer 最後一個符號、不碰 context            |
+ * |`Backspace`                             |`deleteSurroundingText(1, 0)`|只刪 buffer 最後一個 code point、不碰 context   |
  * |`Enter`                                 |`sendKey(KEYCODE_ENTER)`     |上屏 composing 原文（不查候選）                  |
  * |`Shift`                                 |切換一次性大寫鎖                     |同左（只影響之後的 `Character`）                 |
  * |`Character(c)`                          |上屏 `c`（Shift 時轉大寫）           |上屏「highlight 候選（無則原文）+ c」              |

@@ -243,7 +243,7 @@ class DefaultProcessorsTest {
 
     @Test
     fun `with no candidates every key acts on the raw composing buffer`() {
-        val c = chain(StubDecoder()) // 真實 decoder 某些狀態會回 0 個候選（如 ㄋㄧˇㄏ），但 0 不代表打到一半
+        val c = chain(StubDecoder()) // ZhuyinDecoder.input 的 KDoc 允許回 0 個候選，但 0 不代表打到一半
         c.type("ㄍㄍ") // 下兩行：退格只刪 buffer；Space、Enter、字元各上屏當下的原文（字元接在後）
         c.press(KeyAction.Backspace, KeyAction.Space, KeyAction.Zhuyin("ㄍ"), KeyAction.Enter)
         c.press(KeyAction.Zhuyin("ㄍ"), KeyAction.Shift, KeyAction.Character('a'))
