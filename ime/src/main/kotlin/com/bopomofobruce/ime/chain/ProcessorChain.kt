@@ -17,18 +17,26 @@ import kotlinx.coroutines.flow.asStateFlow
  *   `StateChanged`／`Unhandled`；回饋時再 commit 會形成無限迴圈，視為 processor 的程式錯誤直接 fail fast。 `text` 為空字串時視同
  *   `StateChanged`：不呼叫 commitText、也不回饋。回饋同樣是「第一個不回 `Unhandled` 的勝出」：排在前面的 processor 回了
  *   `StateChanged`，後面的 processor 就收不到這次 [InputEvent.TextCommitted]，且它的 newState 會覆蓋剛套用的 newState。
+ *   回饋時 processor 拿到的 state 已是上屏後的 newState（原本的 composing 與候選已不在），事件也只帶 text；要學注音得在 commit
+ *   之前自己記下，或走 [com.bopomofobruce.common.ZhuyinDecoder.commit]。
  * - 全部 `Unhandled`：什麼都不做，原樣回傳 `Unhandled`，讓上層（service）決定要不要自己處理（例如切換鍵盤）。
  *
  * **例外**：本類別不攔截任何例外。processor（含其呼叫的 decoder）或 [ImeContextProvider] 拋出的例外原樣拋給 [dispatch] 的呼叫端，由
  * service 層統一處理。commitText 成功之前拋出時 [state] 不變；之後（回饋階段）才拋出時文字已上屏、[state] 已是 newState。例外不帶
  * 階段資訊，呼叫端分不出是哪一種，所以**不要重送**該事件（可能重複上屏）。要回到乾淨狀態就送 [InputEvent.Reset]；但本類別不會自己清空 [state]，丟棄
  * composing 要靠 chain 裡處理 Reset 的 processor，全部回 `Unhandled`（或該 processor 本身就是拋例外的那個）時 [state]
- * 不變。本類別自己拋的 fail-fast 例外訊息不含上屏內容；其他來源的例外訊息 不受本類別約束，記 log 前請自行過濾。
+ * 不變。上面說的「不變」只指 [state]：processor 在拋出前若已動過 decoder（例如 `input` 已累積音節），decoder 內部狀態不會跟著還原， 要清它得靠處理
+ * Reset 的 processor 呼叫 [com.bopomofobruce.common.ZhuyinDecoder.reset]。本類別自己拋的 fail-fast
+ * 例外訊息不含上屏內容；其他來源的例外訊息 不受本類別約束，記 log 前請自行過濾。
  *
  * **執行緒責任邊界**：本類別是同步、無鎖、**非 thread-safe** 的。[dispatch] 會同步呼叫 processor，而 processor 可能同步呼叫
  * [com.bopomofobruce.common.ZhuyinDecoder.input]（契約不保證 thread-safe，真實實作會走 JNI）。 把所有 [dispatch]
  * 序列化到同一個 work dispatcher（且不要在 main thread 上跑真實 decoder）是 **service 層（W2-B2）的責任**；本類別刻意不碰 coroutine
  * dispatcher，才能用純 JVM unit test 驗證。[state] 是 [StateFlow]，UI 可從任何 thread 觀察。
+ *
+ * **副作用範圍**：本類別只代為執行 `TextCommit` 的
+ * [ImeContextProvider.commitText]。`deleteSurroundingText`、`sendKey` 這類操作沒有對應的 [ProcessResult]，要由
+ * processor 自己持有 context 在 `process` 裡執行，上面的順序與「例外時 state 不變」保證都不涵蓋它們。
  */
 class ProcessorChain(
     private val processors: List<InputProcessor>,
