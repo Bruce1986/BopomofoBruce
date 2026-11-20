@@ -6,6 +6,23 @@
 > PR #9 分支上的 `theme/.../style/StyleSheet.kt`。
 > 本檔只列選項與建議，**沒有任何一項已經決定**；owner 裁決後在各項的「裁決」欄填上結果。
 
+## 目錄
+
+- [0. 現況（2026-11-20 查證）](#0-現況2026-11-20-查證)
+- [1. language_toggle 的目的地鍵盤](#1-language_toggle-的目的地鍵盤)
+  - [1b. toggle 是單向跳轉還是雙向切換](#1b-toggle-是單向跳轉還是雙向切換)
+- [2. Custom id 契約](#2-custom-id-契約)
+  - [2a. id 常數與處理器放哪裡](#2a-id-常數與處理器放哪裡)
+  - [2b. switch_back 的語意](#2b-switch_back-的語意)
+  - [2c. 有 composing 時按插入類 Custom（.com、AM/PM）](#2c-有-composing-時按插入類-customcomampm)
+- [3. KeyboardTheme 是否帶 shapes／typography](#3-keyboardtheme-是否帶-shapestypography)
+- [4. W2 驗收改寫成可否證形式（交接文件 §7 的建議）](#4-w2-驗收改寫成可否證形式交接文件-7-的建議)
+- [5. 其他待裁決（由本輪子工作包回報後補上）](#5-其他待裁決由本輪子工作包回報後補上)
+  - [5a. W2-B1 processor chain 回報的契約缺口](#5a-w2-b1-processor-chain-回報的契約缺口)
+  - [5b. W2-D1 字串工具回報](#5b-w2-d1-字串工具回報)
+  - [5c. W2-A1 decoder JNI 回報](#5c-w2-a1-decoder-jni-回報)
+- [6. 本輪拆包（每支目標 ≤ 450 行，含測試）](#6-本輪拆包每支目標--450-行含測試)
+
 ---
 
 ## 0. 現況（2026-11-20 查證）
