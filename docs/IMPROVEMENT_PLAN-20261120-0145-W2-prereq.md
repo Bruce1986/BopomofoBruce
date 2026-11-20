@@ -134,6 +134,9 @@ W1 的 high 幾乎都是「照驗收看完全合格但功能不能用」。建�
 | B1-5 | `InputProcessor` KDoc 說 Enter 會選候選，`KeyAction` KDoc 說 Enter 送 composing 原文，兩處矛盾 | A：照 `KeyAction`（現況，送原文）／B：照 `InputProcessor` | A，並修正 `InputProcessor` 的 KDoc |
 | B1-6 | `Candidate` 沒有「這個候選吃掉幾個音節」的資訊，選字只能清空整個 composing；子包回報 libchewing wrapper 只回游標所在音節的候選，兩者對不上（**未獨立查證**） | A：v1 限制一次只組一個音節／B：契約 `Candidate` 補欄位（contracts-v2） | 先查證 wrapper 行為再決定；這題會影響 W2-A1 |
 | B1-7 | 長按由 UI 層把 `longPress.action` 包成新 `KeyData` 再送進 chain | 確認／否決 | 確認 |
+| B1-8 | **沒有一聲鍵**：注音配列只有 ˊˇˋ˙ 四個聲調鍵，大千配列的一聲＝空白鍵；但 `KeyAction.Space` 的 KDoc 與 chain 現況都把空白鍵當「上屏候選」，一聲音節無法在 composing 中途結束（W2-D1 的 `ZhuyinText` 與 `bpmf.h` 也都以空白當一聲） | A：空白鍵在「最後一個音節還沒聲調」時當一聲，已有聲調時才上屏候選（同 libchewing 行為）／B：配列另加一聲鍵／C：維持現況 | A；這會改 `KeyAction.Space` 的 KDoc 語意 |
+| B1-9 | decoder 拋例外時 chain 的處置（`reset`／`commit` 失敗時是否先清 composing 與 Shift；學習回饋失敗是否擋住上屏） | A：例外原樣拋給 service，service 送 `Reset` 回乾淨狀態（現況）／B：chain 內 catch 並自行回乾淨狀態 | A，等 W2-B2 service 實作時一起定 |
+| B1-10 | composition 不是靠選字結束（Enter 送原文、退格到空）時，decoder 收不到任何訊號 | A：chain 在這兩種情況呼叫 `decoder.reset()`／B：維持現況 | A |
 
 ### 5b. W2-D1 字串工具回報
 
