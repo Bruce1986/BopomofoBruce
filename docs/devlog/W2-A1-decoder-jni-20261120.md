@@ -37,6 +37,9 @@
 
 - **未在實機驗證**：`ChewingZhuyinDecoderDeviceTest`（3 條）只編譯過。Android linker namespace 下 `dlopen("libbpmf.so")`
   找得到先前 `System.loadLibrary("bpmf")` 載入的 lib 是依文件推論（兩個 ABI 的 `libbpmf.so` 都帶 SONAME `libbpmf.so`，
-  `llvm-readelf -d` 實測），要靠這組測試確認。
+  `llvm-readelf -d` 實測），要靠這組測試確認：接上實機後跑
+  `PATH="/opt/homebrew/opt/rustup/bin:$PATH" ./gradlew :decoder:connectedDebugAndroidTest`（字典由 decoder-native 的
+  `fetchChewingData` 準備，沒有快取時要連網）。3 條全過才算成立；`System.loadLibrary` 丟 `UnsatisfiedLinkError` 代表
+  `JNI_OnLoad` 的 dlopen／dlsym 失敗。
 - DEVPLAN W2-A 的「1k 條真實注音」「Top-1 ≥ baseline 95%」不在本包；`bpmf_input()` 只回游標所在音節的候選。
 - `commit()` 以 `Candidate` 結構相等比對最近一次 `input()`；W2-A2 若重新計分，要拿原本的 candidate 回呼。分數是名次 `1/(i+1)`。
