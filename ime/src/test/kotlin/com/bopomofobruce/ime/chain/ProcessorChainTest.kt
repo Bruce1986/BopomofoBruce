@@ -297,6 +297,28 @@ class ProcessorChainTest {
     }
 
     @Test
+    fun `re-entrant dispatch from the feedback phase fails fast after the text landed`() {
+        lateinit var chain: ProcessorChain
+        var reenter = true
+        val committer = InputProcessor { event, _ ->
+            if (event is InputEvent.TextCommitted) {
+                if (reenter) chain.dispatch(InputEvent.Reset)
+                ProcessResult.Unhandled
+            } else ProcessResult.TextCommit("你", composingB)
+        }
+        chain = ProcessorChain(listOf(committer), context, composingA)
+
+        val error = assertThrows<IllegalStateException> { chain.dispatch(InputEvent.Reset) }
+        assertTrue(error.message!!.contains("re-entrantly"))
+        assertEquals("你", context.getCommittedText()) // 內層沒有再上屏一次
+        assertEquals(composingB, chain.state.value)
+
+        reenter = false
+        chain.dispatch(InputEvent.Reset) // 例外後旗標已復原
+        assertEquals("你你", context.getCommittedText())
+    }
+
+    @Test
     fun `TextCommitted feedback reaches a later processor when earlier ones return Unhandled`() {
         val committer = InputProcessor { event, _ ->
             if (event == InputEvent.Reset) ProcessResult.TextCommit("你", composingB)
