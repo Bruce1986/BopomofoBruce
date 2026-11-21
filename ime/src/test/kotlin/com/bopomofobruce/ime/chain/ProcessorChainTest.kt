@@ -270,6 +270,33 @@ class ProcessorChainTest {
     }
 
     @Test
+    fun `re-entrant dispatch from commitText fails fast with the text sent and state not updated`() {
+        lateinit var chain: ProcessorChain
+        var reenter = true
+        val reentrantContext =
+            object : ImeContextProvider by context {
+                override fun commitText(text: String) {
+                    context.commitText(text)
+                    if (reenter) chain.dispatch(InputEvent.Reset)
+                }
+            }
+        val committer = InputProcessor { event, _ ->
+            if (event == InputEvent.Reset) ProcessResult.TextCommit("你", composingB)
+            else ProcessResult.Unhandled
+        }
+        chain = ProcessorChain(listOf(committer), reentrantContext, composingA)
+
+        assertThrows<IllegalStateException> { chain.dispatch(InputEvent.Reset) }
+        assertEquals("你", context.getCommittedText())
+        assertEquals(composingA, chain.state.value)
+
+        reenter = false
+        chain.dispatch(InputEvent.Reset) // 例外後旗標已復原
+        assertEquals("你你", context.getCommittedText())
+        assertEquals(composingB, chain.state.value)
+    }
+
+    @Test
     fun `TextCommitted feedback walks the whole chain - a later processor can learn`() {
         val committer = InputProcessor { event, _ ->
             if (event == InputEvent.Reset) ProcessResult.TextCommit("你", composingB)

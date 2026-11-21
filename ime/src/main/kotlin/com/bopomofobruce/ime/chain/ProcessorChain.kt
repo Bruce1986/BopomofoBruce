@@ -55,7 +55,9 @@ class ProcessorChain(
      * 不一定是最終狀態，最終狀態一律以 [state] 為準。`TextCommit` 的 [InputEvent.TextCommitted] 回饋由本方法自動送出，呼叫端不要再送一次，否則
      * 學習型 processor 會收到兩次。
      *
-     * 不可重入：processor 在 `process` 裡再呼叫 [dispatch] 會拋 [IllegalStateException]，因為外層稍後會用過期的快照蓋掉內層結果。
+     * 不可重入：[dispatch] 執行期間（含 processor 的 `process`、[ImeContextProvider.commitText] 與回饋階段）再呼叫
+     * [dispatch] 會拋 [IllegalStateException]，因為外層稍後會用過期的快照蓋掉內層結果。從 commitText 內重入時，文字可能已送出而 [state]
+     * 仍是舊值，所以 context 實作要把這類事件排到 service 的序列化 dispatcher，不要同步呼叫。
      */
     fun dispatch(event: InputEvent): ProcessResult {
         check(!dispatching) { "ProcessorChain.dispatch must not be called re-entrantly" }
