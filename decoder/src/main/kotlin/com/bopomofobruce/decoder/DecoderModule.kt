@@ -14,7 +14,8 @@ object DecoderModule {
      * 每次呼叫都有磁碟 I/O（確認或解壓字典、`bpmf_init()` 開字典檔），不要在 main thread 呼叫；只有第一次會從 APK assets 解到
      * cacheDir（[getDataPath]）。
      *
-     * @throws java.io.IOException 字典從 assets 解到 cacheDir 失敗（讀 asset、寫檔或 rename 失敗）。
+     * @throws java.io.IOException 取不到 cacheDir、字典從 assets 解到 cacheDir 失敗（讀 asset、寫檔或 rename
+     *   失敗），或解完後 `word.dat`／`tsi.dat` 不是一般檔案（通常是 APK 沒打包）。
      * @throws IllegalStateException 字典目錄建立失敗，或 `bpmf_init()` 失敗。
      * @throws LinkageError `libbpmf.so`／`libbpmf_jni.so` 載入失敗或缺符號：第一次是 [UnsatisfiedLinkError]，同一
      *   process 內之後再呼叫是 [NoClassDefFoundError]（類別已初始化失敗，不會重試載入）。
