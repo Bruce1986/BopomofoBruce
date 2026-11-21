@@ -319,6 +319,28 @@ class ProcessorChainTest {
     }
 
     @Test
+    fun `a swallowed re-entrancy error does not let a second re-entrant dispatch through`() {
+        lateinit var chain: ProcessorChain
+        val attempts = mutableListOf<Throwable?>()
+        val processor = InputProcessor { _, _ ->
+            if (attempts.isEmpty()) {
+                repeat(2) {
+                    attempts += runCatching { chain.dispatch(InputEvent.Reset) }.exceptionOrNull()
+                }
+            }
+            ProcessResult.StateChanged(composingB)
+        }
+        chain = ProcessorChain(listOf(processor), context, composingA)
+
+        chain.dispatch(InputEvent.Reset)
+
+        // 第一次重入被拒之後，外層還在跑，第二次也要被拒
+        assertEquals(2, attempts.size)
+        assertTrue(attempts.all { it is IllegalStateException })
+        assertEquals(composingB, chain.state.value)
+    }
+
+    @Test
     fun `TextCommitted feedback reaches a later processor when earlier ones return Unhandled`() {
         val committer = InputProcessor { event, _ ->
             if (event == InputEvent.Reset) ProcessResult.TextCommit("你", composingB)
