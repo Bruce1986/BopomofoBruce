@@ -14,11 +14,11 @@ import kotlinx.coroutines.flow.asStateFlow
  * - [ProcessResult.StateChanged]：更新 [state]。
  * - [ProcessResult.TextCommit]：先 [ImeContextProvider.commitText]，再更新 [state]，最後把
  *   [InputEvent.TextCommitted] 餵回 chain 一次（讓學習型 processor 知道哪段字上屏了）。 這次回饋只接受
- *   `StateChanged`／`Unhandled`；回饋時再回 `TextCommit`（含空字串）會形成無限迴圈，視為 processor 的程式錯誤直接 fail fast。
- *   非回饋階段勝出的 `TextCommit` 若 `text` 為空字串則視同 `StateChanged`：不呼叫 commitText、也不回饋。回饋同樣是「第一個不回
- *   `Unhandled` 的勝出」：排在前面的 processor 回了 `StateChanged`，後面的 processor 就收不到這次
- *   [InputEvent.TextCommitted]，且它的 newState 會覆蓋剛套用的 newState。 回饋時 processor 拿到的 state 已是勝出者給的
- *   newState（composing 與候選是否清空由該 newState 決定，本類別不代為清空），事件也只帶 text；要學注音得在 commit 之前自己記下，或走
+ *   `StateChanged`／`Unhandled`；回饋時再回 `TextCommit` 一律視為 processor 的程式錯誤直接 fail
+ *   fast（非空字串照套用會形成無限迴圈；空字串不會，但同樣拒絕）。 非回饋階段勝出的 `TextCommit` 若 `text` 為空字串則視同 `StateChanged`：不呼叫
+ *   commitText、也不回饋。回饋同樣是「第一個不回 `Unhandled` 的勝出」：排在前面的 processor 回了 `StateChanged`，後面的 processor
+ *   就收不到這次 [InputEvent.TextCommitted]，且它的 newState 會覆蓋剛套用的 newState。 回饋時 processor 拿到的 state
+ *   已是勝出者給的 newState（composing 與候選是否清空由該 newState 決定，本類別不代為清空），事件也只帶 text；要學注音得在 commit 之前自己記下，或走
  *   [com.bopomofobruce.common.ZhuyinDecoder.commit]。
  * - 全部 `Unhandled`：什麼都不做，原樣回傳 `Unhandled`，讓上層（service）決定要不要自己處理（例如切換鍵盤）。
  *
