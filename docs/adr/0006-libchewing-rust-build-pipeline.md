@@ -50,7 +50,9 @@ owner 已就此裁示（見 devlog 2026-08-10 段）：**採用 v0.12.0（commit
   `Editor::chewing()` 會靜默退回內建 mini 字典，`bpmf_init()` 舊版只在
   `data_path == NULL` 或 `malloc` 失敗才回 NULL。這句話現在之所以成立，是因為
   第十二輪同一批修正已在 `bpmf_init()` 內加了字典可用性自我檢測，詳見
-  `bpmf.h`／`bpmf_wrapper.c` 與 devlog 對應段落，不是這裡原本假設的理由）。
+  `bpmf.h`／`bpmf_wrapper.c` 與 devlog 對應段落，不是這裡原本假設的理由。**2026-11-21 補記**：
+  現在 `getDataPath()` 解壓後若缺 `word.dat`／`tsi.dat` 會直接丟 `IOException`，不會走到
+  `bpmf_init()`）。
   `ensureChewingDataDir`（純 `mkdir`、不連網）仍是
   `src/main/assets/chewing` 目錄本身唯一的 `outputs.dir` 擁有者，`package*Assets`/`Lint*`
   兩類 task 現在**同時**依附 `ensureChewingDataDir`（先 mkdir）與 `fetchChewingData`（真下載）。

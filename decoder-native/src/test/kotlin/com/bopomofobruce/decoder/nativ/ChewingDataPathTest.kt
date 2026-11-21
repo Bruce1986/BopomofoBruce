@@ -334,7 +334,8 @@ class ChewingDataPathTest {
 
     @Test
     fun `getDataPath scopes the extraction directory to the current dictionary data version`() {
-        val assets = fakeAssets(mapOf("word.dat" to byteArrayOf(1, 2, 3)))
+        val assets =
+            fakeAssets(mapOf("word.dat" to byteArrayOf(1, 2, 3), "tsi.dat" to byteArrayOf(4, 5)))
         val context = fakeContext(assets, tempDir)
 
         val path = getDataPath(context)
@@ -356,7 +357,8 @@ class ChewingDataPathTest {
         staleDir.mkdirs()
         File(staleDir, "word.dat").writeBytes(byteArrayOf(9, 9, 9)) // stale content, must not leak
 
-        val assets = fakeAssets(mapOf("word.dat" to byteArrayOf(1, 2, 3)))
+        val assets =
+            fakeAssets(mapOf("word.dat" to byteArrayOf(1, 2, 3), "tsi.dat" to byteArrayOf(4, 5)))
         val context = fakeContext(assets, tempDir)
 
         val path = getDataPath(context)
@@ -371,7 +373,7 @@ class ChewingDataPathTest {
         unrelatedDir.mkdirs()
         File(unrelatedDir, "marker").writeText("keep me")
 
-        val assets = fakeAssets(mapOf("word.dat" to byteArrayOf(1)))
+        val assets = fakeAssets(mapOf("word.dat" to byteArrayOf(1), "tsi.dat" to byteArrayOf(4, 5)))
         val context = fakeContext(assets, tempDir)
 
         getDataPath(context)
@@ -384,13 +386,68 @@ class ChewingDataPathTest {
     fun `getDataPath does not wipe and re-extract its own current-version dir on a second call`() {
         // The stale-dir sweep must skip the current version's dir; without that exclusion every
         // app start deletes the freshly extracted dictionary and copies it all over again.
-        val assets = fakeAssets(mapOf("word.dat" to byteArrayOf(1, 2, 3)))
+        val assets =
+            fakeAssets(mapOf("word.dat" to byteArrayOf(1, 2, 3), "tsi.dat" to byteArrayOf(4, 5)))
         val context = fakeContext(assets, tempDir)
 
         getDataPath(context)
         getDataPath(context)
 
         verify(exactly = 1) { assets.open("chewing/word.dat") }
+    }
+
+    @Test
+    fun `getDataPath throws naming the file when a required dictionary is not packaged`() {
+        val assets = fakeAssets(mapOf("word.dat" to byteArrayOf(1, 2, 3)))
+        val context = fakeContext(assets, tempDir)
+
+        val error = assertThrows(IOException::class.java) { getDataPath(context) }
+
+        assertTrue(error.message!!.contains("tsi.dat"), "message must name the missing file")
+        assertFalse(
+            error.message!!.contains("word.dat"),
+            "word.dat was packaged, must not be listed",
+        )
+    }
+
+    @Test
+    fun `getDataPath throws when a required file name is occupied by a directory`() {
+        val assets =
+            fakeAssets(mapOf("word.dat" to byteArrayOf(1, 2, 3), "tsi.dat" to byteArrayOf(4, 5)))
+        val context = fakeContext(assets, tempDir)
+        val dataDir = File(getDataPath(context))
+        // Replace the extracted tsi.dat with a directory: extractChewingData skips any existing
+        // final name, so only the regular-file check in getDataPath can notice it.
+        assertTrue(File(dataDir, "tsi.dat").delete())
+        assertTrue(File(dataDir, "tsi.dat").mkdirs())
+
+        val error = assertThrows(IOException::class.java) { getDataPath(context) }
+
+        assertTrue(error.message!!.contains("tsi.dat"))
+    }
+
+    @Test
+    fun `getDataPath throws when there are no chewing assets at all`() {
+        val assets = mockk<AssetManager>()
+        every { assets.list("chewing") } returns null
+        val context = fakeContext(assets, tempDir)
+
+        val error = assertThrows(IOException::class.java) { getDataPath(context) }
+
+        assertTrue(error.message!!.contains("word.dat"))
+        assertTrue(error.message!!.contains("tsi.dat"))
+    }
+
+    @Test
+    fun `getDataPath throws IOException instead of NPE when the app has no cache dir`() {
+        val assets = mockk<AssetManager>()
+        val context = mockk<Context>()
+        every { context.assets } returns assets
+        every { context.cacheDir } returns null
+
+        val error = assertThrows(IOException::class.java) { getDataPath(context) }
+
+        assertTrue(error.message!!.contains("cache directory"))
     }
 
     @Test
@@ -404,8 +461,12 @@ class ChewingDataPathTest {
         every { assets.open("chewing/word.dat") } throws IOException("simulated asset read failure")
         val context = fakeContext(assets, tempDir)
 
-        assertThrows(IOException::class.java) { getDataPath(context) }
+        val error = assertThrows(IOException::class.java) { getDataPath(context) }
 
+        // Pin the source: without this, the required-files check (tsi.dat is not stubbed here)
+        // would also throw IOException and keep the test green even if the read failure never
+        // happened.
+        assertEquals("simulated asset read failure", error.message)
         assertFalse(staleDir.exists(), "stale dir must be cleaned up even when extraction fails")
     }
 
