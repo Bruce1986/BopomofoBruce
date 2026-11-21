@@ -251,6 +251,25 @@ class ProcessorChainTest {
     }
 
     @Test
+    fun `re-entrant dispatch fails fast, leaves state unchanged and the chain stays usable`() {
+        lateinit var chain: ProcessorChain
+        var reenter = true
+        val processor = InputProcessor { _, _ ->
+            if (reenter) chain.dispatch(InputEvent.Reset)
+            ProcessResult.StateChanged(composingB)
+        }
+        chain = ProcessorChain(listOf(processor), context, composingA)
+
+        val error = assertThrows<IllegalStateException> { chain.dispatch(InputEvent.Reset) }
+        assertTrue(error.message!!.contains("re-entrantly"))
+        assertEquals(composingA, chain.state.value)
+
+        reenter = false
+        chain.dispatch(InputEvent.Reset)
+        assertEquals(composingB, chain.state.value)
+    }
+
+    @Test
     fun `TextCommitted feedback walks the whole chain - a later processor can learn`() {
         val committer = InputProcessor { event, _ ->
             if (event == InputEvent.Reset) ProcessResult.TextCommit("你", composingB)

@@ -44,6 +44,7 @@ class ProcessorChain(
     initialState: InputState = InputState.EMPTY,
 ) {
     private val _state = MutableStateFlow(initialState)
+    private var dispatching = false
 
     /** 目前的輸入狀態（composing／候選列）。UI 只讀，唯一的寫入者是 [dispatch]。 */
     val state: StateFlow<InputState> = _state.asStateFlow()
@@ -51,16 +52,25 @@ class ProcessorChain(
     /**
      * 把 [event] 送進 chain 並套用結果；回傳勝出 processor 的原始 [ProcessResult]（全部不處理時為 `Unhandled`）。空字串的
      * `TextCommit` 也原樣回傳，即使它實際上沒有上屏，呼叫端不要只憑回傳型別判斷有沒有上屏。回饋階段可能再改寫狀態，所以回傳值裡的 `newState`
-     * 不一定是最終狀態，最終狀態一律以 [state] 為準。
+     * 不一定是最終狀態，最終狀態一律以 [state] 為準。`TextCommit` 的 [InputEvent.TextCommitted] 回饋由本方法自動送出，呼叫端不要再送一次，否則
+     * 學習型 processor 會收到兩次。
+     *
+     * 不可重入：processor 在 `process` 裡再呼叫 [dispatch] 會拋 [IllegalStateException]，因為外層稍後會用過期的快照蓋掉內層結果。
      */
     fun dispatch(event: InputEvent): ProcessResult {
-        val result = runChain(event)
-        when (result) {
-            is ProcessResult.StateChanged -> _state.value = result.newState
-            is ProcessResult.TextCommit -> applyCommit(result)
-            ProcessResult.Unhandled -> Unit
+        check(!dispatching) { "ProcessorChain.dispatch must not be called re-entrantly" }
+        dispatching = true
+        try {
+            val result = runChain(event)
+            when (result) {
+                is ProcessResult.StateChanged -> _state.value = result.newState
+                is ProcessResult.TextCommit -> applyCommit(result)
+                ProcessResult.Unhandled -> Unit
+            }
+            return result
+        } finally {
+            dispatching = false
         }
-        return result
     }
 
     private fun applyCommit(result: ProcessResult.TextCommit) {
