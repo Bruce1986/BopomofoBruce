@@ -297,7 +297,7 @@ class ProcessorChainTest {
     }
 
     @Test
-    fun `TextCommitted feedback walks the whole chain - a later processor can learn`() {
+    fun `TextCommitted feedback reaches a later processor when earlier ones return Unhandled`() {
         val committer = InputProcessor { event, _ ->
             if (event == InputEvent.Reset) ProcessResult.TextCommit("你", composingB)
             else ProcessResult.Unhandled
