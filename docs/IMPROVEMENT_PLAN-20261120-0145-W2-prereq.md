@@ -97,7 +97,7 @@ W1-C devlog（`W1-C-keyboards-20260810-1531.md`）已指出：`KeyAction` 的 KD
 
 | 選項 | 內容 |
 |---|---|
-| **A（建議）** | 先把 composing 原文送出，再插入文字（與 W2-B1 對 `Character` 的處理一致） |
+| **A（建議）** | 先把 composing 原文送出，再插入文字（W2-B1b 對 `Character` 的現行處理不是這樣：先上屏 highlight 候選，沒有候選才送原文） |
 | B | 先以第一個候選送出，再插入 |
 
 **裁決**：2a（待填）／2b（待填）／2c（待填）

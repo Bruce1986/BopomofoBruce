@@ -32,7 +32,7 @@
 | W1-A | W1 | `:decoder-native` libchewing → libbpmf.so | 🟣 In review | claude-lead | ../BopomofoBruce-w1a-decoder-native | feat/w1a-decoder-native | [#8](https://github.com/Bruce1986/BopomofoBruce/pull/8)（CI 綠，待 owner merge） | 2026-11-20 01:55 |
 | W1-B | W1 | `:theme` Material You + 自訂相片背景 | 🟣 In review | claude-lead | ../BopomofoBruce-w1b-theme | feat/w1b-theme | [#9](https://github.com/Bruce1986/BopomofoBruce/pull/9)（CI 綠，待 owner merge） | 2026-11-20 01:55 |
 | W1-C | W1 | `:keyboards` 注音 4×10、符號、數字、密碼 | ✅ Merged | sonnet-C | — | feat/w1c-keyboards | [#10](https://github.com/Bruce1986/BopomofoBruce/pull/10) | 2026-09-16 |
-| W2-A1 | W2 | `:decoder` JNI binding + `ZhuyinDecoder` 真實實作（疊在 #8 上） | 🟣 In review | claude-lead | ../../worktrees/BopomofoBruce-w2a-decoder-jni | feat/w2-decoder-jni | [#16](https://github.com/Bruce1986/BopomofoBruce/pull/16)（base＝#8 分支） | 2026-11-20 17:40 |
+| W2-A1 | W2 | `:decoder` JNI binding + `ZhuyinDecoder` 真實實作（疊在 #8 上） | 🟣 In review | claude-lead | ../../worktrees/BopomofoBruce-w2a-decoder-jni | feat/w2-decoder-jni | [#16](https://github.com/Bruce1986/BopomofoBruce/pull/16)（base＝#8 分支） | 2026-11-20 17:23 |
 | W2-A2 | W2 | `:decoder` 個人字典（Room） | 🔵 Backlog | — | — | — | — | — |
 | W2-B1a | W2 | `:ime` processor chain dispatcher（純 Kotlin） | 🟣 In review | claude-lead | ../../worktrees/BopomofoBruce-w2b1a-chain | feat/w2-ime-processor-chain-core | [#13](https://github.com/Bruce1986/BopomofoBruce/pull/13) | 2026-11-20 10:40 |
 | W2-B1b | W2 | `:ime` 預設 processor（疊在 #13 上） | 🟣 In review | claude-lead | ../../worktrees/BopomofoBruce-w2b1b-defaults | feat/w2-ime-default-processors | [#14](https://github.com/Bruce1986/BopomofoBruce/pull/14) | 2026-11-20 10:40 |
