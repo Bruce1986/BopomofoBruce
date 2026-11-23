@@ -115,7 +115,7 @@ W1-C devlog（`W1-C-keyboards-20260810-1531.md`）已指出：`KeyAction` 的 KD
 | A | 契約不動；`:ime` v1 用固定圓角／字級 | 零契約變更，最快看到鍵盤 | 設定頁的圓角／字級調了沒效果，等於做出一個假功能 |
 | B | `:common` 新增可選介面（例如 `KeyboardStyleExtras`），`:ime` 用 `as?` 取 | 既有宣告一個字都不改 | `as?` 失敗時靜默退回預設，正是 W1 常見的「看起來合格但功能不能用」型態 |
 | **C（建議）** | #9 合併後，把 `KeyboardShapes`／`KeyboardTypography` 搬進 `:common`，在 `KeyboardTheme` 加帶預設值的 `shapes`／`typography` 成員，打 `contracts-v2` tag | 單一來源、沒有靜默退回；repo 內實作者都會自動拿到預設值 | 要動凍結契約（但是加成員、有預設值，既有實作不必改）；要等 #9 合併 |
-| D | `:ime` 直接依賴 `:theme` | 最直接 | 違反 DEVPLAN 依賴圖（`:ime` 只透過介面） |
+| D | `:ime` 直接依賴 `:theme` | 最直接 | 違反 DEVPLAN W2-B 的禁碰（`:theme` 的內部只透過介面用；模組依賴本身 main 上的 `:ime` 已經有） |
 
 **裁決**：（待填）
 
@@ -159,7 +159,7 @@ W1 的 high 幾乎都是「照驗收看完全合格但功能不能用」。建�
 | B1-7 | 長按由 UI 層把 `longPress.action` 包成新 `KeyData` 再送進 chain | 確認／否決 | 確認 |
 | B1-8 | **沒有一聲鍵**：注音配列只有 ˊˇˋ˙ 四個聲調鍵，大千配列的一聲＝空白鍵；但 `KeyAction.Space` 的 KDoc 與 chain 現況都把空白鍵當「上屏候選」，一聲音節無法在 composing 中途結束（W2-D1 的 `ZhuyinText` 與 `bpmf.h` 也都以空白當一聲） | A：空白鍵在「最後一個音節還沒聲調」時當一聲，已有聲調時才上屏候選（同 libchewing 行為）／B：配列另加一聲鍵／C：維持現況 | A；這會改 `KeyAction.Space` 的 KDoc 語意 |
 | B1-9 | decoder 拋例外時 chain 的處置（`reset`／`commit` 失敗時是否先清 composing 與 Shift；學習回饋失敗是否擋住上屏） | A：例外原樣拋給 service，service 送 `Reset` 回乾淨狀態（現況）／B：chain 內 catch 並自行回乾淨狀態 | A，等 W2-B2 service 實作時一起定 |
-| B1-10 | composition 不是靠選字結束（Enter 送原文、退格到空）時，decoder 收不到任何訊號 | A：chain 在這兩種情況呼叫 `decoder.reset()`／B：維持現況 | A |
+| B1-10 | composition 不是靠選字結束（Enter 送原文、退格到空、沒有候選時空白鍵／字元鍵送原文）時，decoder 收不到任何訊號 | A：chain 在這些情況呼叫 `decoder.reset()`／B：維持現況 | A |
 
 ### 5b. W2-D1 字串工具回報
 
