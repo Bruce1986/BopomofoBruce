@@ -35,6 +35,10 @@ import kotlinx.coroutines.flow.asStateFlow
  *
  * **service 的責任**：換輸入欄／結束輸入時送 [InputEvent.Reset]；處理回 `Unhandled` 的切換鍵與 `Custom`；單行欄位的 Enter
  * 動作（`performEditorAction`）要在進 chain 前自行攔下。
+ *
+ * TODO(owner 裁決)：`decoder.reset()` 拋例外時 Reset 只做了一半——Shift 已放開，但 [ProcessorChain] 不更新
+ *   state，composing 與候選都還在（下一個 Space 會把它上屏到新欄位）。裁決前 service 收到 Reset 的例外要自行重建
+ *   chain；替代方案是這裡吞掉例外、照樣清空。
  */
 fun defaultProcessors(
     decoder: ZhuyinDecoder,

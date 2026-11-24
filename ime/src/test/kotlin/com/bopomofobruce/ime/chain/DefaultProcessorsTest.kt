@@ -245,7 +245,7 @@ class DefaultProcessorsTest {
 
     @Test
     fun `with no candidates every key acts on the raw composing buffer`() {
-        val c = chain(StubDecoder()) // ZhuyinDecoder.input 的 KDoc 允許回 0 個候選，但 0 不代表打到一半
+        val c = chain(StubDecoder()) // ZhuyinDecoder.input 的 KDoc 允許回 0 個候選（「可能空」）
         c.type("ㄍㄍ") // 下兩行：退格只刪 buffer；Space、Enter、字元各上屏當下的原文（字元接在後）
         c.press(KeyAction.Backspace, KeyAction.Space, KeyAction.Zhuyin("ㄍ"), KeyAction.Enter)
         c.press(KeyAction.Zhuyin("ㄍ"), KeyAction.Shift, KeyAction.Character('a'))
@@ -312,17 +312,19 @@ class DefaultProcessorsTest {
     }
 
     @Test
-    fun `a decoder reset that throws still releases shift`() {
+    fun `a decoder reset that throws still releases shift but keeps composing`() {
         val throwing =
             object : ZhuyinDecoder by StubDecoder() {
                 override fun reset() = error("decoder down")
             }
         val c = chain(throwing)
+        c.type("ㄍ")
         c.press(KeyAction.Shift)
 
         runCatching { c.dispatch(InputEvent.Reset) }
 
         assertFalse(shift.active.value)
+        assertEquals("ㄍ", c.state.value.composing) // 現況：state 沒清，見 DefaultProcessors 的 TODO
     }
 
     /** 不論 buffer 都回固定 [candidates]（造 fake 給不出的「亂序」「無候選」）；commit 只收自己給過的候選，原文回饋就炸。 */
