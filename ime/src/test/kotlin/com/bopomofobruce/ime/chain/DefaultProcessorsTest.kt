@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 
 /** 預設 chain 的端到端情境：按鍵序列 → context 收到什麼、state 剩什麼。 */
 class DefaultProcessorsTest {
@@ -314,17 +315,19 @@ class DefaultProcessorsTest {
     @Test
     fun `a decoder reset that throws still releases shift but keeps composing`() {
         val throwing =
-            object : ZhuyinDecoder by StubDecoder() {
+            object : ZhuyinDecoder by StubDecoder(Candidate("高", 0.9f, PRIMARY)) {
                 override fun reset() = error("decoder down")
             }
         val c = chain(throwing)
         c.type("ㄍ")
+        val before = c.state.value
         c.press(KeyAction.Shift)
 
-        runCatching { c.dispatch(InputEvent.Reset) }
+        assertThrows<IllegalStateException> { c.dispatch(InputEvent.Reset) } // 例外要拋給 service
 
         assertFalse(shift.active.value)
-        assertEquals("ㄍ", c.state.value.composing) // 現況：state 沒清，見 DefaultProcessors 的 TODO
+        assertEquals(listOf("高"), before.texts())
+        assertEquals(before, c.state.value) // 現況：state 沒清，見 DefaultProcessors 的 TODO
     }
 
     /** 不論 buffer 都回固定 [candidates]（造 fake 給不出的「亂序」「無候選」）；commit 只收自己給過的候選，原文回饋就炸。 */

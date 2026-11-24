@@ -37,8 +37,8 @@ import kotlinx.coroutines.flow.asStateFlow
  * 動作（`performEditorAction`）要在進 chain 前自行攔下。
  *
  * TODO(owner 裁決)：`decoder.reset()` 拋例外時 Reset 只做了一半——Shift 已放開，但 [ProcessorChain] 不更新
- *   state，composing 與候選都還在（下一個 Space 會把它上屏到新欄位）。裁決前 service 收到 Reset 的例外要自行重建
- *   chain；替代方案是這裡吞掉例外、照樣清空。
+ *   state，composing 與候選都還在（之後的 Space／Enter／字元會把舊 composing 或舊候選上屏到新欄位）。裁決前 service 收到 Reset
+ *   的例外要自行重建 chain；替代方案是這裡吞掉例外、照樣清空。
  */
 fun defaultProcessors(
     decoder: ZhuyinDecoder,
@@ -73,7 +73,9 @@ class ShiftLatch {
 
 private fun InputEvent.keyAction(): KeyAction? = (this as? InputEvent.KeyPressed)?.key?.action
 
-/** 以完整 [buffer] 查候選；候選依 score 降序（穩定排序，同分保留 decoder 原順序——見 `Candidate` KDoc「:ime 會自行 sort」）。 */
+/**
+ * 以完整 [buffer] 查候選；候選依 score 降序（穩定排序，同分保留 decoder 原順序——見 `Candidate` KDoc「:ime 不依賴這點（會自行 sort）」）。
+ */
 private fun composingState(buffer: String, decoder: ZhuyinDecoder): InputState =
     if (buffer.isEmpty()) InputState.EMPTY
     else InputState(buffer, decoder.input(buffer).sortedByDescending { it.score }, 0)
