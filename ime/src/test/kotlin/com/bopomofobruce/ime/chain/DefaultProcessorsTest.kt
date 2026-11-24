@@ -204,19 +204,21 @@ class DefaultProcessorsTest {
     @Test
     fun `keyboard switch keys are left to the host and keep composing`() {
         val c = chain()
-        c.type("ㄋㄧˇ")
-        val before = c.state.value
         val deferred =
             listOf(
                 KeyAction.SymbolToggle,
                 KeyAction.LanguageToggle,
                 KeyAction.Custom("switch_back"),
             )
-
-        deferred.forEach {
-            val result = c.dispatch(key(it))
-            assertEquals(ProcessResult.Unhandled, result, "$it")
+        val assertDeferred = {
+            deferred.forEach { assertEquals(ProcessResult.Unhandled, c.dispatch(key(it)), "$it") }
         }
+
+        assertDeferred() // composing 空
+        assertEquals(InputState.EMPTY, c.state.value)
+        c.type("ㄋㄧˇ")
+        val before = c.state.value
+        assertDeferred() // composing 非空
 
         assertEquals(before, c.state.value)
         assertEquals("", context.getCommittedText())
@@ -277,8 +279,21 @@ class DefaultProcessorsTest {
             KeyAction.Enter,
         )
         assertTrue(shift.active.value)
+        c.type("ㄋㄧˇ")
+        c.dispatch(InputEvent.CandidateSelected(1)) // 有效的候選點擊也不消耗
+        assertEquals("妳", context.getCommittedText().takeLast(1))
+        assertTrue(shift.active.value)
         c.press(KeyAction.Character('x'))
         assertFalse(shift.active.value)
+    }
+
+    @Test
+    fun `shift uppercases only the character, not the composing text committed before it`() {
+        val c = chain(StubDecoder(Candidate("ab", 0.9f, PRIMARY)))
+        c.type("ㄍ")
+        c.press(KeyAction.Shift, KeyAction.Character('x'))
+
+        assertEquals("abX", context.getCommittedText())
     }
 
     @Test
