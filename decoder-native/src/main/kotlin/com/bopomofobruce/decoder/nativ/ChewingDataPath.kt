@@ -10,7 +10,8 @@ import java.io.IOException
  *
  * `libbpmf.so` needs a readable filesystem directory containing the chewing dictionary files
  * (`word.dat`, `tsi.dat`) — it cannot read them straight out of the APK's compressed assets. This
- * extracts them once into [Context.getCacheDir] and returns that directory's path.
+ * extracts them once into a versioned subdirectory of [Context.getCacheDir] and returns that
+ * subdirectory's path.
  *
  * `bpmf_init()` (see `cmake/include/bpmf.h`) only needs this directory to be *readable* — `bpmf.h`
  * documents `data_path` as syspath-only, and W1-A deliberately passes NULL as libchewing's userpath
@@ -33,7 +34,8 @@ private const val CHEWING_CACHE_DIR_PREFIX = "chewing-"
  * times (this one at app-compile time, the script's at CI/dev-machine asset-fetch time), so nothing
  * ties them together at the language level; instead the `verifyChewingDataVersionSync` task in
  * `decoder-native/build.gradle.kts` regex-compares the two literals and fails the build on drift
- * (wired onto the unit-test, `package*Assets`, and `assemble*` tasks — see that file).
+ * (wired onto `testDebugUnitTest`/`testReleaseUnitTest`, every task whose name contains `Assets`,
+ * `assembleDebug`/`assembleRelease`, and the `connected*`/`install*` tasks — see that file).
  *
  * Why this exists at all (K5): [extractChewingData] only checks "does the file already exist at its
  * final cache path" — it has no way to tell "cached word.dat" apart from "this app version's
