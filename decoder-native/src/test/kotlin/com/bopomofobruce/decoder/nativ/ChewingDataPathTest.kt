@@ -505,9 +505,10 @@ class ChewingDataPathTest {
             blockerMarker.isFile,
             "test setup: the blocking directory must have been created",
         )
-        assertFalse(
-            blocker.isFile,
-            "a failed rename must not publish the payload at the final name",
+        assertArrayEquals(
+            byteArrayOf(9),
+            blockerMarker.readBytes(),
+            "a failed rename must leave whatever occupies the final name untouched",
         )
         assertFalse(
             File(targetDir, "word.dat.tmp").exists(),

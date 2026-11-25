@@ -5,7 +5,9 @@ import android.content.res.AssetManager
 import java.io.File
 import java.io.IOException
 
-/**
+/*
+ * File overview (a plain comment, not KDoc, so it does not attach to the constant below).
+ *
  * `libbpmf.so` needs a readable filesystem directory containing the chewing dictionary files
  * (`word.dat`, `tsi.dat`) — it cannot read them straight out of the APK's compressed assets. This
  * extracts them once into [Context.getCacheDir] and returns that directory's path.
@@ -17,8 +19,9 @@ import java.io.IOException
  * (copying assets in, atomically renaming `.tmp` files into place — see [extractChewingData]'s
  * KDoc), not a requirement `bpmf_init()` imposes.
  *
- * `bpmf_init()` (see `cmake/include/bpmf.h`) is the only caller in mind; `:decoder` (W2-A) is
- * expected to call [getDataPath] once per process and pass the result straight through.
+ * The path [getDataPath] returns is meant only to be passed to `bpmf_init()` (see
+ * `cmake/include/bpmf.h`); `:decoder` (W2-A) is expected to call [getDataPath] once per process and
+ * pass the result straight through.
  */
 private const val CHEWING_ASSET_SUBDIR = "chewing"
 private const val CHEWING_CACHE_DIR_PREFIX = "chewing-"
@@ -154,7 +157,8 @@ fun extractChewingData(assets: AssetManager, targetDir: File): File =
         // Copies whatever is under chewing/, without checking for specific names: the required
         // word.dat/tsi.dat check lives in getDataPath() (REQUIRED_CHEWING_FILES), which throws
         // IOException naming the missing file, so callers that go through getDataPath() never get a
-        // silent success.
+        // silent success. Assumes chewing/ holds only flat files (what fetch_chewing_data.sh
+        // writes); a subdirectory there would make assets.open() throw and abort the whole copy.
         val assetNames = assets.list(CHEWING_ASSET_SUBDIR) ?: emptyArray()
         for (name in assetNames) {
             val target = File(targetDir, name)
