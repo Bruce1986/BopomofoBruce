@@ -312,8 +312,9 @@ class ChewingDataPathTest {
 
         val result = extractChewingData(assets, targetDir)
 
-        val filesInTargetDir: List<File> = result.listFiles()?.toList() ?: emptyList()
-        assertEquals(emptyList<File>(), filesInTargetDir)
+        assertEquals(targetDir, result)
+        assertTrue(result.isDirectory, "the target dir must be created even with no assets")
+        assertEquals(emptyList<File>(), result.listFiles()!!.toList())
     }
 
     private fun fakeContext(assets: AssetManager, cacheDir: File): Context {
@@ -364,7 +365,8 @@ class ChewingDataPathTest {
         val path = getDataPath(context)
 
         assertFalse(staleDir.exists(), "stale previous-version cache dir must be deleted")
-        assertEquals(3, File(path, "word.dat").length()) // freshly extracted, not the stale bytes
+        // Same length as the stale bytes on purpose; compare content so stale data cannot pass.
+        assertArrayEquals(byteArrayOf(1, 2, 3), File(path, "word.dat").readBytes())
     }
 
     @Test

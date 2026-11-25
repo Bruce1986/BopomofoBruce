@@ -94,9 +94,9 @@ fun getDataPath(context: Context): String {
  * version's directory on disk forever (unbounded growth), never read again once
  * [CHEWING_CACHE_DIR_NAME] changes name.
  *
- * Deliberately best-effort: a directory that fails to delete (e.g. still open by a lagging process)
- * is left behind rather than throwing — going stale on disk is a (bounded, single-directory) space
- * leak, not a correctness problem, since [getDataPath] never reads from it again once the current
+ * Deliberately best-effort: a directory that fails to delete (e.g. a permission or I/O error) is
+ * left behind rather than throwing — going stale on disk is a bounded space leak (retried on every
+ * call), not a correctness problem, since [getDataPath] never reads from it again once the current
  * version's directory exists.
  */
 private fun deleteStaleChewingCacheDirs(cacheDir: File) {
@@ -128,8 +128,10 @@ private fun deleteStaleChewingCacheDirs(cacheDir: File) {
  * because the final name can only come into existence via a completed rename. A process kill
  * mid-copy (e.g. low-memory kill) can therefore only ever leave behind an orphaned `.tmp` file,
  * never a truncated file at the final name; the next call harmlessly overwrites that `.tmp` and
- * retries. If the rename itself fails, the `.tmp` file is deleted and an [IOException] is thrown —
- * no partial state is left at the final name either way.
+ * retries. (No fsync is done before the rename, so a power loss or kernel crash — unlike a process
+ * kill — could still leave a short file at the final name; that case is not handled.) If the rename
+ * itself fails, the `.tmp` file is deleted and an [IOException] is thrown — no partial state is
+ * left at the final name either way.
  *
  * Synchronized on [extractionLock]: without it, two threads racing this call for the first time
  * could both observe the final file missing, then interleave writes into (or one truncate the
@@ -151,7 +153,8 @@ fun extractChewingData(assets: AssetManager, targetDir: File): File =
     synchronized(extractionLock) {
         // 用 isDirectory 而不是 exists()：同一路徑若已經是一個普通檔案，exists() 為 true 會讓
         // 這道檢查整個短路，接著在複製迴圈裡以「Not a directory」的 FileNotFoundException
-        // 失敗，而不是這裡明確的訊息。最後一次 isDirectory 容忍另一條執行緒剛好先建好目錄。
+        // 失敗，而不是這裡明確的訊息。最後一次 isDirectory 容忍鎖外的建立者（另一個行程
+        // 或不經此函式的程式）剛好先建好目錄。
         if (!targetDir.isDirectory && !targetDir.mkdirs() && !targetDir.isDirectory) {
             throw IllegalStateException("Could not create chewing data dir: $targetDir")
         }
