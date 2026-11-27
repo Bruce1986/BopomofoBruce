@@ -523,6 +523,13 @@ void bpmf_commit(void* opaque_handle, size_t index) {
     if (index >= handle->last_candidate_count) {
         return;
     }
+    /* The list bpmf_input() enumerated is only valid for one commit: choosing
+     * a candidate advances libchewing's composition state, so a second
+     * bpmf_commit() without an intervening bpmf_input() would index into a
+     * different candidate list than the one the caller was shown. Invalidate
+     * the count so that second call is the same silent no-op as any other
+     * out-of-range index. */
+    handle->last_candidate_count = 0;
     ChewingContext* ctx = handle->ctx;
     if (chewing_cand_open(ctx) == 0) {
         chewing_cand_choose_by_index(ctx, (int)index);

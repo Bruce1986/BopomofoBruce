@@ -193,10 +193,13 @@ size_t bpmf_input(void* handle, const char* zhuyin, char** candidates_out);
  * this handle returned: an index at or beyond that count (which includes
  * every index when the last call returned 0, and any negative value a caller
  * pushed through the size_t parameter) is a silent no-op — the candidate
- * window is not even opened. The check lives here rather than being left to
- * libchewing because the count is only known on this side, and because a
- * negative value arriving as a huge size_t would be cast back to a negative
- * int on the way into libchewing. Callers get no return value to distinguish
+ * window is not even opened. Each bpmf_input() result allows at most one
+ * commit: a successful bounds check resets that count to 0, so calling
+ * bpmf_commit() again before the next bpmf_input() is the same no-op. The
+ * check lives here rather than being left to libchewing because the count
+ * is only known on this side, and because a negative value arriving as a
+ * huge size_t would be cast back to a negative int on the way into
+ * libchewing. Callers get no return value to distinguish
  * "committed" from "rejected"; the 4-function API shape is fixed by the
  * DEVPLAN W1-A spec, so widening bpmf_commit() to return a status code is an
  * owner-level spec change, not something this wrapper may do unilaterally.

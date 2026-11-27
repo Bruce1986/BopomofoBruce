@@ -114,7 +114,16 @@ Java_com_bopomofobruce_decoder_nativ_testbridge_BpmfTestBridge_nativeTestInput(
             char* newline = strchr(cursor, '\n');
             size_t segment_len = newline != NULL ? (size_t)(newline - cursor) : strlen(cursor);
             char* segment = (char*)malloc(segment_len + 1);
-            if (segment != NULL) {
+            if (segment == NULL) {
+                /* Leaving this slot null would surface later as an unexplained
+                 * NullPointerException on the Kotlin side; fail loudly here. */
+                jclass oom = (*env)->FindClass(env, "java/lang/OutOfMemoryError");
+                if (oom != NULL) {
+                    (*env)->ThrowNew(env, oom, "bpmf_test_jni: malloc failed copying a candidate");
+                }
+                return NULL;
+            }
+            {
                 memcpy(segment, cursor, segment_len);
                 segment[segment_len] = '\0';
                 /*
