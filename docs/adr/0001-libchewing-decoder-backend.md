@@ -78,3 +78,7 @@ libchewing 的 source-level 可行性檢查通過（尚未做完整 NDK build）
 - [DEVPLAN W2-A 子代理 spec](../DEVPLAN-SubagentFanout-20260620-0851.md#w2-a--decoderjni--個人字典)
 - libchewing 上游：<https://github.com/chewing/libchewing>
 - libchewing License (LGPL-2.1)：<https://github.com/chewing/libchewing/blob/master/COPYING>
+
+---
+
+Superseded in part by [ADR-0006](0006-libchewing-rust-build-pipeline.md)（建置管線部分）。**授權前提部分亦受影響，詳見 ADR-0006**：本 ADR 第 43、56 行的合規論證前提是「動態連結（JNI 載 `.so`）」，但 ADR-0006 把建置管線換成 Corrosion `corrosion_import_crate()` 靜態編譯，`chewing_capi` staticlib 被整份靜態連進 `libbpmf.so`——這正是本 ADR 第 56 行自己講的「未來若想靜態連結需重新評估授權與逆向工程條款」的情境，但 ADR-0006 原文沒有接手這個重新評估，也沒有提及 LGPL（2026-08-11 第七階段補上，見 ADR-0006 K1）。
