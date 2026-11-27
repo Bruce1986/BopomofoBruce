@@ -437,6 +437,7 @@ size_t bpmf_input(void* opaque_handle, const char* zhuyin, char** candidates_out
 
     size_t count = 0;
     int has_phrase_candidate = 0;
+    int enumeration_failed = 0;
     char* joined = strdup("");
     if (joined == NULL) {
         /* OOM: *candidates_out is already the static empty string set above. */
@@ -448,6 +449,7 @@ size_t bpmf_input(void* opaque_handle, const char* zhuyin, char** candidates_out
         while (chewing_cand_hasNext(ctx)) {
             char* candidate = chewing_cand_String(ctx);
             if (candidate == NULL) {
+                enumeration_failed = 1;
                 break;
             }
             size_t old_len = strlen(joined);
@@ -456,6 +458,7 @@ size_t bpmf_input(void* opaque_handle, const char* zhuyin, char** candidates_out
             char* grown = (char*)realloc(joined, old_len + sep_len + cand_len + 1);
             if (grown == NULL) {
                 chewing_free(candidate);
+                enumeration_failed = 1;
                 break;
             }
             joined = grown;
@@ -470,6 +473,17 @@ size_t bpmf_input(void* opaque_handle, const char* zhuyin, char** candidates_out
             count++;
         }
         chewing_cand_close(ctx);
+    }
+
+    /*
+     * An enumeration cut short (candidate string or realloc returned NULL,
+     * i.e. out of memory) would otherwise hand back the first few candidates
+     * as if they were the whole list. Fail closed instead, the same way the
+     * other failure paths in this function report 0.
+     */
+    if (enumeration_failed) {
+        free(joined);
+        return 0;
     }
 
     /*
