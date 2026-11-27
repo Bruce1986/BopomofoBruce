@@ -8,11 +8,27 @@ plugins {
 android {
     namespace = "com.bopomofobruce.decoder"
     compileSdk = 35
+    ndkVersion = "27.2.12479018"
 
     defaultConfig {
         minSdk = 28
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
+
+        // ABI、STL、16 KB page 與 :decoder-native 一致（理由見該模組 build.gradle.kts）。
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
+        externalNativeBuild {
+            cmake {
+                arguments += listOf("-DANDROID_STL=none", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("cmake/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     compileOptions {
