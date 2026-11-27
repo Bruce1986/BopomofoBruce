@@ -40,7 +40,10 @@ EXPECTED_WORD_DAT_SHA256="5a60f84f9a4927404063cc0a9845714dbc36c99548f25fe962e1df
 EXPECTED_TSI_DAT_SHA256="641ee9784b77e21fdd8b8e4393ed7776b5016b05f26e771fecdcb4874bac8081"
 
 WORK_DIR="$(mktemp -d)"
-trap 'rm -rf "${WORK_DIR}"' EXIT
+# The `.tmp` files below live in ASSETS_DIR (the directory Gradle packages),
+# so a failed `cp` (disk full, set -e exit) must not leave one behind: it would
+# ship in the APK and ChewingDataPath.kt extracts every file under assets/chewing.
+trap 'rm -rf "${WORK_DIR}"; rm -f "${ASSETS_DIR}/word.dat.tmp" "${ASSETS_DIR}/tsi.dat.tmp"' EXIT
 
 # Pick a sha256 tool once, up front, rather than discovering it is missing
 # only after the download has already been paid for. `sha256sum` (coreutils)

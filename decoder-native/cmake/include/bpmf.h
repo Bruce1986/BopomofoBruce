@@ -55,7 +55,8 @@
  *     must never free() the returned pointer, in either case.
  *   - bpmf_commit() selects candidate `index` (0-based, matching the order
  *     bpmf_input returned) and commits it into libchewing's internal
- *     composition state, then closes the candidate window. See its own doc
+ *     composition state, then closes the candidate window — at most once per
+ *     bpmf_input() result. See its own doc
  *     comment below for a known limitation on observing the committed
  *     result.
  */
